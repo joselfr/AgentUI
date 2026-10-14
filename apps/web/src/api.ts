@@ -47,8 +47,8 @@ export const api = {
   messages: (id: string) => call<{ conversation: Conversation; messages: Message[] }>('GET', `/conversations/${id}/messages`),
   rename: (id: string, title: string) => call('PATCH', `/conversations/${id}`, { title }),
   remove: (id: string) => call('DELETE', `/conversations/${id}`),
-  send: (id: string, text: string, attachments: OutgoingAttachment[] = []) =>
-    call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments }),
+  send: (id: string, text: string, attachments: OutgoingAttachment[] = [], interactive = false) =>
+    call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments, interactive }),
   abort: (id: string) => call('POST', `/conversations/${id}/abort`),
   approval: (id: string, approvalId: string, approve: boolean) => call('POST', `/conversations/${id}/approval`, { approvalId, approve }),
 };

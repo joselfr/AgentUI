@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AgentEvent, Message, OutgoingAttachment, ServerPush, ToolCall, SubAgentRun } from '@agentui/shared';
 import type { DB } from './db.js';
 import type { AgentAdapter } from './agents/types.js';
+import { ASK_INSTRUCTIONS } from './interactive.js';
 import { prepareAttachments, type AttachmentStore } from './attachments.js';
 
 export interface ConversationRow {
@@ -177,7 +178,7 @@ export class RunManager {
   }
 
   // ---------- Run ----------
-  async start(convId: string, text: string, attachments: OutgoingAttachment[] = []): Promise<{ runId: string; messageId: string }> {
+  async start(convId: string, text: string, attachments: OutgoingAttachment[] = [], opts: { interactive?: boolean } = {}): Promise<{ runId: string; messageId: string }> {
     const conv = this.getConversation(convId);
     if (!conv) throw new Error('Conversation inconnue');
     if (this.active.has(convId)) throw new Error('Un run est déjà en cours dans cette conversation');
@@ -186,6 +187,9 @@ export class RunManager {
 
     // Validation AVANT toute écriture : une erreur de pièce jointe ne laisse rien derrière elle.
     const prepared = prepareAttachments(text, attachments, adapter.capabilities());
+    // Convention « ask » : déclarée à l'agent une seule fois, dans le premier message du fil.
+    const first = !(this.db.prepare('SELECT 1 AS x FROM messages WHERE conversation_id = ? LIMIT 1').get(convId));
+    if (opts.interactive && first) prepared.agentText = `${ASK_INSTRUCTIONS}\n\n${prepared.agentText}`;
     const now = Date.now();
     const userMsgId = randomUUID();
     this.db

@@ -192,12 +192,13 @@ async function main() {
     const b = z
       .object({
         text: z.string().max(100_000).default(''),
+        interactive: z.boolean().default(false),
         attachments: z.array(z.object({ name: z.string().min(1).max(300), mimeType: z.string().max(200).default(''), data: z.string() })).max(20).default([]),
       })
       .refine((v) => v.text.trim() || v.attachments.length, { message: 'Message vide' })
       .parse(req.body);
     try {
-      return await runs.start(req.params.id, b.text, b.attachments);
+      return await runs.start(req.params.id, b.text, b.attachments, { interactive: b.interactive });
     } catch (e) {
       return reply.code(e instanceof AttachmentError ? 400 : 409).send({ error: (e as Error).message });
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { Alert, Avatar, Button, Box, Chip, Collapse, Fab, IconButton, Paper, TextField, Tooltip, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import AttachFile from '@mui/icons-material/AttachFile';
@@ -12,8 +12,9 @@ import remarkGfm from 'remark-gfm';
 import type { Capabilities, Message } from '@agentui/shared';
 import { checkFile, formatSize, isImage, type AttachmentView } from '../attachments';
 import { ToolsBlock } from './ToolCard';
+import AskCard from './AskCard';
 
-function Bubble({ m, expandTools, agentName }: { m: Message; expandTools: boolean; agentName: string }) {
+function Bubble({ m, expandTools, agentName, answer, onAnswer }: { m: Message; expandTools: boolean; agentName: string; answer?: string; onAnswer?: (t: string) => void }) {
   const mine = m.role === 'user';
   const [showReasoning, setShowReasoning] = useState(false);
   return (
@@ -49,7 +50,13 @@ function Bubble({ m, expandTools, agentName }: { m: Message; expandTools: boolea
           </Box>
         )}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
-          : <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text || (m.status === 'streaming' ? '…' : '')}</ReactMarkdown>}
+          : <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+            pre: ({ children }) => {
+              const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
+              if (el?.props?.className?.includes('language-ask') && m.status !== 'streaming') return <AskCard raw={String(el.props.children ?? '').replace(/\n$/, '')} answer={answer} onAnswer={onAnswer} />;
+              return <pre>{children}</pre>;
+            },
+          }}>{m.text || (m.status === 'streaming' ? '…' : '')}</ReactMarkdown>}
         {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">⏹ interrompu</Typography>}
       </Paper>
     </Box>
@@ -70,7 +77,20 @@ export default function Chat(props: {
   const bottom = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (stick.current) bottom.current?.scrollIntoView({ block: 'end' }); }, [props.messages]);
+  const lastTop = useRef(0);
+  const toBottom = () => { const el = scroller.current; if (el && stick.current) el.scrollTop = el.scrollHeight; };
+  const firstId = props.messages[0]?.id;
+  useEffect(() => { stick.current = true; }, [firstId]); // autre conversation : on repart du bas
+  useEffect(toBottom, [props.messages]);
+  // Le contenu peut grandir sans que les messages changent (bloc ask rendu en carte, images chargées…)
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = content.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(toBottom);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const add = (list: FileList | File[]) => {
     let next = files; const errs: string[] = [];
     for (const f of Array.from(list)) { const e = checkFile(f, next, props.attach); if (e) errs.push(e); else next = [...next, f]; }
@@ -93,15 +113,28 @@ export default function Chat(props: {
           <Typography variant="h6" color="primary">Déposez vos fichiers ici</Typography>
         </Box>)}
       <Box ref={scroller} sx={{ flex: 1, overflow: 'auto', p: { xs: 1.5, sm: 3 } }}
-        onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
-        <Box sx={{ maxWidth: 860, mx: 'auto' }}>
+        onScroll={(e) => {
+          // Seul un défilement vers le haut désactive le suivi : la croissance du contenu ne fait jamais reculer scrollTop.
+          const el = e.currentTarget;
+          const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          if (atBottom) stick.current = true;
+          else if (el.scrollTop < lastTop.current - 2) stick.current = false;
+          lastTop.current = el.scrollTop;
+        }}>
+        <Box ref={content} sx={{ maxWidth: 860, mx: 'auto' }}>
           {props.messages.length === 0 && (
             <Box sx={{ textAlign: 'center', mt: { xs: 6, md: 12 }, color: 'text.secondary' }}>
               <Avatar sx={{ mx: 'auto', mb: 2, width: 64, height: 64, fontSize: 28, fontWeight: 700, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main', border: 1, borderColor: (t) => alpha(t.palette.primary.main, 0.4) }}>{props.agentName[0]}</Avatar>
               <Typography variant="h6" color="text.primary">Discutez avec {props.agentName}</Typography>
               <Typography variant="body2">Posez une question, joignez des fichiers ou lancez une tâche.</Typography>
             </Box>)}
-          {props.messages.map((m) => <Bubble key={m.id} m={m} expandTools={props.expandTools} agentName={props.agentName} />)}
+          {props.messages.map((m, i) => {
+            const last = i === props.messages.length - 1;
+            const next = props.messages[i + 1];
+            return <Bubble key={m.id} m={m} expandTools={props.expandTools} agentName={props.agentName}
+              answer={next?.role === 'user' ? next.text : undefined}
+              onAnswer={last && !props.running && m.role === 'assistant' ? (t) => void props.onSend(t, []) : undefined} />;
+          })}
           <div ref={bottom} />
         </Box>
       </Box>

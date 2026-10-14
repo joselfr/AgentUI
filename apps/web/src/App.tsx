@@ -25,6 +25,7 @@ const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.str
 export default function App() {
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
   const [themeMode, setThemeMode] = useState<'auto' | 'light' | 'dark'>(() => load('themeMode', 'dark'));
+  const [askUser, setAskUser] = useState<boolean>(() => load('askUser', true));
   const [expandTools, setExpandTools] = useState<boolean>(() => load('expandTools', false));
   const theme = useMemo(() => makeTheme(themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode), [themeMode, prefersDark]);
   const wide = useMediaQuery(theme.breakpoints.up('md'));
@@ -127,7 +128,7 @@ export default function App() {
         { id: `local-a-${Date.now()}`, role: 'assistant', text: '', createdAt: Date.now(), status: 'streaming' }]);
       optimistic = true;
       setRunning(true);
-      await api.send(id, text, attachments);
+      await api.send(id, text, attachments, askUser);
       return true;
     } catch (e) {
       setRunning(false);
@@ -199,6 +200,7 @@ export default function App() {
               {(Object.keys(themeLabel) as Array<keyof typeof themeLabel>).map((k) => <MenuItem key={k} value={k}>Thème : {themeLabel[k]}</MenuItem>)}
             </Select>
             <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 3 }} control={<Switch checked={expandTools} onChange={(e) => { setExpandTools(e.target.checked); save('expandTools', e.target.checked); }} />} label="Déplier les outils par défaut" />
+            <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 3 }} control={<Switch checked={askUser} onChange={(e) => { setAskUser(e.target.checked); save('askUser', e.target.checked); }} />} label="Questions interactives de l'agent (bloc ask)" />
             <PushToggle />
             <PasswordForm />
           </DialogContent>
