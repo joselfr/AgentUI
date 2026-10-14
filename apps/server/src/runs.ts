@@ -102,8 +102,60 @@ export class RunManager {
         })),
       subAgentRuns: subs
         .filter((s) => s.message_id === r.id)
-        .map<SubAgentRun>((s) => ({ id: s.id, name: s.name, status: s.status, startedAt: s.started_at, endedAt: s.ended_at ?? undefined })),
+        .map<SubAgentRun>((s) => ({ id: s.id, name: s.name, status: s.status, startedAt: s.started_at, endedAt: s.ended_at ?? undefined, reasoning: s.reasoning ?? undefined, summary: s.summary ?? undefined, sessionId: s.session_id ?? undefined })),
     }));
+  }
+
+  /** Un run terminé ne laisse ni outil ni sous-agent « en cours » (leur événement de fin peut ne jamais arriver). */
+  private closeRunning(messageId: string, status: 'done' | 'failed', now: number) {
+    this.db.prepare("UPDATE tool_calls SET status = ?, ended_at = ? WHERE message_id = ? AND status = 'running'").run(status, now, messageId);
+    this.db.prepare("UPDATE subagent_runs SET status = ?, ended_at = ? WHERE message_id = ? AND status = 'running' AND session_id IS NULL").run(status, now, messageId);
+  }
+
+  private following = new Set<string>();
+
+  /** Suit la session d'un sous-agent (qui peut finir après le run principal) et synchronise raisonnement, outils et réponse. */
+  private async followSub(conv: ConversationRow, messageId: string, subId: string, sessionId: string) {
+    const ad = this.adapters.get(conv.agent_id);
+    const key = `${messageId}:${subId}`;
+    if (!ad?.subSession || this.following.has(key)) return;
+    this.following.add(key);
+    let last = '';
+    let ended = false;
+    const deadline = Date.now() + 15 * 60_000;
+    try {
+      while (Date.now() < deadline) {
+        const r = await ad.subSession(sessionId).catch(() => undefined);
+        if (r) {
+          const reasoning = r.messages.map((m) => m.reasoning).filter(Boolean).join('\n\n');
+          const tools = r.messages.flatMap((m) => m.toolCalls ?? []);
+          const answer = r.messages.filter((m) => m.role === 'assistant' && m.text).at(-1)?.text;
+          const sig = JSON.stringify([reasoning, tools, answer, r.ended]);
+          if (sig !== last) {
+            last = sig;
+            const now = Date.now();
+            this.db.prepare('UPDATE subagent_runs SET reasoning = ?, summary = ? WHERE message_id = ? AND id = ?').run(reasoning || null, answer ?? null, messageId, subId);
+            const ins = this.db.prepare('INSERT OR REPLACE INTO tool_calls (id, message_id, name, status, args, result_preview, result_truncated, parent_subagent_run_id, started_at, ended_at) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            for (const t of tools) {
+              ins.run(`${subId}:${t.id}`, messageId, t.name, t.status, t.args === undefined ? null : JSON.stringify(t.args), t.resultPreview ?? null, t.resultTruncated ? 1 : 0, subId, t.startedAt, t.endedAt ?? null);
+            }
+            if (r.ended) {
+              ended = true;
+              this.db.prepare("UPDATE subagent_runs SET status = 'done', ended_at = ? WHERE message_id = ? AND id = ?").run(now, messageId, subId);
+            }
+            this.broadcast({ type: 'event', seq: 0, agentId: conv.agent_id, sessionId: conv.id, runId: '', event: { type: 'subagent.sync', id: subId } });
+          }
+          if (r.ended) break;
+        }
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+    } finally {
+      this.following.delete(key);
+      if (!ended) {
+        this.db.prepare("UPDATE subagent_runs SET status = 'failed', ended_at = ? WHERE message_id = ? AND id = ? AND status = 'running'").run(Date.now(), messageId, subId);
+        this.broadcast({ type: 'event', seq: 0, agentId: conv.agent_id, sessionId: conv.id, runId: '', event: { type: 'subagent.sync', id: subId } });
+      }
+    }
   }
 
   eventsSince(seq: number): ServerPush[] {
@@ -226,6 +278,7 @@ export class RunManager {
         if (ev.type === 'run.failed') outcome = 'failed';
         if (ev.type === 'run.aborted') outcome = 'aborted';
         emit(ev);
+        if (ev.type === 'subagent.start' && ev.sessionId) void this.followSub(conv, messageId, ev.id, ev.sessionId);
       }
     } catch (e) {
       outcome = 'failed';
@@ -269,8 +322,8 @@ export class RunManager {
         return text;
       case 'subagent.start':
         this.db
-          .prepare('INSERT OR REPLACE INTO subagent_runs (id, message_id, name, status, started_at) VALUES (?,?,?,?,?)')
-          .run(ev.id, messageId, ev.name, 'running', now);
+          .prepare('INSERT OR REPLACE INTO subagent_runs (id, message_id, name, status, started_at, session_id) VALUES (?,?,?,?,?,?)')
+          .run(ev.id, messageId, ev.name, 'running', now, ev.sessionId ?? null);
         return text;
       case 'subagent.end':
         this.db
@@ -279,11 +332,14 @@ export class RunManager {
         return text;
       case 'run.completed':
         this.db.prepare("UPDATE messages SET status = 'done' WHERE id = ?").run(messageId);
+        this.closeRunning(messageId, 'done', now);
         return text;
       case 'run.aborted':
         this.db.prepare("UPDATE messages SET status = 'aborted' WHERE id = ?").run(messageId);
+        this.closeRunning(messageId, 'failed', now);
         return text;
       case 'run.failed':
+        this.closeRunning(messageId, 'failed', now);
         this.db
           .prepare("UPDATE messages SET status = 'failed', text = text || ? WHERE id = ?")
           .run(`\n\n⚠️ ${ev.error}`, messageId);

@@ -35,6 +35,8 @@ export interface AgentAdapter {
 
   listSessions(): Promise<Session[]>;
   getMessages(sessionId: string): Promise<Message[]>;
+  /** Session d'un sous-agent (raisonnement, outils, réponse) et indicateur de fin. */
+  subSession?(sessionId: string): Promise<{ messages: Message[]; ended: boolean }>;
 
   send(sessionId: string | undefined, input: SendInput): Promise<RunHandle>;
   /** Rattache un run lancé avant un redémarrage d'AgentUI ; `null` si impossible. */

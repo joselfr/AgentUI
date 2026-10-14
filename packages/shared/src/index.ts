@@ -84,6 +84,10 @@ export interface SubAgentRun {
   status: 'running' | 'done' | 'failed';
   startedAt: number;
   endedAt?: number;
+  reasoning?: string;
+  summary?: string;
+  /** Session de l'agent distant où le sous-agent travaille (suivie jusqu'à sa fin). */
+  sessionId?: string;
 }
 
 export interface AttachmentMeta {
@@ -133,7 +137,8 @@ export type AgentEvent =
       truncated?: boolean;
       failed?: boolean;
     }
-  | { type: 'subagent.start'; id: string; name: string }
+  | { type: 'subagent.start'; id: string; name: string; sessionId?: string }
+  | { type: 'subagent.sync'; id: string }
   | { type: 'subagent.end'; id: string; failed?: boolean }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
   | { type: 'run.completed' }

@@ -221,6 +221,11 @@ export class HermesAdapter implements AgentAdapter {
     return out;
   }
 
+  async subSession(sessionId: string): Promise<{ messages: Message[]; ended: boolean }> {
+    const [messages, info] = await Promise.all([this.getMessages(sessionId), this.json(`/api/sessions/${encodeURIComponent(sessionId)}`)]);
+    return { messages, ended: !!info?.session?.ended_at };
+  }
+
   // ---------- Chat via /v1/runs ----------
   async send(sessionId: string | undefined, input: SendInput): Promise<RunHandle> {
     const profile = input.subAgentId;
@@ -321,7 +326,7 @@ export class HermesAdapter implements AgentAdapter {
         };
       }
       case 'subagent.start':
-        return { type: 'subagent.start', id: String(d.id ?? d.subagent_id ?? ''), name: str(d.name) ?? 'subagent' };
+        return { type: 'subagent.start', id: String(d.id ?? d.subagent_id ?? ''), name: str(d.name) ?? 'subagent', sessionId: str(d.child_session_id) };
       case 'subagent.complete':
         return { type: 'subagent.end', id: String(d.id ?? d.subagent_id ?? ''), failed: d.error !== undefined && d.error !== false };
       case 'approval.request':

@@ -91,5 +91,8 @@ export function openDb(dataDir: string): DB {
     );
     CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `);
+  for (const col of ['reasoning TEXT', 'summary TEXT', 'session_id TEXT']) {
+    try { db.exec(`ALTER TABLE subagent_runs ADD COLUMN ${col}`); } catch { /* colonne déjà présente */ }
+  }
   return db;
 }
