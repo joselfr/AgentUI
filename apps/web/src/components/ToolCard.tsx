@@ -60,6 +60,28 @@ function Reasoning({ text, running }: { text: string; running: boolean }) {
   );
 }
 
+function SubRunCard({ run, tools, expandAll }: { run: SubAgentRun; tools: ToolCall[]; expandAll: boolean }) {
+  const [manual, setManual] = useState<boolean>();
+  const open = manual ?? (expandAll || run.status === 'running');
+  return (
+    <Paper sx={{ my: 0.5, overflow: 'hidden', bgcolor: 'background.default', borderLeft: 3, borderLeftColor: 'secondary.main' }}>
+      <Box onClick={() => setManual(!open)} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.5, cursor: 'pointer' }}>
+        <AccountTreeOutlined fontSize="small" color="secondary" />
+        <Typography variant="body2" sx={{ flex: 1 }} noWrap>Sous-agent : {run.name}</Typography>
+        <StatusIcon s={run.status} />
+        <IconButton size="small" sx={{ transform: open ? 'rotate(180deg)' : 'none' }}><ExpandMore fontSize="small" /></IconButton>
+      </Box>
+      <Collapse in={open} unmountOnExit>
+        <Box sx={{ px: 1, pb: 1 }}>
+          {run.reasoning && <Reasoning text={run.reasoning} running={run.status === 'running'} />}
+          {run.summary && run.status !== 'running' && <Typography variant="body2" sx={{ px: 0.5, py: 0.5, whiteSpace: 'pre-wrap' }}>{run.summary}</Typography>}
+          {tools.map((t) => <ToolCard key={t.id} tool={t} />)}
+        </Box>
+      </Collapse>
+    </Paper>
+  );
+}
+
 /** Regroupe les outils : ceux d'un sous-agent sont imbriqués sous sa carte. */
 export function ToolsBlock({ tools, subRuns, expandAll }: { tools: ToolCall[]; subRuns: SubAgentRun[]; expandAll: boolean }) {
   const [open, setOpen] = useState(false);
@@ -76,16 +98,7 @@ export function ToolsBlock({ tools, subRuns, expandAll }: { tools: ToolCall[]; s
         onClick={() => setOpen(!open)} variant="outlined" sx={{ mb: 0.5, borderRadius: 2, fontFamily: MONO, fontSize: 12 }} />
       <Collapse in={showAll || running}>
         {runs.map((s) => (
-          <Paper key={s.id} sx={{ my: 0.5, p: 1, borderLeft: 3, borderLeftColor: 'secondary.main' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <AccountTreeOutlined fontSize="small" color="secondary" />
-              <Typography variant="body2" sx={{ flex: 1 }}>Sous-agent : {s.name}</Typography>
-              <StatusIcon s={s.status} />
-            </Box>
-            {s.reasoning && <Reasoning text={s.reasoning} running={s.status === 'running'} />}
-            {s.summary && s.status !== 'running' && <Typography variant="body2" sx={{ px: 0.5, py: 0.5, whiteSpace: 'pre-wrap' }}>{s.summary}</Typography>}
-            {visible.filter((t) => t.parentSubAgentRunId === s.id).map((t) => <ToolCard key={t.id} tool={t} />)}
-          </Paper>
+          <SubRunCard key={s.id} run={s} expandAll={expandAll} tools={visible.filter((t) => t.parentSubAgentRunId === s.id)} />
         ))}
         {top.map((t) => <ToolCard key={t.id} tool={t} />)}
       </Collapse>
