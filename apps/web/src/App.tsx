@@ -33,17 +33,18 @@ export default function App() {
   const [auth, setAuth] = useState<'loading' | 'out' | 'in'>('loading');
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [convs, setConvs] = useState<Conversation[]>([]);
-  const [currentId, setCurrentId] = useState<string>();
+  const [currentId, setCurrentId] = useState<string | undefined>(() => load<string | null>('currentId', null) ?? undefined);
   const [messages, setMessages] = useState<Message[]>([]);
   const [running, setRunning] = useState(false);
   const [approval, setApproval] = useState<{ id: string; description: string }>();
   const [error, setError] = useState<string>();
   const [drawer, setDrawer] = useState(false);
-  const [view, setView] = useState<View>('chats');
+  const [view, setView] = useState<View>(() => load<View>('view', 'chats'));
   const [settings, setSettings] = useState(false);
   const [newDlg, setNewDlg] = useState(false);
-  const [sub, setSub] = useState<string>();
-  const [newAgent, setNewAgent] = useState<string>();
+  const [sub, setSub] = useState<string | undefined>(() => load<string | null>('newSub', null) ?? undefined);
+  const [newAgent, setNewAgent] = useState<string | undefined>(() => load<string | null>('newAgent', null) ?? undefined);
+  const [convsLoaded, setConvsLoaded] = useState(false);
   const currentRef = useRef<string>();
   currentRef.current = currentId;
 
@@ -55,7 +56,7 @@ export default function App() {
 
   const refreshLists = useCallback(() => {
     api.agents().then(setAgents).catch(guard);
-    api.conversations().then(setConvs).catch(guard);
+    api.conversations().then((c) => { setConvs(c); setConvsLoaded(true); }).catch(guard);
   }, [guard]);
 
   const loadMessages = useCallback((id: string) => {
@@ -71,19 +72,25 @@ export default function App() {
   // Ouverture d'une conversation depuis une notification (?c=<id> ou message du service worker)
   useEffect(() => {
     if (auth !== 'in') return;
-    const open = (url: string) => { const id = new URL(url, location.origin).searchParams.get('c'); if (id) { setCurrentId(id); history.replaceState(null, '', '/'); } };
+    const open = (url: string) => { const id = new URL(url, location.origin).searchParams.get('c'); if (id) { setCurrentId(id); setView('chats'); history.replaceState(null, '', '/'); } };
     open(location.href);
     const onMsg = (e: MessageEvent) => { if (e.data?.type === 'open-conversation') { open(e.data.url); refreshLists(); } };
     navigator.serviceWorker?.addEventListener('message', onMsg);
     return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
   }, [auth, refreshLists]);
   useEffect(() => {
-    if (!newAgent && agents.length) setNewAgent(agents[0]!.id);
+    if (agents.length && !agents.some((a) => a.id === newAgent)) setNewAgent(agents[0]!.id);
   }, [agents, newAgent]);
+  // Reprise de l'état au rechargement : page, conversation ouverte, agent de la prochaine conversation
+  useEffect(() => { save('view', view); }, [view]);
+  useEffect(() => { save('currentId', currentId ?? null); }, [currentId]);
+  useEffect(() => { save('newAgent', newAgent ?? null); save('newSub', sub ?? null); }, [newAgent, sub]);
+  useEffect(() => { if (convsLoaded && currentId && !convs.some((c) => c.id === currentId)) setCurrentId(undefined); }, [convsLoaded, convs, currentId]);
   useEffect(() => {
     setApproval(undefined); setError(undefined);
+    if (auth !== 'in') return;
     if (currentId) loadMessages(currentId); else { setMessages([]); setRunning(false); }
-  }, [currentId, loadMessages]);
+  }, [auth, currentId, loadMessages]);
 
   const onEvent = useCallback((e: LiveEvent) => {
     if (e.event.type === 'approval.request' && e.sessionId === currentRef.current) setApproval({ id: e.event.id, description: e.event.description });
