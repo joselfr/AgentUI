@@ -1,21 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AppBar, Badge, Box, Button, Chip, CircularProgress, CssBaseline, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, FormControlLabel,
+  AppBar, Box, Button, Chip, CircularProgress, CssBaseline, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, FormControlLabel,
   IconButton, MenuItem, Select, Switch, TextField, ThemeProvider, Toolbar, Typography, useMediaQuery,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
-import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import type { AgentInfo, Message } from '@agentui/shared';
 import { api, UnauthorizedError, type Conversation } from './api';
 import { makeTheme } from './theme';
 import { applyEvent } from './reducer';
 import { useLive, type LiveEvent } from './useLive';
 import Login from './components/Login';
-import Sidebar, { DRAWER, RAIL, StatusDot } from './components/Sidebar';
+import Sidebar, { DRAWER, StatusDot } from './components/Sidebar';
+import NavRail, { type View } from './components/NavRail';
 import Chat from './components/Chat';
 import NewConversation from './components/NewConversation';
-import AgentPanels from './components/AgentPanels';
+import { AgentsPage, JobsPage, SkillsPage } from './components/Pages';
 import { toOutgoing, type AttachmentView } from './attachments';
 import { disablePush, enablePush, pushState, type PushState } from './push';
 
@@ -39,8 +39,7 @@ export default function App() {
   const [approval, setApproval] = useState<{ id: string; description: string }>();
   const [error, setError] = useState<string>();
   const [drawer, setDrawer] = useState(false);
-  const [rail, setRail] = useState<boolean>(() => load('sidebarCollapsed', false));
-  const [info, setInfo] = useState(false);
+  const [view, setView] = useState<View>('chats');
   const [settings, setSettings] = useState(false);
   const [newDlg, setNewDlg] = useState(false);
   const [sub, setSub] = useState<string>();
@@ -146,13 +145,11 @@ export default function App() {
       api.remove(c.id).then(() => { setConvs((cs) => cs.filter((x) => x.id !== c.id)); if (c.id === currentId) setCurrentId(undefined); }).catch(guard);
     }
   };
-  const collapsed = wide && rail;
   const drawerContent = (
-    <Sidebar agents={agents} convs={convs} currentId={currentId} collapsed={collapsed} canCollapse={wide}
-      onToggle={() => { setRail(!rail); save('sidebarCollapsed', !rail); }}
+    <Sidebar agents={agents} convs={convs} currentId={currentId}
       onSelectConv={(id) => { setCurrentId(id); closeDrawer(); }}
       onNew={() => { setNewDlg(true); closeDrawer(); }}
-      onDelete={deleteConv} onSettings={() => setSettings(true)} />
+      onDelete={deleteConv} />
   );
   const boot = (child: React.ReactNode) => <ThemeProvider theme={theme}><CssBaseline />{child}</ThemeProvider>;
 
@@ -163,8 +160,11 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', height: '100dvh' }}>
-        <Drawer variant={wide ? 'permanent' : 'temporary'} open={wide || drawer} onClose={() => setDrawer(false)}
-          sx={{ width: wide ? (collapsed ? RAIL : DRAWER) : 0, flexShrink: 0, transition: 'width .2s', '& .MuiDrawer-paper': { width: wide ? 'auto' : DRAWER, borderWidth: '0 1px 0 0', borderStyle: 'solid' } }}>{drawerContent}</Drawer>
+        <NavRail view={view} onView={setView} onSettings={() => setSettings(true)} settingsOpen={settings} />
+        {view === 'chats' && (
+          <Drawer variant={wide ? 'permanent' : 'temporary'} open={wide || drawer} onClose={() => setDrawer(false)}
+            sx={{ width: wide ? DRAWER : 0, flexShrink: 0, '& .MuiDrawer-paper': { width: DRAWER, position: wide ? 'relative' : 'fixed', borderWidth: '0 1px 0 0', borderStyle: 'solid' } }}>{drawerContent}</Drawer>)}
+        {view === 'chats' ? (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <AppBar position="static" color="transparent" elevation={0}
             sx={{ border: 0, borderBottom: 1, borderColor: 'divider', backdropFilter: 'blur(12px)', bgcolor: (t) => alpha(t.palette.background.default, 0.8) }}>
@@ -176,7 +176,6 @@ export default function App() {
                   label={<Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><StatusDot status={agent.status} /><Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{agent.name}</Box></Box>}
                   title={agent.status === 'connected' ? agent.type : agent.statusDetail ?? agent.status}
                   sx={{ height: 32, fontWeight: 600, maxWidth: { xs: 140, sm: 260 }, '& .MuiChip-label': { px: 1.5 } }} />)}
-              {agent && <IconButton onClick={() => setInfo(true)} aria-label="Agents, skills et tâches"><Badge color="primary" variant="dot" invisible={!agent.capabilities.jobs}><InfoOutlined /></Badge></IconButton>}
             </Toolbar>
           </AppBar>
           <Box sx={{ flex: 1, minHeight: 0 }}>
@@ -188,9 +187,12 @@ export default function App() {
             ) : <Typography sx={{ p: 4 }} color="text.secondary">Aucun agent configuré.</Typography>}
           </Box>
         </Box>
-        <Drawer anchor="right" open={info} onClose={() => setInfo(false)} sx={{ '& .MuiDrawer-paper': { width: 'min(420px, 100vw)' } }}>
-          {agent && <AgentPanels agent={agent} sub={current?.subAgentId ?? sub} onSubChange={(s) => setSub(s)} />}
-        </Drawer>
+        ) : (
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setView('chats'); }} />}
+            {view === 'skills' && <SkillsPage agents={agents} />}
+            {view === 'jobs' && <JobsPage agents={agents} />}
+          </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}
           onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />
         <Dialog open={settings} onClose={() => setSettings(false)} fullWidth maxWidth="xs">
