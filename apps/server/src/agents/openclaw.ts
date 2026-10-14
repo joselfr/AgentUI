@@ -429,7 +429,18 @@ export class OpenClawAdapter implements AgentAdapter {
     const r = await this.rpc('sessions.list', {});
     const s = (r.sessions ?? []).find((x: Json) => x.key === sessionKey);
     if (!s) return 'unknown';
-    return (s.activeRunIds ?? []).includes(runId) ? 'active' : 'ended';
+    // Session active = n'importe quel run en cours : un message envoyé pendant un run peut être absorbé par lui (autre runId).
+    if (s.hasActiveRun || (s.activeRunIds ?? []).length) return 'active';
+    // Filet : le Gateway peut ne rien signaler pendant un long appel d'outil → on regarde si le transcript attend encore un résultat d'outil.
+    return (await this.transcriptPending(sessionKey).catch(() => false)) ? 'active' : 'ended';
+  }
+
+  /** Le dernier échange du transcript est un appel d'outil (ou son résultat) : l'agent n'a pas fini. */
+  private async transcriptPending(sessionKey: string): Promise<boolean> {
+    const r = await this.rpc('chat.history', { sessionKey, limit: 20 });
+    const last = [...((r.messages ?? []) as Json[])].reverse().find((m) => m.role === 'assistant' || m.role === 'toolResult' || m.role === 'user');
+    const fresh = Date.now() - (Number(last?.timestamp) || 0) < 10 * 60_000; // au-delà, run abandonné : on ne bloque pas indéfiniment
+    return !!last && fresh && (last.role === 'toolResult' || last.stopReason === 'toolUse');
   }
 
   private async *stream(
@@ -481,7 +492,10 @@ export class OpenClawAdapter implements AgentAdapter {
   /** Reconstitue la fin d'un run manqué (texte final + outils non vus) depuis le transcript. */
   private async *finalizeFromHistory(runId: string, sessionKey: string, seen: Set<string>): AsyncGenerator<AgentEvent> {
     const r = await this.rpc('chat.history', { sessionKey, limit: 200 });
-    const msgs = ((r.messages ?? []) as Json[]).filter((m) => (m.runId ?? m.__openclaw?.runId) === runId);
+    const all = (r.messages ?? []) as Json[];
+    let msgs = all.filter((m) => (m.runId ?? m.__openclaw?.runId) === runId);
+    // Message absorbé par un run déjà en cours : sa réponse porte un autre runId → tout ce qui suit le dernier message utilisateur.
+    if (!msgs.length) msgs = all.slice(all.map((m) => m.role).lastIndexOf('user') + 1);
     const results = new Map<string, Json>();
     for (const m of msgs) {
       if (m.role === 'toolResult') results.set(String(m.toolCallId), m);
