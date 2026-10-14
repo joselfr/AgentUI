@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, CircularProgress, IconButton, List, ListItemButton, ListItemText, Tooltip, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, IconButton, List, ListItemButton, ListItemText, Tooltip, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import Add from '@mui/icons-material/Add';
 import Settings from '@mui/icons-material/Settings';
@@ -28,8 +28,8 @@ const Label = ({ children }: { children: string }) => (
 );
 
 export default function Sidebar(props: {
-  agents: AgentInfo[]; convs: Conversation[]; agentId?: string; currentId?: string; collapsed: boolean; canCollapse: boolean;
-  onToggle: () => void; onSelectAgent: (id: string) => void; onSelectConv: (id: string) => void; onNew: () => void;
+  agents: AgentInfo[]; convs: Conversation[]; currentId?: string; collapsed: boolean; canCollapse: boolean;
+  onToggle: () => void; onSelectConv: (id: string) => void; onNew: () => void;
   onDelete: (c: Conversation) => void; onSettings: () => void;
 }) {
   const { collapsed: rail, agents, convs } = props;
@@ -53,20 +53,6 @@ export default function Sidebar(props: {
       </Box>
 
       <Box sx={{ flex: 1, overflow: 'auto', px: rail ? 1.25 : 1, pb: 1 }}>
-        {!rail && <Label>Agents</Label>}
-        <List dense disablePadding sx={{ mt: rail ? 1.5 : 0 }}>
-          {agents.map((a) => (
-            <Tooltip key={a.id} title={rail ? `${a.name} — ${a.status}` : ''} placement="right">
-              <ListItemButton selected={a.id === props.agentId} onClick={() => props.onSelectAgent(a.id)} sx={{ gap: 1.25, px: rail ? 0 : 1.5, justifyContent: rail ? 'center' : 'flex-start', minHeight: 44 }}>
-                {rail
-                  ? <Avatar sx={{ width: 32, height: 32, fontSize: 14, bgcolor: 'action.selected', color: 'text.primary', position: 'relative' }}>{a.name[0]}</Avatar>
-                  : <StatusDot status={a.status} />}
-                {!rail && <ListItemText primary={a.name} secondary={a.status === 'connected' ? a.type : a.statusDetail ?? a.status}
-                  primaryTypographyProps={{ fontWeight: 600, noWrap: true }} secondaryTypographyProps={{ noWrap: true, fontSize: 12 }} />}
-              </ListItemButton>
-            </Tooltip>))}
-        </List>
-
         {!rail && <Label>Conversations</Label>}
         <List dense disablePadding sx={{ mt: rail ? 1.5 : 0 }}>
           {convs.map((c) => (

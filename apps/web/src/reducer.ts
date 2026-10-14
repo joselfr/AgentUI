@@ -1,5 +1,11 @@
 import type { AgentEvent, Message, ToolCall } from '@agentui/shared';
 
+/** Un run terminé ne laisse ni outil ni sous-agent « en cours » (miroir du serveur). */
+function closeRunning(m: Message, status: 'done' | 'failed', now: number) {
+  m.toolCalls = m.toolCalls?.map((t) => (t.status === 'running' ? { ...t, status, endedAt: now } : t));
+  m.subAgentRuns = m.subAgentRuns?.map((s) => (s.status === 'running' && !s.sessionId ? { ...s, status, endedAt: now } : s));
+}
+
 /** Applique un événement normalisé au dernier message assistant en streaming (miroir du serveur). */
 export function applyEvent(messages: Message[], ev: AgentEvent): Message[] | null {
   const i = messages.findLastIndex((m) => m.role === 'assistant' && m.status === 'streaming');
@@ -19,14 +25,15 @@ export function applyEvent(messages: Message[], ev: AgentEvent): Message[] | nul
         t.id === ev.id ? { ...t, status: ev.failed ? 'failed' : 'done', resultPreview: ev.result, resultTruncated: ev.truncated, endedAt: now } : t);
       break;
     case 'subagent.start':
-      m.subAgentRuns = [...(m.subAgentRuns ?? []), { id: ev.id, name: ev.name, status: 'running', startedAt: now }];
+      m.subAgentRuns = [...(m.subAgentRuns ?? []), { id: ev.id, name: ev.name, status: 'running', startedAt: now, sessionId: ev.sessionId }];
       break;
     case 'subagent.end':
       m.subAgentRuns = (m.subAgentRuns ?? []).map((s) => (s.id === ev.id ? { ...s, status: ev.failed ? 'failed' : 'done', endedAt: now } : s));
       break;
-    case 'run.completed': m.status = 'done'; break;
-    case 'run.aborted': m.status = 'aborted'; break;
-    case 'run.failed': m.status = 'failed'; m.text += `\n\n⚠️ ${ev.error}`; break;
+    case 'run.completed': m.status = 'done'; closeRunning(m, 'done', now); break;
+    case 'run.aborted': m.status = 'aborted'; closeRunning(m, 'failed', now); break;
+    case 'run.failed': m.status = 'failed'; m.text += `\n\n⚠️ ${ev.error}`; closeRunning(m, 'failed', now); break;
+    case 'subagent.sync': return null; // l'appelant recharge les messages
     default: return messages;
   }
   const next = messages.slice();

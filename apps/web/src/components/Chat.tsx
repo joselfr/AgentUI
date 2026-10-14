@@ -124,16 +124,16 @@ export default function Chat(props: {
             </Box>)}
           <Box sx={{ p: 1, display: 'flex', gap: 0.5, alignItems: 'flex-end' }}>
             <input ref={picker} type="file" multiple hidden data-testid="file-input" onChange={(e) => { if (e.target.files) add(e.target.files); e.target.value = ''; }} />
-            <Tooltip title="Joindre des fichiers"><span><IconButton onClick={() => picker.current?.click()} aria-label="Joindre un fichier" disabled={props.running}><AttachFile /></IconButton></span></Tooltip>
+            <Tooltip title="Joindre des fichiers"><span><IconButton onClick={() => picker.current?.click()} aria-label="Joindre un fichier" disabled={props.running} sx={{ borderRadius: '50%' }}><AttachFile /></IconButton></span></Tooltip>
             <TextField fullWidth multiline size="small" maxRows={8}placeholder={`Message à ${props.agentName}`} value={text}
-              sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'transparent', '& fieldset': { border: 0 } } }}
+              sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'transparent' }, '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 0 } }}
               onChange={(e) => setText(e.target.value)}
               onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); add(e.clipboardData.files); } }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
             {props.running && props.canAbort
               ? <Fab color="error" size="small" onClick={props.onAbort} aria-label="Arrêter" sx={{ flexShrink: 0, boxShadow: 'none' }}><StopIcon /></Fab>
               : <IconButton onClick={() => void send()} disabled={!canSend} aria-label="Envoyer"
-                  sx={{ flexShrink: 0, bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}><SendIcon /></IconButton>}
+                  sx={{ flexShrink: 0, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}><SendIcon /></IconButton>}
           </Box>
         </Paper>
       </Box>

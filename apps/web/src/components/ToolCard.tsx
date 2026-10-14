@@ -5,6 +5,7 @@ import CheckCircle from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import BuildOutlined from '@mui/icons-material/BuildOutlined';
+import PsychologyOutlined from '@mui/icons-material/PsychologyOutlined';
 import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
 import type { SubAgentRun, ToolCall } from '@agentui/shared';
 
@@ -43,26 +44,47 @@ export function ToolCard({ tool, defaultOpen }: { tool: ToolCall; defaultOpen?: 
   );
 }
 
+function Reasoning({ text, running }: { text: string; running: boolean }) {
+  const [open, setOpen] = useState(running);
+  return (
+    <Paper sx={{ my: 0.5, overflow: 'hidden', bgcolor: 'background.default', borderLeft: 3, borderLeftColor: 'secondary.main' }}>
+      <Box onClick={() => setOpen(!open)} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.5, cursor: 'pointer' }}>
+        <PsychologyOutlined fontSize="small" color="action" />
+        <Typography variant="body2" sx={{ fontFamily: MONO, fontSize: 13, flex: 1 }} noWrap>Réflexion</Typography>
+        <IconButton size="small" sx={{ transform: open ? 'rotate(180deg)' : 'none' }}><ExpandMore fontSize="small" /></IconButton>
+      </Box>
+      <Collapse in={open} unmountOnExit>
+        <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, pb: 1, fontSize: 12.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 300, overflow: 'auto' }}>{text}</Typography>
+      </Collapse>
+    </Paper>
+  );
+}
+
 /** Regroupe les outils : ceux d'un sous-agent sont imbriqués sous sa carte. */
 export function ToolsBlock({ tools, subRuns, expandAll }: { tools: ToolCall[]; subRuns: SubAgentRun[]; expandAll: boolean }) {
   const [open, setOpen] = useState(false);
   if (!tools.length && !subRuns.length) return null;
-  const running = tools.some((t) => t.status === 'running');
-  const expanded = open || expandAll || running;
-  const top = tools.filter((t) => !t.parentSubAgentRunId);
+  const running = tools.some((t) => t.status === 'running') || subRuns.some((s) => s.status === 'running');
+  const showAll = open || expandAll;
+  // Hors dépliage manuel, seul l'outil en cours d'exécution est affiché
+  const visible = showAll ? tools : tools.filter((t) => t.status === 'running');
+  const runs = showAll ? subRuns : subRuns.filter((s) => s.status === 'running' || visible.some((t) => t.parentSubAgentRunId === s.id));
+  const top = visible.filter((t) => !t.parentSubAgentRunId);
   return (
     <Box sx={{ mb: 1 }}>
       <Chip size="small" icon={<BuildOutlined />} label={`${tools.length} outil${tools.length > 1 ? 's' : ''} utilisé${tools.length > 1 ? 's' : ''}`}
         onClick={() => setOpen(!open)} variant="outlined" sx={{ mb: 0.5, borderRadius: 2, fontFamily: MONO, fontSize: 12 }} />
-      <Collapse in={expanded}>
-        {subRuns.map((s) => (
+      <Collapse in={showAll || running}>
+        {runs.map((s) => (
           <Paper key={s.id} sx={{ my: 0.5, p: 1, borderLeft: 3, borderLeftColor: 'secondary.main' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <AccountTreeOutlined fontSize="small" color="secondary" />
               <Typography variant="body2" sx={{ flex: 1 }}>Sous-agent : {s.name}</Typography>
               <StatusIcon s={s.status} />
             </Box>
-            {tools.filter((t) => t.parentSubAgentRunId === s.id).map((t) => <ToolCard key={t.id} tool={t} />)}
+            {s.reasoning && <Reasoning text={s.reasoning} running={s.status === 'running'} />}
+            {s.summary && s.status !== 'running' && <Typography variant="body2" sx={{ px: 0.5, py: 0.5, whiteSpace: 'pre-wrap' }}>{s.summary}</Typography>}
+            {visible.filter((t) => t.parentSubAgentRunId === s.id).map((t) => <ToolCard key={t.id} tool={t} />)}
           </Paper>
         ))}
         {top.map((t) => <ToolCard key={t.id} tool={t} />)}

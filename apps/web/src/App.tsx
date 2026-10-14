@@ -14,6 +14,7 @@ import { useLive, type LiveEvent } from './useLive';
 import Login from './components/Login';
 import Sidebar, { DRAWER, RAIL, StatusDot } from './components/Sidebar';
 import Chat from './components/Chat';
+import NewConversation from './components/NewConversation';
 import AgentPanels from './components/AgentPanels';
 import { toOutgoing, type AttachmentView } from './attachments';
 import { disablePush, enablePush, pushState, type PushState } from './push';
@@ -40,6 +41,7 @@ export default function App() {
   const [rail, setRail] = useState<boolean>(() => load('sidebarCollapsed', false));
   const [info, setInfo] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [newDlg, setNewDlg] = useState(false);
   const [sub, setSub] = useState<string>();
   const [newAgent, setNewAgent] = useState<string>();
   const currentRef = useRef<string>();
@@ -88,6 +90,7 @@ export default function App() {
     const terminal = ['run.completed', 'run.failed', 'run.aborted'].includes(e.event.type);
     if (terminal) { setApproval(undefined); api.conversations().then(setConvs).catch(() => {}); }
     if (e.sessionId !== currentRef.current) return;
+    if (e.event.type === 'subagent.sync') { loadMessages(e.sessionId); return; } // sous-agent suivi à distance, pas de run en cours
     if (terminal) setRunning(false);
     setMessages((prev) => {
       const next = applyEvent(prev, e.event);
@@ -144,11 +147,10 @@ export default function App() {
   };
   const collapsed = wide && rail;
   const drawerContent = (
-    <Sidebar agents={agents} convs={convs} agentId={agent?.id} currentId={currentId} collapsed={collapsed} canCollapse={wide}
+    <Sidebar agents={agents} convs={convs} currentId={currentId} collapsed={collapsed} canCollapse={wide}
       onToggle={() => { setRail(!rail); save('sidebarCollapsed', !rail); }}
-      onSelectAgent={(id) => { setNewAgent(id); setCurrentId(undefined); setSub(undefined); closeDrawer(); }}
       onSelectConv={(id) => { setCurrentId(id); closeDrawer(); }}
-      onNew={() => { setCurrentId(undefined); closeDrawer(); }}
+      onNew={() => { setNewDlg(true); closeDrawer(); }}
       onDelete={deleteConv} onSettings={() => setSettings(true)} />
   );
   const boot = (child: React.ReactNode) => <ThemeProvider theme={theme}><CssBaseline />{child}</ThemeProvider>;
@@ -188,6 +190,8 @@ export default function App() {
         <Drawer anchor="right" open={info} onClose={() => setInfo(false)} sx={{ '& .MuiDrawer-paper': { width: 'min(420px, 100vw)' } }}>
           {agent && <AgentPanels agent={agent} sub={current?.subAgentId ?? sub} onSubChange={(s) => setSub(s)} />}
         </Drawer>
+        <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}
+          onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />
         <Dialog open={settings} onClose={() => setSettings(false)} fullWidth maxWidth="xs">
           <DialogTitle sx={{ fontWeight: 650 }}>Réglages</DialogTitle>
           <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
