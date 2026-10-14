@@ -1,0 +1,13 @@
+# Copier en agents.config.yaml. Les ${VARIABLES} sont lues dans l'environnement (.env).
+agents:
+  - id: hermes
+    type: hermes
+    name: Hermes
+    url: https://hermes-agent.jlfr.io
+    apiKey: ${HERMES_API_KEY}
+    profiles: [default]
+  - id: openclaw
+    type: openclaw
+    name: OpenClaw
+    url: wss://openclaw.jlfr.io
+    auth: { token: ${OPENCLAW_TOKEN} }

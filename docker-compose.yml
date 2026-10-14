@@ -1,0 +1,9 @@
+services:
+  agentui:
+    build: .
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./agents.config.yaml:/config/agents.config.yaml:ro
