@@ -172,6 +172,8 @@ async function main() {
     updatedAt: c.updated_at,
     running: runs.isRunning(c.id),
     unread: !!c.unread,
+    favorite: !!c.favorite,
+    cron: !!c.remote_session_id?.startsWith('cron-'), // discussion dédiée d'une tâche planifiée
     lastReadAt: c.last_read_at ?? 0, // lecture précédente : sert à repérer les messages non lus à l'ouverture
   });
   app.get<{ Querystring: { agentId?: string } }>('/api/conversations', async (req) =>
@@ -193,7 +195,9 @@ async function main() {
     return { ok: true };
   });
   app.patch<{ Params: { id: string } }>('/api/conversations/:id', async (req) => {
-    runs.renameConversation(req.params.id, z.object({ title: z.string().min(1).max(200) }).parse(req.body).title);
+    const b = z.object({ title: z.string().min(1).max(200).optional(), favorite: z.boolean().optional() }).parse(req.body);
+    if (b.title !== undefined) runs.renameConversation(req.params.id, b.title);
+    if (b.favorite !== undefined) runs.setFavorite(req.params.id, b.favorite);
     return { ok: true };
   });
   app.delete<{ Params: { id: string } }>('/api/conversations/:id', async (req) => {

@@ -15,6 +15,8 @@ export interface ConversationRow {
   updated_at: number;
   /** Dernière lecture (ms). */
   last_read_at: number | null;
+  /** 1 si la discussion est épinglée en tête de liste. */
+  favorite?: number;
   /** 1 si un message d'agent terminé est plus récent que la dernière lecture. */
   unread?: number;
 }
@@ -69,7 +71,7 @@ export class RunManager {
     return this.db.prepare(`SELECT c.*, ${UNREAD} FROM conversations c WHERE c.id = ?`).get(id) as unknown as ConversationRow | undefined;
   }
   listConversations(agentId?: string): ConversationRow[] {
-    const sql = `SELECT c.*, ${UNREAD} FROM conversations c ${agentId ? 'WHERE c.agent_id = ?' : ''} ORDER BY c.updated_at DESC LIMIT 500`;
+    const sql = `SELECT c.*, ${UNREAD} FROM conversations c ${agentId ? 'WHERE c.agent_id = ?' : ''} ORDER BY c.favorite DESC, c.updated_at DESC LIMIT 500`;
     return (agentId ? this.db.prepare(sql).all(agentId) : this.db.prepare(sql).all()) as unknown as ConversationRow[];
   }
   /** Conversation AgentUI rattachée à une session distante (ex. discussion dédiée d'une tâche cron). */
@@ -117,6 +119,9 @@ export class RunManager {
       .prepare(`UPDATE conversations SET last_read_at = MAX(?, COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id = conversations.id AND role = 'assistant'), 0)) WHERE id = ?`)
       .run(Date.now(), id);
     if (Number(r.changes)) this.broadcast({ type: 'conversation.read', conversationId: id });
+  }
+  setFavorite(id: string, favorite: boolean) {
+    this.db.prepare('UPDATE conversations SET favorite = ? WHERE id = ?').run(favorite ? 1 : 0, id);
   }
   renameConversation(id: string, title: string) {
     this.db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);
