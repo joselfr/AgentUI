@@ -91,6 +91,11 @@ export function openDb(dataDir: string): DB {
     );
     CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `);
+  try {
+    // Dernière lecture de la discussion (ms) : les messages d'agent plus récents sont « non lus ».
+    db.exec('ALTER TABLE conversations ADD COLUMN last_read_at INTEGER');
+    db.exec('UPDATE conversations SET last_read_at = updated_at'); // migration : l'existant est considéré comme lu
+  } catch { /* colonne déjà présente */ }
   for (const col of ['reasoning TEXT', 'summary TEXT', 'session_id TEXT']) {
     try { db.exec(`ALTER TABLE subagent_runs ADD COLUMN ${col}`); } catch { /* colonne déjà présente */ }
   }

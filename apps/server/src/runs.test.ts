@@ -212,3 +212,50 @@ test('suppression : un run en cours est arrêté avant la suppression', async ()
   expect(runs.isRunning(conv.id)).toBe(false);
 });
 
+test('non lu : un message d’agent terminé plus récent que la dernière lecture', () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const runs = new RunManager(db, new Map());
+  const unread = (id: string) => !!runs.getConversation(id)!.unread;
+  const pushes: string[] = [];
+  runs.subscribe((p) => p.type === 'conversation.read' && pushes.push(p.conversationId));
+
+  // Une discussion que l'utilisateur vient de créer n'est pas non lue
+  const mine = runs.createConversation('a');
+  expect(unread(mine.id)).toBe(false);
+  db.prepare('UPDATE conversations SET last_read_at = 1000 WHERE id = ?').run(mine.id); // lue il y a longtemps
+
+  // Réponse en cours de streaming : pas encore non lue ; terminée : non lue
+  const add = (conv: string, role: string, status: string, at: number) =>
+    db.prepare('INSERT INTO messages (id, conversation_id, role, text, status, created_at) VALUES (?,?,?,?,?,?)').run(`m${at}${role}`, conv, role, 'x', status, at);
+  const t = 2000;
+  add(mine.id, 'user', 'done', t);
+  add(mine.id, 'assistant', 'streaming', t + 1);
+  expect(unread(mine.id)).toBe(false);
+  db.prepare("UPDATE messages SET status = 'done' WHERE id = ?").run(`m${t + 1}assistant`);
+  expect(unread(mine.id)).toBe(true);
+  expect(runs.listConversations('a').find((c) => c.id === mine.id)!.unread).toBe(1);
+
+  // Les messages de l'utilisateur ne comptent pas
+  const other = runs.createConversation('a');
+  db.prepare('UPDATE conversations SET last_read_at = 1000 WHERE id = ?').run(other.id);
+  add(other.id, 'user', 'done', t + 5);
+  expect(unread(other.id)).toBe(false);
+
+  // Marquer lu : plus de non lu, et les autres appareils sont prévenus
+  runs.markRead(mine.id);
+  expect(unread(mine.id)).toBe(false);
+  expect(pushes).toEqual([mine.id]);
+});
+
+test('non lu : message proactif dans une discussion existante ou créée par l’agent', async () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const runs = new RunManager(db, new Map());
+  const first = runs.deliver('a', 'cron-x', 'Résultat 1', [], 'A', '⏰ x');
+  expect(!!runs.getConversation(first.id)!.unread).toBe(true); // créée par l'agent : non lue d'emblée
+  runs.markRead(first.id);
+  expect(!!runs.getConversation(first.id)!.unread).toBe(false);
+  await new Promise((r) => setTimeout(r, 5));
+  runs.deliver('a', 'cron-x', 'Résultat 2', [], 'A', '⏰ x');
+  expect(!!runs.getConversation(first.id)!.unread).toBe(true); // nouveau message après la lecture
+  expect(runs.listConversations('a')).toHaveLength(1);
+});

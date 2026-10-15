@@ -210,4 +210,6 @@ export type ConfigFile = z.infer<typeof ConfigFileSchema>;
 // ---------- Protocole front <-> backend (WS /ws) ----------
 export type ServerPush =
   | { type: 'event'; seq: number; agentId: string; sessionId: string; runId: string; event: AgentEvent }
-  | { type: 'agent.status'; agentId: string; status: ConnStatus; detail?: string };
+  | { type: 'agent.status'; agentId: string; status: ConnStatus; detail?: string }
+  /** Discussion marquée lue (depuis un autre appareil) : retirer son indicateur « non lu ». */
+  | { type: 'conversation.read'; conversationId: string };

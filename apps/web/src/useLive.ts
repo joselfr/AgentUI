@@ -8,6 +8,8 @@ export function useLive(opts: {
   enabled: boolean;
   onEvent: (e: LiveEvent) => void;
   onStatus: (agentId: string, s: ConnStatus, detail?: string) => void;
+  /** Discussion marquée lue depuis un autre appareil. */
+  onRead?: (conversationId: string) => void;
   onOpen: () => void;
   onUnauthorized: () => void;
 }) {
@@ -31,6 +33,7 @@ export function useLive(opts: {
       ws.onmessage = (m) => {
         const p = JSON.parse(m.data as string) as ServerPush;
         if (p.type === 'event') ref.current.onEvent(p);
+        else if (p.type === 'conversation.read') ref.current.onRead?.(p.conversationId);
         else ref.current.onStatus(p.agentId, p.status, p.detail);
       };
       ws.onclose = (e) => {

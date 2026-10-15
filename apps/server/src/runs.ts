@@ -13,6 +13,10 @@ export interface ConversationRow {
   title: string;
   created_at: number;
   updated_at: number;
+  /** Dernière lecture (ms). */
+  last_read_at: number | null;
+  /** 1 si un message d'agent terminé est plus récent que la dernière lecture. */
+  unread?: number;
 }
 
 /** Clé de session synthétique des messages proactifs rangés dans une discussion « maison » (voir `deliver`). */
@@ -20,6 +24,10 @@ const HOME_SESSION = 'home';
 /** Attente maximale de la fin d'un run avant de supprimer sa discussion. */
 const ABORT_GRACE_MS = 5_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Un message en cours de streaming n'est pas « non lu » : il le devient en se terminant.
+const UNREAD = `EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.role = 'assistant'
+  AND COALESCE(m.status, 'done') != 'streaming' AND m.created_at > COALESCE(c.last_read_at, 0)) AS unread`;
 
 type Listener = (push: ServerPush) => void;
 
@@ -53,15 +61,15 @@ export class RunManager {
     const now = Date.now();
     const id = randomUUID();
     this.db
-      .prepare('INSERT INTO conversations (id, agent_id, sub_agent_id, remote_session_id, title, created_at, updated_at) VALUES (?,?,?,?,?,?,?)')
-      .run(id, agentId, subAgentId ?? null, remoteSessionId ?? null, title, now, now);
+      .prepare('INSERT INTO conversations (id, agent_id, sub_agent_id, remote_session_id, title, created_at, updated_at, last_read_at) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id, agentId, subAgentId ?? null, remoteSessionId ?? null, title, now, now, now);
     return this.getConversation(id)!;
   }
   getConversation(id: string): ConversationRow | undefined {
-    return this.db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as unknown as ConversationRow | undefined;
+    return this.db.prepare(`SELECT c.*, ${UNREAD} FROM conversations c WHERE c.id = ?`).get(id) as unknown as ConversationRow | undefined;
   }
   listConversations(agentId?: string): ConversationRow[] {
-    const sql = `SELECT * FROM conversations ${agentId ? 'WHERE agent_id = ?' : ''} ORDER BY updated_at DESC LIMIT 500`;
+    const sql = `SELECT c.*, ${UNREAD} FROM conversations c ${agentId ? 'WHERE c.agent_id = ?' : ''} ORDER BY c.updated_at DESC LIMIT 500`;
     return (agentId ? this.db.prepare(sql).all(agentId) : this.db.prepare(sql).all()) as unknown as ConversationRow[];
   }
   /** Conversation AgentUI rattachée à une session distante (ex. discussion dédiée d'une tâche cron). */
@@ -101,6 +109,14 @@ export class RunManager {
     }
     this.db.prepare('DELETE FROM conversations WHERE id = ?').run(id);
     this.files?.removeConversation(id);
+  }
+  /** Marque la discussion lue (tous les messages reçus jusqu'ici) et prévient les autres appareils. */
+  markRead(id: string) {
+    // max(maintenant, dernier message d'agent) : un message daté légèrement dans le futur (« now + 1 » au lancement d'un run) est bien lu
+    const r = this.db
+      .prepare(`UPDATE conversations SET last_read_at = MAX(?, COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id = conversations.id AND role = 'assistant'), 0)) WHERE id = ?`)
+      .run(Date.now(), id);
+    if (Number(r.changes)) this.broadcast({ type: 'conversation.read', conversationId: id });
   }
   renameConversation(id: string, title: string) {
     this.db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);
@@ -338,6 +354,7 @@ export class RunManager {
     let conv = this.findByRemoteSession(agentId, key);
     if (!conv) {
       conv = this.createConversation(agentId, undefined, title ?? (key === HOME_SESSION ? `Messages de ${agentName}` : 'Message de l’agent'), key);
+      this.db.prepare('UPDATE conversations SET last_read_at = 0 WHERE id = ?').run(conv.id); // créée par l'agent : non lue d'emblée
     }
     const now = Date.now();
     const messageId = randomUUID();

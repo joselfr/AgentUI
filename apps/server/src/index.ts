@@ -171,6 +171,8 @@ async function main() {
     title: c.title,
     updatedAt: c.updated_at,
     running: runs.isRunning(c.id),
+    unread: !!c.unread,
+    lastReadAt: c.last_read_at ?? 0, // lecture précédente : sert à repérer les messages non lus à l'ouverture
   });
   app.get<{ Querystring: { agentId?: string } }>('/api/conversations', async (req) =>
     runs.listConversations(req.query.agentId).map(convDto),
@@ -184,6 +186,11 @@ async function main() {
     const c = runs.getConversation(req.params.id);
     if (!c) return reply.code(404).send({ error: 'not found' });
     return { conversation: convDto(c), messages: runs.getMessages(c.id) };
+  });
+  app.post<{ Params: { id: string } }>('/api/conversations/:id/read', async (req, reply) => {
+    if (!runs.getConversation(req.params.id)) return reply.code(404).send({ error: 'not found' });
+    runs.markRead(req.params.id);
+    return { ok: true };
   });
   app.patch<{ Params: { id: string } }>('/api/conversations/:id', async (req) => {
     runs.renameConversation(req.params.id, z.object({ title: z.string().min(1).max(200) }).parse(req.body).title);
