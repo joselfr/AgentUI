@@ -22,7 +22,7 @@ export default function Login({ onDone }: { onDone: () => void }) {
     }
   };
   return (
-    <Box sx={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', p: 2, background: (t) => `radial-gradient(60% 50% at 50% 0%, ${alpha(t.palette.primary.main, 0.14)}, transparent)` }}>
+    <Box sx={{ height: 'var(--app-height, 100dvh)', overflow: 'auto', display: 'grid', placeItems: 'center', p: 2, background: (t) => `radial-gradient(60% 50% at 50% 0%, ${alpha(t.palette.primary.main, 0.14)}, transparent)` }}>
       <Paper component="form" onSubmit={submit} sx={{ p: 4, width: 'min(400px, 100%)', display: 'grid', gap: 2, borderRadius: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
           <Box component="img" src="/icon.svg" alt="" sx={{ width: 40, height: 40, borderRadius: '11px' }} />

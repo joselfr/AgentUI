@@ -24,6 +24,7 @@ export function applyEvent(messages: Message[], ev: AgentEvent): Message[] | nul
       m.toolCalls = (m.toolCalls ?? []).map<ToolCall>((t) =>
         t.id === ev.id ? { ...t, status: ev.failed ? 'failed' : 'done', resultPreview: ev.result, resultTruncated: ev.truncated, endedAt: now } : t);
       break;
+    case 'attachment.added': m.attachments = [...(m.attachments ?? []), ev.attachment]; break;
     case 'subagent.start':
       m.subAgentRuns = [...(m.subAgentRuns ?? []), { id: ev.id, name: ev.name, status: 'running', startedAt: now, sessionId: ev.sessionId }];
       break;

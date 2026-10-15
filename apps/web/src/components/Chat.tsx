@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { Alert, Avatar, Button, Box, Chip, Collapse, Fab, IconButton, Paper, TextField, Tooltip, Typography } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { Alert, Avatar, Button, Box, Chip, CircularProgress, Collapse, Fab, IconButton, Paper, TextField, Tooltip, Typography } from '@mui/material';
+import { alpha, keyframes } from '@mui/material/styles';
 import AttachFile from '@mui/icons-material/AttachFile';
 import Close from '@mui/icons-material/Close';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
@@ -14,12 +14,44 @@ import { checkFile, formatSize, isImage, type AttachmentView } from '../attachme
 import { ToolsBlock } from './ToolCard';
 import AskCard from './AskCard';
 
-function Bubble({ m, expandTools, agentName, answer, onAnswer }: { m: Message; expandTools: boolean; agentName: string; answer?: string; onAnswer?: (t: string) => void }) {
+const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
+const halo = keyframes`0% { box-shadow: 0 0 0 0 var(--halo) } 70%, 100% { box-shadow: 0 0 0 7px transparent }`;
+
+/** Indicateur « l'agent travaille » : points animés + activité en cours. */
+function Working({ m }: { m: Message }) {
+  const tool = [...(m.toolCalls ?? [])].reverse().find((t) => t.status === 'running');
+  const label = tool ? `Utilise ${tool.name}` : m.text ? 'Rédige' : 'Réfléchit';
+  return (
+    <Box role="status" aria-label={`${label}…`} sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: m.text || m.toolCalls?.length ? 1 : 0, color: 'text.secondary' }}>
+      <Box sx={{ display: 'flex', gap: '4px' }}>
+        {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main', animation: `${bounce} 1.2s ${i * 0.15}s infinite ease-in-out` }} />)}
+      </Box>
+      <Typography variant="caption" noWrap sx={{ minWidth: 0 }}>{label}…</Typography>
+    </Box>
+  );
+}
+
+function Bubble({ m, expandTools, agentName, answer, onAnswer, working }: { m: Message; expandTools: boolean; agentName: string; answer?: string; onAnswer?: (t: string) => void; working?: boolean }) {
   const mine = m.role === 'user';
   const [showReasoning, setShowReasoning] = useState(false);
+  const attachmentsView = (
+        !!m.attachments?.length && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: m.text ? 1 : 0 }}>
+            {(m.attachments as AttachmentView[]).map((a) => {
+              const href = a.url ?? `/api/attachments/${a.id}`;
+              return isImage(a.mimeType) ? (
+                <a key={a.id} href={href} target="_blank" rel="noreferrer"><img src={href} alt={a.name} title={a.name} style={{ maxWidth: 'min(100%, 480px)', maxHeight: 320, borderRadius: 8, display: 'block' }} /></a>
+              ) : (
+                <Chip key={a.id} component="a" href={href} download={a.name} clickable icon={<InsertDriveFileOutlined />} label={`${a.name} · ${formatSize(a.size)}`}
+                  sx={{ bgcolor: 'action.selected', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } }} />
+              );
+            })}
+          </Box>)
+  );
   return (
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
-      {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main' }}>{agentName[0]}</Avatar>}
+      {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
+        '--halo': (t) => alpha(t.palette.primary.main, 0.5), animation: working ? `${halo} 1.6s infinite` : 'none' }}>{agentName[0]}</Avatar>}
       <Paper data-role={m.role} sx={{
         maxWidth: mine ? 'min(640px, 88%)' : 'min(760px, calc(100% - 44px))', px: 2, py: 1.25, borderRadius: mine ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
         bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
@@ -36,19 +68,7 @@ function Bubble({ m, expandTools, agentName, answer, onAnswer }: { m: Message; e
           </Box>
         )}
         {!mine && <ToolsBlock tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
-        {mine && !!m.attachments?.length && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: m.text ? 1 : 0 }}>
-            {(m.attachments as AttachmentView[]).map((a) => {
-              const href = a.url ?? `/api/attachments/${a.id}`;
-              return isImage(a.mimeType) ? (
-                <a key={a.id} href={href} target="_blank" rel="noreferrer"><img src={href} alt={a.name} title={a.name} style={{ maxWidth: 240, maxHeight: 200, borderRadius: 8, display: 'block' }} /></a>
-              ) : (
-                <Chip key={a.id} component="a" href={href} download={a.name} clickable icon={<InsertDriveFileOutlined />} label={`${a.name} · ${formatSize(a.size)}`}
-                  sx={{ bgcolor: 'action.selected', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } }} />
-              );
-            })}
-          </Box>
-        )}
+        {mine && attachmentsView}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
           : <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
             pre: ({ children }) => {
@@ -56,15 +76,30 @@ function Bubble({ m, expandTools, agentName, answer, onAnswer }: { m: Message; e
               if (el?.props?.className?.includes('language-ask') && m.status !== 'streaming') return <AskCard raw={String(el.props.children ?? '').replace(/\n$/, '')} answer={answer} onAnswer={onAnswer} />;
               return <pre>{children}</pre>;
             },
-          }}>{m.text || (m.status === 'streaming' ? '…' : '')}</ReactMarkdown>}
+          }}>{m.text}</ReactMarkdown>}
+        {!mine && attachmentsView}
+        {working && <Working m={m} />}
         {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">⏹ interrompu</Typography>}
       </Paper>
     </Box>
   );
 }
 
+/** Repère « non lus » : sépare ce qui a été lu de ce qui est arrivé depuis la dernière visite. */
+function UnreadDivider({ count }: { count: number }) {
+  return (
+    <Box role="separator" aria-label={`${count} message${count > 1 ? 's' : ''} non lu${count > 1 ? 's' : ''}`}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, color: 'primary.main' }}>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: (t) => alpha(t.palette.primary.main, 0.4) }} />
+      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>{count > 1 ? `${count} nouveaux messages` : 'Nouveau message'}</Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: (t) => alpha(t.palette.primary.main, 0.4) }} />
+    </Box>
+  );
+}
+
 export default function Chat(props: {
-  title: string; agentName: string; messages: Message[]; running: boolean; expandTools: boolean;
+  unreadMark?: { id: string; count: number };
+  title: string; agentName: string; messages: Message[]; loading: boolean; isNew: boolean; running: boolean; expandTools: boolean;
   canAbort: boolean; attach: Capabilities['attachments']; approval?: { id: string; description: string }; onApprove: (ok: boolean) => void; onSend: (t: string, files: File[]) => Promise<boolean>; onAbort: () => void; error?: string;
 }) {
   const [text, setText] = useState('');
@@ -122,7 +157,8 @@ export default function Chat(props: {
           lastTop.current = el.scrollTop;
         }}>
         <Box ref={content} sx={{ maxWidth: 860, mx: 'auto' }}>
-          {props.messages.length === 0 && (
+          {props.messages.length === 0 && props.loading && <Box sx={{ display: 'grid', placeItems: 'center', mt: 8 }}><CircularProgress size={28} /></Box>}
+          {props.messages.length === 0 && props.isNew && (
             <Box sx={{ textAlign: 'center', mt: { xs: 6, md: 12 }, color: 'text.secondary' }}>
               <Avatar sx={{ mx: 'auto', mb: 2, width: 64, height: 64, fontSize: 28, fontWeight: 700, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main', border: 1, borderColor: (t) => alpha(t.palette.primary.main, 0.4) }}>{props.agentName[0]}</Avatar>
               <Typography variant="h6" color="text.primary">Discutez avec {props.agentName}</Typography>
@@ -131,9 +167,14 @@ export default function Chat(props: {
           {props.messages.map((m, i) => {
             const last = i === props.messages.length - 1;
             const next = props.messages[i + 1];
-            return <Bubble key={m.id} m={m} expandTools={props.expandTools} agentName={props.agentName}
-              answer={next?.role === 'user' ? next.text : undefined}
-              onAnswer={last && !props.running && m.role === 'assistant' ? (t) => void props.onSend(t, []) : undefined} />;
+            return (
+              <Fragment key={m.id}>
+                {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
+                <Bubble m={m} expandTools={props.expandTools} agentName={props.agentName}
+                  answer={next?.role === 'user' ? next.text : undefined}
+                  onAnswer={last && !props.running && m.role === 'assistant' ? (t) => void props.onSend(t, []) : undefined}
+                  working={last && props.running && m.role === 'assistant'} />
+              </Fragment>);
           })}
           <div ref={bottom} />
         </Box>

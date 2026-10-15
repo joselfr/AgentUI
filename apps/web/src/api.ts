@@ -7,6 +7,10 @@ export interface Conversation {
   title: string;
   updatedAt: number;
   running: boolean;
+  /** Un message d'agent est arrivé depuis la dernière lecture. */
+  unread: boolean;
+  /** Dernière lecture avant l'ouverture en cours (ms) : sert à repérer les messages non lus. */
+  lastReadAt: number;
 }
 
 export class UnauthorizedError extends Error {}
@@ -17,7 +21,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     credentials: 'same-origin',
     headers: { 'X-Requested-With': 'agentui', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  }).catch(() => { throw new Error('Pas de connexion au serveur'); });
   if (res.status === 401 && !path.startsWith('/auth/login')) throw new UnauthorizedError();
   if (!res.ok) {
     const e = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
@@ -44,6 +48,7 @@ export const api = {
     call<{ ok: true }>('POST', `/agents/${id}/jobs/${encodeURIComponent(jobId)}/${action}${q(sub)}`),
   conversations: () => call<Conversation[]>('GET', '/conversations'),
   createConversation: (agentId: string, subAgentId?: string) => call<Conversation>('POST', '/conversations', { agentId, subAgentId }),
+  markRead: (id: string) => call<{ ok: true }>('POST', `/conversations/${id}/read`),
   messages: (id: string) => call<{ conversation: Conversation; messages: Message[] }>('GET', `/conversations/${id}/messages`),
   rename: (id: string, title: string) => call('PATCH', `/conversations/${id}`, { title }),
   remove: (id: string) => call('DELETE', `/conversations/${id}`),

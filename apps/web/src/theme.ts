@@ -35,6 +35,9 @@ export const makeTheme = (mode: 'light' | 'dark') => {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
+          html: { touchAction: 'manipulation' }, // manipulation : pas de zoom au double tap
+          // Page figée : seule l'app (hauteur --app-height) défile en interne, y compris clavier ouvert.
+          'html, body': { height: '100%', overflow: 'hidden', overscrollBehavior: 'none' },
           body: { backgroundColor: t.bg },
           '::selection': { background: alpha(t.accent, 0.35) },
           '*::-webkit-scrollbar': { width: 8, height: 8 },
