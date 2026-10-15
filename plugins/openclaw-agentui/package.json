@@ -1,0 +1,39 @@
+{
+  "name": "@agentui/openclaw-agentui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canal AgentUI pour OpenClaw (AgentUI Channel Protocol v1)",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit false --outDir dist",
+    "test": "npm run build && node --test --experimental-test-module-mocks test/plugin.test.mjs",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.9.9"
+  },
+  "devDependencies": {
+    "openclaw": "2026.10.3",
+    "typescript": "^5.6.3"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "runtimeExtensions": [
+      "./dist/index.js"
+    ],
+    "setupEntry": "./setup-entry.ts",
+    "runtimeSetupEntry": "./dist/setup-entry.js",
+    "channel": {
+      "id": "agentui",
+      "label": "AgentUI",
+      "blurb": "Utiliser AgentUI (PWA de chat) comme canal : streaming, outils, approbations, crons."
+    },
+    "compat": {
+      "pluginApi": ">=2026.9.9",
+      "minGatewayVersion": "2026.9.9"
+    }
+  }
+}

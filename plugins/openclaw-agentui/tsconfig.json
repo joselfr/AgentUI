@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": false,
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["index.ts", "setup-entry.ts", "src/**/*.ts"]
+}
