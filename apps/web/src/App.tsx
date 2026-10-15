@@ -258,7 +258,7 @@ export default function App() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setView('chats'); }} />}
             {view === 'skills' && <SkillsPage agents={agents} />}
-            {view === 'jobs' && <JobsPage agents={agents} />}
+            {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => { setCurrentId(id); setView('chats'); }} />}
           </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}
           onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />
