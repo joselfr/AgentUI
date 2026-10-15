@@ -32,6 +32,16 @@ const toMs = (v: unknown): number | undefined => {
   return undefined;
 };
 
+/** Sépare le texte des images Markdown intégrées `![alt](data:image/…;base64,…)`. */
+export function splitInlineImages(content: string): { text: string; images: string[] } {
+  const images: string[] = [];
+  const text = content
+    .replace(/!\[[^\]]*\]\((data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+)\)/gi, (_m, url: string) => (images.push(url.replace(/\s+/g, '')), ''))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return { text, images };
+}
+
 export class HermesAdapter implements AgentAdapter {
   readonly id: string;
   readonly name: string;
@@ -40,6 +50,7 @@ export class HermesAdapter implements AgentAdapter {
   private listeners: Array<(s: ConnStatus, d?: string) => void> = [];
   private timer?: NodeJS.Timeout;
   private runProfile = new Map<string, string>();
+  private abortedRuns = new Set<string>(); // le flux session ne signale pas l'interruption : on la déduit de la demande d'arrêt
 
   constructor(private cfg: HermesConfig) {
     this.id = cfg.id;
@@ -230,6 +241,8 @@ export class HermesAdapter implements AgentAdapter {
   async send(sessionId: string | undefined, input: SendInput): Promise<RunHandle> {
     const profile = input.subAgentId;
     const session = sessionId ?? `agentui-${crypto.randomUUID()}`;
+    // Sans image en entrée : flux « session chat », seul à renvoyer les images `MEDIA:` intégrées (base64). Avec images : /v1/runs.
+    if (!(input.attachments ?? []).some((a) => a.kind === 'image')) return this.sendSession(session, !sessionId, input, profile);
     const started = await this.json(
       '/v1/runs',
       {
@@ -242,6 +255,112 @@ export class HermesAdapter implements AgentAdapter {
     const runId = String(started.run_id ?? started.id);
     this.runProfile.set(runId, profile ?? 'default');
     return { runId, sessionId: session, events: this.stream(runId, profile) };
+  }
+
+  /** POST /api/sessions/{id}/chat/stream : le run démarre et le flux SSE est lu dans la même requête. */
+  private async sendSession(session: string, create: boolean, input: SendInput, profile?: string): Promise<RunHandle> {
+    if (create) await this.req('/api/sessions', { method: 'POST', body: JSON.stringify({ id: session }) }, profile);
+    const startedAt = Date.now();
+    const res = await this.req(
+      `/api/sessions/${encodeURIComponent(session)}/chat/stream`,
+      { method: 'POST', headers: { Accept: 'text/event-stream' }, body: JSON.stringify({ message: input.text }) },
+      profile,
+    );
+    if (!res.body) throw new Error('Flux SSE vide');
+    const it = parseSse(res.body)[Symbol.asyncIterator]();
+    let runId = '';
+    for (;;) {
+      const n = await it.next();
+      if (n.done) throw new Error('Hermes a fermé le flux avant le démarrage du run');
+      let d: Json = {};
+      try { d = JSON.parse(n.value.data); } catch { /* ignoré */ }
+      if (/error|failed/.test(n.value.event)) throw new Error(str(d.error) ?? str(d.message) ?? 'Hermes a refusé le message');
+      if (n.value.event === 'run.started' || str(d.run_id)) { runId = String(d.run_id); break; }
+    }
+    this.runProfile.set(runId, profile ?? 'default');
+    return { runId, sessionId: session, events: this.streamSession(it, runId, session, startedAt, profile) };
+  }
+
+  /** Sous-agents créés par ce run : sessions `subagent` dont le parent est la session (le flux session n'émet pas d'événement dédié). */
+  private async newChildren(session: string, since: number, known: Set<string>, profile?: string): Promise<AgentEvent[]> {
+    const data = await this.json('/api/sessions?limit=50&include_children=true', undefined, profile).catch(() => null);
+    const out: AgentEvent[] = [];
+    for (const x of asArray(data, 'data', 'sessions') as Json[]) {
+      const id = String(x.id);
+      if (x.source !== 'subagent' || x.parent_session_id !== session || known.has(id) || (toMs(x.started_at) ?? 0) < since - 5000) continue;
+      known.add(id);
+      out.push({ type: 'subagent.start', id, name: 'subagent', sessionId: id });
+    }
+    return out;
+  }
+
+  private async *streamSession(it: AsyncIterator<{ event: string; data: string }>, runId: string, session: string, startedAt: number, profile?: string): AsyncGenerator<AgentEvent> {
+    const running = new Map<string, string[]>();
+    const children = new Set<string>();
+    let n = 0;
+    let expected = 0; // sous-agents annoncés par delegate_task (leur session apparaît quelques secondes plus tard)
+    let streamed = false;
+    let ended = false;
+    let interrupted = false;
+    try {
+      for (;;) {
+        const m = await it.next();
+        if (m.done) break;
+        const name = m.value.event;
+        let d: Json;
+        try { d = JSON.parse(m.value.data); } catch { continue; }
+        if (name === 'assistant.delta') {
+          const t = str(d.delta);
+          if (t) { streamed = true; yield { type: 'message.delta', text: t }; }
+        } else if (name === 'tool.progress') {
+          if (d.tool_name === '_thinking' && str(d.delta)) yield { type: 'reasoning.delta', text: d.delta };
+        } else if (name === 'tool.started') {
+          const tool = str(d.tool_name) ?? 'tool';
+          const id = `${runId}-t${++n}`;
+          running.set(tool, [...(running.get(tool) ?? []), id]);
+          yield { type: 'tool.started', id, name: tool, args: d.args ?? d.preview };
+          if (tool === 'delegate_task' && Array.isArray(d.args?.tasks)) expected += d.args.tasks.length;
+        } else if (name === 'tool.completed') {
+          const tool = str(d.tool_name) ?? 'tool';
+          yield { type: 'tool.completed', id: running.get(tool)?.shift() ?? `${runId}-t${++n}`, name: tool, failed: d.error === true };
+          if (tool === 'delegate_task') yield* await this.newChildren(session, startedAt, children, profile);
+        } else if (name === 'assistant.completed') {
+          if (d.interrupted === true) interrupted = true;
+          const { text, images } = splitInlineImages(str(d.content) ?? '');
+          if (text || images.length || !streamed) yield { type: 'message.final', text };
+          for (const url of images) yield { type: 'message.media', url, name: 'image', mimeType: url.slice(5, url.indexOf(';')) };
+        } else if (name === 'run.completed') {
+          for (let i = 0; i < 20; i++) {
+            yield* await this.newChildren(session, startedAt, children, profile);
+            if (children.size >= expected) break;
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+          ended = true;
+          if (d.interrupted === true || this.abortedRuns.has(runId)) interrupted = true;
+          yield interrupted ? { type: 'run.aborted' } : { type: 'run.completed' };
+          return;
+        } else {
+          const ev = this.mapEvent(name, d);
+          if (ev && (ev.type === 'approval.request' || ev.type === 'run.failed' || ev.type === 'run.aborted')) {
+            yield ev;
+            if (ev.type !== 'approval.request') { ended = true; return; }
+          }
+        }
+      }
+      if (!ended) yield interrupted || this.abortedRuns.has(runId) ? { type: 'run.aborted' } : { type: 'run.completed' };
+    } finally {
+      this.runProfile.delete(runId);
+      this.abortedRuns.delete(runId);
+    }
+  }
+
+  /** Les images renvoyées par Hermes sont intégrées au texte (`data:image/…;base64,…`) : on les décode ici. */
+  async fetchMedia(url: string): Promise<{ data: Buffer; mimeType: string }> {
+    const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is.exec(url);
+    if (!m) throw new Error('Média non pris en charge');
+    const data = Buffer.from(m[2]!, 'base64');
+    if (data.length > 20 * 1024 * 1024) throw new Error('Média trop volumineux');
+    return { data, mimeType: m[1]! };
   }
 
   /** Texte seul → chaîne ; avec images → message multimodal au format OpenAI (validé sur Hermes v0.21). */
@@ -376,6 +495,7 @@ export class HermesAdapter implements AgentAdapter {
   }
 
   async abort(runId: string): Promise<void> {
+    this.abortedRuns.add(runId);
     await this.req(`/v1/runs/${runId}/stop`, { method: 'POST', body: '{}' }, this.runProfile.get(runId));
   }
 

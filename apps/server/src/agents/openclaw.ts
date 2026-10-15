@@ -60,6 +60,14 @@ const textOf = (content: unknown): string => {
   return content.filter((p: Json) => p?.type === 'text' && typeof p.text === 'string').map((p: Json) => p.text).join('');
 };
 
+/** Images produites par l'agent (parties `image` avec une URL relative au Gateway). */
+const mediaOf = (content: unknown): AgentEvent[] =>
+  Array.isArray(content)
+    ? content
+        .filter((p: Json) => p?.type === 'image' && typeof p.url === 'string' && p.url.startsWith('/api/chat/media/'))
+        .map((p: Json) => ({ type: 'message.media', url: p.url, name: str(p.alt) ?? 'image', mimeType: str(p.mimeType) }))
+    : [];
+
 export class OpenClawAdapter implements AgentAdapter {
   readonly id: string;
   readonly name: string;
@@ -449,6 +457,7 @@ export class OpenClawAdapter implements AgentAdapter {
     feed: { queue: Json[]; closed: boolean; wake?: () => void; dispose: () => void },
   ): AsyncGenerator<AgentEvent> {
     const seenTools = new Set<string>();
+    const seenMedia = new Set<string>();
     const terminal = (ev: AgentEvent) => ev.type === 'run.completed' || ev.type === 'run.failed' || ev.type === 'run.aborted';
     try {
       for (;;) {
@@ -457,6 +466,9 @@ export class OpenClawAdapter implements AgentAdapter {
           if (p.runId !== runId) continue;
           for (const ev of this.mapEvent(p)) {
             if (ev.type === 'tool.started') seenTools.add(ev.id);
+            if (ev.type === 'message.media') seenMedia.add(ev.url);
+            // L'événement final peut omettre les médias : on complète depuis le transcript avant de clore.
+            if (ev.type === 'run.completed') for (const m of await this.trailingMedia(runId, sessionKey, seenMedia)) yield m;
             yield ev;
             if (terminal(ev)) return;
           }
@@ -480,7 +492,7 @@ export class OpenClawAdapter implements AgentAdapter {
             // Laisse un court délai aux derniers événements `final` en vol, puis reconstitue depuis l'historique.
             await new Promise((r) => setTimeout(r, 1500));
             if (feed.queue.some((q) => q.runId === runId && q.event === 'chat' && q.state !== 'delta')) continue;
-            return void (yield* this.finalizeFromHistory(runId, sessionKey, seenTools));
+            return void (yield* this.finalizeFromHistory(runId, sessionKey, seenTools, seenMedia));
           }
         }
       }
@@ -489,8 +501,47 @@ export class OpenClawAdapter implements AgentAdapter {
     }
   }
 
+  /** Médias de la réponse du run présents dans le transcript mais pas encore émis. */
+  private async trailingMedia(runId: string, sessionKey: string, seen: Set<string>): Promise<AgentEvent[]> {
+    // Le transcript peut être écrit un instant après l'événement `final` : on attend le message final du run (max ~4 s).
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const r = await this.rpc('chat.history', { sessionKey, limit: 10 }).catch(() => undefined);
+      const mine = ((r?.messages ?? []) as Json[]).filter((x) => x.role === 'assistant' && (x.runId ?? x.__openclaw?.runId) === runId);
+      const finalMsg = [...mine].reverse().find((x) => x.stopReason !== 'toolUse');
+      if (finalMsg) {
+        const out: AgentEvent[] = [];
+        for (const ev of mediaOf(finalMsg.content)) if (ev.type === 'message.media' && !seen.has(ev.url)) { seen.add(ev.url); out.push(ev); }
+        return out;
+      }
+      await new Promise((res) => setTimeout(res, 500));
+    }
+    return [];
+  }
+
+  /** Les images « managées » sont rattachées au transcript un peu après l'événement final : relevé ponctuel, sans attente. */
+  async collectMedia(runId: string, sessionKey: string, seen: Set<string>): Promise<AgentEvent[]> {
+    const r = await this.rpc('chat.history', { sessionKey, limit: 10 }).catch(() => undefined);
+    const out: AgentEvent[] = [];
+    for (const m of ((r?.messages ?? []) as Json[]).filter((x) => x.role === 'assistant' && (x.runId ?? x.__openclaw?.runId) === runId)) {
+      for (const ev of mediaOf(m.content)) if (ev.type === 'message.media' && !seen.has(ev.url)) { seen.add(ev.url); out.push(ev); }
+    }
+    return out;
+  }
+
+  /** Télécharge un média du Gateway (chemin `/api/chat/media/…` uniquement, authentifié par le token). */
+  async fetchMedia(url: string): Promise<{ data: Buffer; mimeType: string }> {
+    if (!url.startsWith('/api/chat/media/')) throw new Error('URL de média non autorisée');
+    const base = new URL(this.cfg.url);
+    base.protocol = base.protocol === 'wss:' ? 'https:' : 'http:';
+    const res = await fetch(new URL(url, base), { headers: { Authorization: `Bearer ${this.cfg.auth.token ?? ''}` }, signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`Média indisponible (${res.status})`);
+    const data = Buffer.from(await res.arrayBuffer());
+    if (data.length > 20 * 1024 * 1024) throw new Error('Média trop volumineux');
+    return { data, mimeType: res.headers.get('content-type')?.split(';')[0] ?? 'application/octet-stream' };
+  }
+
   /** Reconstitue la fin d'un run manqué (texte final + outils non vus) depuis le transcript. */
-  private async *finalizeFromHistory(runId: string, sessionKey: string, seen: Set<string>): AsyncGenerator<AgentEvent> {
+  private async *finalizeFromHistory(runId: string, sessionKey: string, seen: Set<string>, seenMedia: Set<string> = new Set()): AsyncGenerator<AgentEvent> {
     const r = await this.rpc('chat.history', { sessionKey, limit: 200 });
     const all = (r.messages ?? []) as Json[];
     let msgs = all.filter((m) => (m.runId ?? m.__openclaw?.runId) === runId);
@@ -511,8 +562,9 @@ export class OpenClawAdapter implements AgentAdapter {
         yield { type: 'tool.completed', id: String(p.id), result: txt.slice(0, MAX_RESULT), truncated: txt.length > MAX_RESULT, failed: !!res?.isError };
       }
     }
-    const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant' && textOf(m.content));
-    if (lastAssistant) yield { type: 'message.final', text: textOf(lastAssistant.content) };
+    const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant' && (textOf(m.content) || mediaOf(m.content).length));
+    if (lastAssistant && textOf(lastAssistant.content)) yield { type: 'message.final', text: textOf(lastAssistant.content) };
+    if (lastAssistant) for (const ev of mediaOf(lastAssistant.content)) if (ev.type !== 'message.media' || !seenMedia.has(ev.url)) yield ev;
     yield { type: 'run.completed' };
   }
 
@@ -524,7 +576,7 @@ export class OpenClawAdapter implements AgentAdapter {
           return p.replace ? [{ type: 'message.final', text: textOf(p.message?.content) }] : p.deltaText ? [{ type: 'message.delta', text: String(p.deltaText) }] : [];
         case 'final': {
           const text = textOf(p.message?.content);
-          return [...(text ? [{ type: 'message.final', text } as AgentEvent] : []), { type: 'run.completed' }];
+          return [...(text ? [{ type: 'message.final', text } as AgentEvent] : []), ...mediaOf(p.message?.content), { type: 'run.completed' }];
         }
         case 'aborted':
           return [{ type: 'run.aborted' }];

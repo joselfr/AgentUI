@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AdapterAttachment, Capabilities, OutgoingAttachment } from '@agentui/shared';
+import type { AdapterAttachment, AttachmentMeta, Capabilities, OutgoingAttachment } from '@agentui/shared';
 import type { DB } from './db.js';
 
 export const LIMITS = {
@@ -92,7 +92,8 @@ export function prepareAttachments(text: string, incoming: OutgoingAttachment[],
 export class AttachmentStore {
   constructor(private db: DB, private dir: string) {}
 
-  save(messageId: string, convId: string, files: Prepared['stored']): void {
+  save(messageId: string, convId: string, files: Prepared['stored']): AttachmentMeta[] {
+    const metas: AttachmentMeta[] = [];
     const folder = join(this.dir, 'uploads', convId);
     mkdirSync(folder, { recursive: true });
     for (const f of files) {
@@ -102,7 +103,9 @@ export class AttachmentStore {
       this.db
         .prepare('INSERT INTO attachments (id, message_id, name, mime_type, size, path) VALUES (?,?,?,?,?,?)')
         .run(id, messageId, f.name, f.mimeType, f.data.length, path);
+      metas.push({ id, name: f.name, mimeType: f.mimeType, size: f.data.length });
     }
+    return metas;
   }
 
   get(id: string): { name: string; mimeType: string; path: string } | undefined {

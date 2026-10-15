@@ -142,6 +142,7 @@ export type AgentEvent =
   | { type: 'subagent.sync'; id: string }
   | { type: 'subagent.end'; id: string; failed?: boolean }
   | { type: 'message.media'; url: string; name: string; mimeType?: string }
+  | { type: 'attachment.added'; attachment: AttachmentMeta }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
   | { type: 'run.completed' }
   | { type: 'run.failed'; error: string }

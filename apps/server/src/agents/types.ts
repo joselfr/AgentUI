@@ -37,6 +37,10 @@ export interface AgentAdapter {
 
   listSessions(): Promise<Session[]>;
   getMessages(sessionId: string): Promise<Message[]>;
+  /** Télécharge un média produit par l'agent (image…) à partir de l'URL fournie dans ses événements. */
+  /** Médias de la réponse d'un run apparus dans le transcript après sa fin (hors `seen`), sans attendre. */
+  collectMedia?(runId: string, sessionId: string, seen: Set<string>): Promise<AgentEvent[]>;
+  fetchMedia?(url: string): Promise<{ data: Buffer; mimeType: string }>;
   /** Session d'un sous-agent (raisonnement, outils, réponse) et indicateur de fin. */
   subSession?(sessionId: string): Promise<{ messages: Message[]; ended: boolean }>;
 

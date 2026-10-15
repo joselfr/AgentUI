@@ -20,17 +20,22 @@ beforeAll(async () => {
   server = createServer((req, res) => {
     if (req.headers.authorization !== 'Bearer k') return void res.writeHead(401).end();
     if (req.url === '/health') return void res.end('{"status":"ok"}');
-    if (req.url === '/v1/runs' && req.method === 'POST') {
+    // Messages texte : flux « session chat » (événements nommés via `event:`), seul à intégrer les images MEDIA.
+    if (req.url === '/api/sessions' && req.method === 'POST') {
       res.setHeader('content-type', 'application/json');
-      return void res.end('{"run_id":"r1","status":"started"}');
+      return void res.end('{"object":"hermes.session"}');
     }
-    if (req.url === '/v1/runs/r1/events') {
+    if (req.url?.endsWith('/chat/stream') && req.method === 'POST') {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
-      sse(res, 'tool.started', { tool: 'terminal', preview: 'ls' });
-      sse(res, 'tool.completed', { tool: 'terminal', duration: 0.2, error: false });
-      sse(res, 'message.delta', { delta: 'Bon' });
-      sse(res, 'message.delta', { delta: 'jour' });
-      sse(res, 'run.completed', {});
+      const ev = (name: string, data: object) => res.write(`event: ${name}\ndata: ${JSON.stringify({ run_id: 'r1', ...data })}\n\n`);
+      ev('run.started', {});
+      ev('tool.started', { tool_name: 'terminal', preview: 'ls', args: 'ls' });
+      ev('tool.completed', { tool_name: 'terminal' });
+      ev('assistant.delta', { delta: 'Bon' });
+      ev('assistant.delta', { delta: 'jour' });
+      ev('assistant.completed', { content: 'Bonjour' });
+      ev('run.completed', {});
+      ev('done', {});
       return void res.end();
     }
     res.writeHead(404).end();
@@ -55,7 +60,7 @@ test('run Hermes : persistance du texte et des outils, événements rejouables',
   expect(msgs[1]!.text).toBe('Bonjour');
   expect(msgs[1]!.status).toBe('done');
   expect(msgs[1]!.toolCalls).toMatchObject([{ name: 'terminal', status: 'done', args: 'ls' }]);
-  expect(runs.eventsSince(0).length).toBe(5);
+  expect(runs.eventsSince(0).length).toBe(6);
   expect(runs.isRunning(conv.id)).toBe(false);
 });
 

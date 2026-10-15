@@ -147,6 +147,35 @@ export class RunManager {
     }));
   }
 
+  /** Médias qui apparaissent dans le transcript de l'agent peu après la fin du run (relevés espacés, ~25 s). */
+  private async lateMedia(conv: ConversationRow, runId: string, messageId: string, seen: Set<string>, emit: (e: AgentEvent) => void) {
+    const ad = this.adapters.get(conv.agent_id);
+    const sessionId = this.getConversation(conv.id)?.remote_session_id;
+    if (!ad?.collectMedia || !sessionId) return;
+    for (const delay of [1500, 3000, 6000, 12000]) {
+      await new Promise((r) => setTimeout(r, delay));
+      const found = await ad.collectMedia(runId, sessionId, seen).catch(() => []);
+      for (const ev of found) {
+        if (ev.type !== 'message.media') continue;
+        const added = await this.attachMedia(conv, messageId, ev);
+        if (added) emit({ type: 'attachment.added', attachment: added });
+      }
+    }
+  }
+
+  /** Récupère un média produit par l'agent et l'enregistre comme pièce jointe du message. */
+  private async attachMedia(conv: ConversationRow, messageId: string, ev: Extract<AgentEvent, { type: 'message.media' }>) {
+    const ad = this.adapters.get(conv.agent_id);
+    if (!ad?.fetchMedia || !this.files) return undefined;
+    try {
+      const { data, mimeType } = await ad.fetchMedia(ev.url);
+      return this.files.save(messageId, conv.id, [{ name: ev.name, mimeType: ev.mimeType ?? mimeType, data }])[0];
+    } catch (e) {
+      console.error('[media] échec du téléchargement :', (e as Error).message);
+      return undefined;
+    }
+  }
+
   /** Un run terminé ne laisse ni outil ni sous-agent « en cours » (leur événement de fin peut ne jamais arriver). */
   private closeRunning(messageId: string, status: 'done' | 'failed', now: number) {
     this.db.prepare("UPDATE tool_calls SET status = ?, ended_at = ? WHERE message_id = ? AND status = 'running'").run(status, now, messageId);
@@ -344,6 +373,7 @@ export class RunManager {
   private async consume(conv: ConversationRow, runId: string, messageId: string, events: AsyncIterable<AgentEvent>, initialText = '') {
     let outcome: 'completed' | 'failed' | 'aborted' = 'completed';
     let text = initialText;
+    const mediaSeen = new Set<string>();
     const emit = (event: AgentEvent) => {
       const r = this.db
         .prepare('INSERT INTO events (conversation_id, run_id, payload, created_at) VALUES (?,?,?,?)')
@@ -352,6 +382,12 @@ export class RunManager {
     };
     try {
       for await (const ev of events) {
+        if (ev.type === 'message.media') {
+          mediaSeen.add(ev.url);
+          const added = await this.attachMedia(conv, messageId, ev);
+          if (added) emit({ type: 'attachment.added', attachment: added });
+          continue;
+        }
         text = this.apply(messageId, ev, text);
         if (ev.type === 'run.failed') outcome = 'failed';
         if (ev.type === 'run.aborted') outcome = 'aborted';
@@ -372,6 +408,7 @@ export class RunManager {
     }
     this.db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(Date.now(), conv.id);
     this.active.delete(conv.id);
+    void this.lateMedia(conv, runId, messageId, mediaSeen, emit);
     this.onRunFinished?.(conv, outcome, text.slice(0, 140));
   }
 
