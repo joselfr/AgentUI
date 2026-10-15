@@ -1,0 +1,605 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentui.local/channel/v1.json",
+  "title": "AgentUI Channel Protocol v1",
+  "description": "Trames échangées entre AgentUI et un plugin canal. Voir PROTOCOL.md.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/PluginMessage"
+    },
+    {
+      "$ref": "#/$defs/GatewayMessage"
+    }
+  ],
+  "$defs": {
+    "Media": {
+      "type": "object",
+      "required": [
+        "name",
+        "mimeType",
+        "data"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      }
+    },
+    "Capabilities": {
+      "type": "object",
+      "required": [
+        "sessions",
+        "abort",
+        "approvals",
+        "subagents",
+        "reasoning",
+        "toolDetails",
+        "skills",
+        "jobs",
+        "jobControl",
+        "attachments"
+      ],
+      "properties": {
+        "sessions": {
+          "type": "boolean"
+        },
+        "abort": {
+          "type": "boolean"
+        },
+        "approvals": {
+          "type": "boolean"
+        },
+        "subagents": {
+          "type": "boolean"
+        },
+        "reasoning": {
+          "type": "boolean"
+        },
+        "toolDetails": {
+          "type": "boolean"
+        },
+        "skills": {
+          "type": "boolean"
+        },
+        "jobs": {
+          "type": "boolean"
+        },
+        "jobControl": {
+          "type": "boolean"
+        },
+        "sessionDelete": {
+          "type": "boolean",
+          "description": "Suppression de la session de plateforme quand l'utilisateur supprime la discussion (rpc deleteSession)"
+        },
+        "attachments": {
+          "type": "object",
+          "required": [
+            "images",
+            "files",
+            "maxBytes"
+          ],
+          "properties": {
+            "images": {
+              "type": "boolean"
+            },
+            "files": {
+              "type": "boolean"
+            },
+            "maxBytes": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "AgentEvent": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "message.delta"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "message.final"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "reasoning.delta"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "tool.started"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "args": {},
+            "parentSubAgentRunId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "tool.completed"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "result": {
+              "type": "string"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "failed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "subagent.start"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "subagent.sync"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "subagent.end"
+            },
+            "id": {
+              "type": "string"
+            },
+            "failed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "message.media"
+            },
+            "name": {
+              "type": "string"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "data": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "mimeType",
+            "data"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "approval.request"
+            },
+            "id": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "payload": {}
+          },
+          "required": [
+            "id",
+            "description"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "run.completed"
+            }
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "run.failed"
+            },
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "run.aborted"
+            }
+          }
+        }
+      ]
+    },
+    "PluginMessage": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "hello"
+            },
+            "protocol": {
+              "const": 1
+            },
+            "token": {
+              "type": "string"
+            },
+            "agent": {
+              "type": "object",
+              "required": [
+                "type",
+                "name"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                }
+              }
+            },
+            "capabilities": {
+              "$ref": "#/$defs/Capabilities"
+            },
+            "subAgents": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "activeRuns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "runId",
+                  "conversationId"
+                ],
+                "properties": {
+                  "runId": {
+                    "type": "string"
+                  },
+                  "conversationId": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "mode": {
+              "enum": [
+                "send-only"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "token",
+            "agent",
+            "capabilities"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "event"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "event": {
+              "$ref": "#/$defs/AgentEvent"
+            }
+          },
+          "required": [
+            "conversationId",
+            "runId",
+            "event"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "outbound"
+            },
+            "id": {
+              "type": "string"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "media": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Media"
+              }
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "rpc.result"
+            },
+            "id": {
+              "type": "string"
+            },
+            "result": {},
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "pong"
+            }
+          }
+        }
+      ]
+    },
+    "GatewayMessage": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "welcome"
+            },
+            "protocol": {
+              "const": 1
+            }
+          },
+          "required": [
+            "protocol"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "inbound"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "subAgentId": {
+              "type": "string"
+            },
+            "attachments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Media"
+              }
+            }
+          },
+          "required": [
+            "conversationId",
+            "runId",
+            "text"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "abort"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "runId"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "approval"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "approve": {
+              "type": "boolean"
+            },
+            "scope": {
+              "enum": [
+                "once",
+                "session",
+                "always"
+              ]
+            }
+          },
+          "required": [
+            "conversationId",
+            "runId",
+            "id",
+            "approve"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "rpc"
+            },
+            "id": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "params": {}
+          },
+          "required": [
+            "id",
+            "method"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ping"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
