@@ -277,8 +277,8 @@ export default function App() {
             <Select size="small" value={themeMode} onChange={(e) => { const v = e.target.value as 'auto' | 'light' | 'dark'; setThemeMode(v); save('themeMode', v); }}>
               {(Object.keys(themeLabel) as Array<keyof typeof themeLabel>).map((k) => <MenuItem key={k} value={k}>Thème : {themeLabel[k]}</MenuItem>)}
             </Select>
-            <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 3 }} control={<Switch checked={expandTools} onChange={(e) => { setExpandTools(e.target.checked); save('expandTools', e.target.checked); }} />} label="Déplier les outils par défaut" />
-            <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 3 }} control={<Switch checked={askUser} onChange={(e) => { setAskUser(e.target.checked); save('askUser', e.target.checked); }} />} label="Questions interactives de l'agent (bloc ask)" />
+            <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 1 }} control={<Switch checked={expandTools} onChange={(e) => { setExpandTools(e.target.checked); save('expandTools', e.target.checked); }} />} label="Déplier les outils par défaut" />
+            <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 1 }} control={<Switch checked={askUser} onChange={(e) => { setAskUser(e.target.checked); save('askUser', e.target.checked); }} />} label="Questions interactives de l'agent (bloc ask)" />
             <PushToggle />
             <UpdateButton />
             <PasswordForm />
@@ -319,7 +319,7 @@ function PushToggle() {
   const help = st === 'unsupported' ? 'Non supporté par ce navigateur (sur iPhone : ajouter l\'app à l\'écran d\'accueil).'
     : st === 'denied' ? 'Bloquées dans le navigateur : à réactiver dans les réglages du site.' : err;
   return (
-    <Box sx={{ p: 2, py: 1, border: 1, borderColor: 'divider', borderRadius: 3 }}>
+    <Box sx={{ p: 2, py: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
       <FormControlLabel disabled={st === 'unsupported' || st === 'denied'} control={<Switch checked={st === 'on'} onChange={toggle} />} label="Notifications quand un agent répond" />
       {help && <Typography variant="caption" color="text.secondary" display="block">{help}</Typography>}
     </Box>
@@ -329,7 +329,7 @@ function PushToggle() {
 function PasswordForm() {
   const [o, setO] = useState(''); const [n, setN] = useState(''); const [msg, setMsg] = useState('');
   return (
-    <Box sx={{ display: 'grid', gap: 1, p: 2, border: 1, borderColor: 'divider', borderRadius: 3 }}>
+    <Box sx={{ display: 'grid', gap: 1, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
       <Typography variant="subtitle2">Changer le mot de passe</Typography>
       <TextField size="small" type="password" label="Actuel" value={o} onChange={(e) => setO(e.target.value)} autoComplete="current-password" />
       <TextField size="small" type="password" label="Nouveau (8+ caractères)" value={n} onChange={(e) => setN(e.target.value)} autoComplete="new-password" />
