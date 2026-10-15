@@ -11,6 +11,7 @@ import { env, loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { changePassword, ensureAdmin, login, logout, RateLimiter, userFromToken, type AuthUser } from './auth.js';
 import { createAdapter } from './agents/registry.js';
+import { GatewayAdapter, sameToken, type GatewaySocket } from './agents/gateway.js';
 import type { AgentAdapter } from './agents/types.js';
 import { RunManager } from './runs.js';
 import { PushService } from './push.js';
@@ -185,7 +186,7 @@ async function main() {
     return { ok: true };
   });
   app.delete<{ Params: { id: string } }>('/api/conversations/:id', async (req) => {
-    runs.deleteConversation(req.params.id);
+    await runs.deleteConversation(req.params.id); // la session de plateforme est supprimée par le plugin canal
     return { ok: true };
   });
   app.post<{ Params: { id: string } }>('/api/conversations/:id/send', { bodyLimit: 40 * 1024 * 1024 }, async (req, reply) => {
@@ -255,6 +256,38 @@ async function main() {
     });
     socket.on('close', unsub);
     socket.on('error', unsub);
+  });
+
+  // ---------- Gateway des plugins canal (Hermes, OpenClaw…) ----------
+  // Le plugin installé dans la plateforme se connecte ici ; authentification par le token de l'agent (premier message).
+  const gateways = [...adapters.values()].filter((a): a is GatewayAdapter => a instanceof GatewayAdapter);
+  for (const g of gateways) {
+    g.onOutbound = (m) => {
+      const conv = runs.deliver(g.id, m.conversationId, m.text, m.media, g.name, m.title);
+      app.log.info({ agent: g.id, conversation: conv.id }, 'message proactif reçu');
+    };
+  }
+  app.get('/gateway', { websocket: true }, (socket) => {
+    const ws = socket as unknown as GatewaySocket;
+    const timer = setTimeout(() => ws.close(4001, 'hello attendu'), 10_000);
+    socket.once('message', (raw) => {
+      clearTimeout(timer);
+      let hello: Record<string, any>;
+      try {
+        hello = JSON.parse(String(raw));
+      } catch {
+        return ws.close(4001, 'hello invalide');
+      }
+      if (hello.type !== 'hello' || typeof hello.token !== 'string') return ws.close(4001, 'hello attendu');
+      const g = gateways.find((x) => sameToken(x.token, hello.token));
+      if (!g) {
+        app.log.warn('gateway : token refusé');
+        return ws.close(4001, 'token invalide');
+      }
+      if (hello.protocol !== 1) return ws.close(4002, 'protocole non supporté');
+      app.log.info({ agent: g.id, plugin: hello.agent, mode: hello.mode }, 'plugin canal connecté');
+      g.attach(ws, hello);
+    });
   });
 
   const connections: Promise<unknown>[] = [];

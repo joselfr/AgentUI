@@ -32,6 +32,8 @@ export interface AgentAdapter {
   listSkills(subAgentId?: string): Promise<Skill[]>;
   listJobs(subAgentId?: string): Promise<Job[]>;
   jobAction?(jobId: string, action: 'pause' | 'resume' | 'run' | 'delete', subAgentId?: string): Promise<void>;
+  /** Supprime la session de la plateforme (adaptateurs canal) ; absent = l'agent ne sait pas le faire. */
+  deleteSession?(sessionId: string): Promise<void>;
 
   listSessions(): Promise<Session[]>;
   getMessages(sessionId: string): Promise<Message[]>;

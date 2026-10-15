@@ -15,6 +15,12 @@ export interface ConversationRow {
   updated_at: number;
 }
 
+/** Clé de session synthétique des messages proactifs rangés dans une discussion « maison » (voir `deliver`). */
+const HOME_SESSION = 'home';
+/** Attente maximale de la fin d'un run avant de supprimer sa discussion. */
+const ABORT_GRACE_MS = 5_000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 type Listener = (push: ServerPush) => void;
 
 /**
@@ -58,7 +64,41 @@ export class RunManager {
     const sql = `SELECT * FROM conversations ${agentId ? 'WHERE agent_id = ?' : ''} ORDER BY updated_at DESC LIMIT 500`;
     return (agentId ? this.db.prepare(sql).all(agentId) : this.db.prepare(sql).all()) as unknown as ConversationRow[];
   }
-  deleteConversation(id: string) {
+  /** Conversation AgentUI rattachée à une session distante (ex. discussion dédiée d'une tâche cron). */
+  findByRemoteSession(agentId: string, remoteSessionId: string): ConversationRow | undefined {
+    return this.db
+      .prepare('SELECT * FROM conversations WHERE agent_id = ? AND remote_session_id = ? ORDER BY updated_at DESC LIMIT 1')
+      .get(agentId, remoteSessionId) as unknown as ConversationRow | undefined;
+  }
+  /**
+   * Supprime une discussion, **session de plateforme comprise** : on demande d'abord au plugin canal
+   * d'effacer sa session, et on n'efface localement que s'il a confirmé (sinon la discussion est conservée
+   * telle quelle). Une discussion sans session distante réelle (jamais utilisée, ou messages proactifs
+   * rangés dans la session `home`) n'a rien à supprimer côté agent.
+   */
+  async deleteConversation(id: string): Promise<void> {
+    const conv = this.getConversation(id);
+    if (!conv) return;
+    // Un run vivant écrit encore dans des lignes qu'on s'apprête à effacer, et la plateforme refuse de
+    // supprimer une session active : on l'arrête et on attend sa fin (le run se termine par un événement
+    // terminal du plugin, consommé ici même).
+    if (this.active.has(id)) {
+      await this.abort(id);
+      const deadline = Date.now() + ABORT_GRACE_MS;
+      while (this.active.has(id) && Date.now() < deadline) await sleep(50);
+      if (this.active.has(id)) throw Object.assign(new Error('Le run n’a pas pu être arrêté'), { statusCode: 502 });
+    }
+    const sessionId = conv.remote_session_id;
+    if (sessionId && sessionId !== HOME_SESSION) {
+      const adapter = this.adapters.get(conv.agent_id);
+      if (!adapter?.deleteSession) {
+        throw Object.assign(
+          new Error(`${adapter?.name ?? conv.agent_id} : la suppression de la session côté agent n’est pas supportée`),
+          { statusCode: 501 },
+        );
+      }
+      await adapter.deleteSession(sessionId); // échec → rien n'est effacé localement
+    }
     this.db.prepare('DELETE FROM conversations WHERE id = ?').run(id);
     this.files?.removeConversation(id);
   }
@@ -251,6 +291,40 @@ export class RunManager {
       resumed++;
     }
     return resumed;
+  }
+
+  /**
+   * Message proactif d'un agent (cron, envoi spontané) : rangé dans la conversation correspondant à la session
+   * distante, ou dans la discussion « maison » de l'agent (créée au besoin), puis notifié comme une réponse.
+   */
+  deliver(
+    agentId: string,
+    remoteSessionId: string | undefined,
+    text: string,
+    media: { name: string; mimeType: string; data: Buffer }[],
+    agentName = agentId,
+    title?: string,
+  ): ConversationRow {
+    const key = remoteSessionId ?? HOME_SESSION;
+    let conv = this.findByRemoteSession(agentId, key);
+    if (!conv) {
+      conv = this.createConversation(agentId, undefined, title ?? (key === HOME_SESSION ? `Messages de ${agentName}` : 'Message de l’agent'), key);
+    }
+    const now = Date.now();
+    const messageId = randomUUID();
+    const runId = `outbound-${randomUUID()}`;
+    this.db
+      .prepare('INSERT INTO messages (id, conversation_id, role, text, run_id, status, created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(messageId, conv.id, 'assistant', text, runId, 'done', now);
+    if (media.length) this.files?.save(messageId, conv.id, media);
+    this.db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conv.id);
+    const event: AgentEvent = { type: 'message.added', messageId };
+    const r = this.db
+      .prepare('INSERT INTO events (conversation_id, run_id, payload, created_at) VALUES (?,?,?,?)')
+      .run(conv.id, runId, JSON.stringify(event), now);
+    this.broadcast({ type: 'event', seq: Number(r.lastInsertRowid), agentId, sessionId: conv.id, runId, event });
+    this.onRunFinished?.(conv, 'completed', (text || media[0]?.name || '').slice(0, 140));
+    return conv;
   }
 
   async abort(convId: string) {

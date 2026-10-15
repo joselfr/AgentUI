@@ -13,6 +13,12 @@ docker compose up --build
 
 Ajouter un agent : implémenter `AgentAdapter` (`apps/server/src/agents/types.ts`), l'enregistrer dans `agents/registry.ts`, le déclarer dans `agents.config.yaml`.
 
+## Agents par plugin canal
+Plutôt qu'AgentUI aille chercher l'agent (adapters `hermes` / `openclaw`), la plateforme peut se connecter à AgentUI
+comme à Telegram, via un plugin canal : agent de type `gateway` (token) dans `agents.config.yaml`, plugin installé côté
+plateforme, connexion WebSocket sur `/gateway`. Apporte les messages proactifs (crons, envois spontanés), rangés dans
+la discussion « Messages de <agent> ». Protocole, plugins Hermes / OpenClaw et installation : [`plugins/`](plugins/README.md).
+
 ## Notifications push
 Activables dans Réglages → « Notifications quand un agent répond ». Elles exigent **HTTPS** (hors `localhost`) ;
 sur iPhone, l'app doit d'abord être ajoutée à l'écran d'accueil. Les clés VAPID sont générées au premier démarrage et

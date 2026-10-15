@@ -11,6 +11,7 @@ export const CapabilitiesSchema = z.object({
   skills: z.boolean(),
   jobs: z.boolean(),
   jobControl: z.boolean(), // pause/reprise/exécution/suppression
+  sessionDelete: z.boolean().optional(), // suppression de la session de plateforme avec la discussion
   attachments: z.object({
     images: z.boolean(), // PNG/JPEG/GIF/WebP envoyés nativement
     files: z.boolean(), // fichiers binaires (PDF, zip…) ; les fichiers texte sont toujours insérés dans le message
@@ -140,10 +141,13 @@ export type AgentEvent =
   | { type: 'subagent.start'; id: string; name: string; sessionId?: string }
   | { type: 'subagent.sync'; id: string }
   | { type: 'subagent.end'; id: string; failed?: boolean }
+  | { type: 'message.media'; url: string; name: string; mimeType?: string }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
   | { type: 'run.completed' }
   | { type: 'run.failed'; error: string }
-  | { type: 'run.aborted' };
+  | { type: 'run.aborted' }
+  /** Message proactif de l'agent (cron, envoi spontané) enregistré hors run : recharger la conversation. */
+  | { type: 'message.added'; messageId: string };
 
 export interface SendInput {
   text: string;
@@ -175,6 +179,13 @@ export const AgentConfigSchema = z.discriminatedUnion('type', [
     name: z.string(),
     url: z.string(), // ws:// ou wss://
     auth: z.object({ token: z.string().optional(), password: z.string().optional() }),
+  }),
+  // Agent relié par un plugin canal qui se connecte à AgentUI sur /gateway (plugins/protocol/PROTOCOL.md)
+  z.object({
+    id: z.string().regex(/^[a-z0-9_-]+$/i),
+    type: z.literal('gateway'),
+    name: z.string(),
+    token: z.string().min(16, 'token de 16 caractères minimum'),
   }),
 ]);
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
