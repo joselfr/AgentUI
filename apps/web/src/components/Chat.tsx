@@ -9,6 +9,7 @@ import StopIcon from '@mui/icons-material/Stop';
 import Psychology from '@mui/icons-material/Psychology';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks'; // un retour à la ligne = une ligne (sorties de cron, messages courts)
 import type { Capabilities, Message } from '@agentui/shared';
 import { checkFile, formatSize, isImage, type AttachmentView } from '../attachments';
 import { ToolsBlock } from './ToolCard';
@@ -70,7 +71,7 @@ function Bubble({ m, expandTools, agentName, answer, onAnswer, working }: { m: M
         {!mine && <ToolsBlock tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
         {mine && attachmentsView}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
-          : <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={{
             pre: ({ children }) => {
               const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
               if (el?.props?.className?.includes('language-ask') && m.status !== 'streaming') return <AskCard raw={String(el.props.children ?? '').replace(/\n$/, '')} answer={answer} onAnswer={onAnswer} />;
