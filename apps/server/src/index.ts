@@ -146,7 +146,11 @@ async function main() {
     adapterOf(req.params.id).listSkills(req.query.sub),
   );
   app.get<{ Params: { id: string }; Querystring: { sub?: string } }>('/api/agents/:id/jobs', async (req) =>
-    adapterOf(req.params.id).listJobs(req.query.sub),
+    // Lien vers la discussion qui reçoit les résultats de chaque tâche, quand elle existe déjà.
+    (await adapterOf(req.params.id).listJobs(req.query.sub)).map((j) => {
+      const conv = j.deliverTo ? runs.findByRemoteSession(req.params.id, j.deliverTo) : undefined;
+      return conv ? { ...j, conversationId: conv.id } : j;
+    }),
   );
   app.post<{ Params: { id: string; jobId: string; action: string }; Querystring: { sub?: string } }>(
     '/api/agents/:id/jobs/:jobId/:action',

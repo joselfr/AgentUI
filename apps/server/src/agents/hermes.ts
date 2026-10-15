@@ -155,7 +155,9 @@ export class HermesAdapter implements AgentAdapter {
         typeof j.schedule === 'string'
           ? j.schedule
           : str(j.schedule?.display) ?? str(j.schedule_display) ?? str(j.schedule?.expr) ?? JSON.stringify(j.schedule ?? ''),
-      prompt: str(j.prompt),
+      mode: j.no_agent ? 'script' : 'agent',
+      prompt: j.no_agent ? undefined : str(j.prompt),
+      script: str(j.script),
       enabled: j.enabled !== false && j.state !== 'paused' && !j.paused_at,
       nextRunAt: toMs(j.next_run_at),
       lastRunAt: toMs(j.last_run_at),

@@ -51,11 +51,24 @@ export interface Job {
   id: string;
   name: string;
   schedule: string;
+  /** `agent` : un prompt est confié à l'agent ; `script` : un script/une commande s'exécute sans agent. */
+  mode?: 'agent' | 'script';
   prompt?: string;
+  /** Script exécuté (chemin, commande ou source) : le job lui-même en mode `script`, collecte préalable en mode `agent`. */
+  script?: string;
   enabled: boolean;
   nextRunAt?: number;
   lastRunAt?: number;
   lastStatus?: string;
+  /** Exécution demandée (« Exécuter maintenant »), pas encore prise par le planificateur. */
+  queued?: boolean;
+  /** Exécution en cours. */
+  running?: boolean;
+  lastError?: string;
+  /** Destination côté plateforme (plugin canal) : id de la discussion qui reçoit les résultats. */
+  deliverTo?: string;
+  /** Discussion AgentUI correspondante, si elle existe déjà (renseigné par le serveur). */
+  conversationId?: string;
 }
 
 export interface Session {

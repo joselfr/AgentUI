@@ -280,12 +280,20 @@ export class OpenClawAdapter implements AgentAdapter {
         id: j.id,
         name: j.displayName ?? j.name ?? j.id,
         schedule: this.scheduleLabel(j.schedule),
-        prompt: str(j.payload?.message) ?? str(j.description),
+        ...this.jobPayload(j),
         enabled: !!j.enabled,
         nextRunAt: j.state?.nextRunAtMs ?? j.nextRunAtMs,
         lastRunAt: j.state?.lastRunAtMs ?? j.lastRunAtMs,
         lastStatus: j.state?.lastStatus ?? j.lastRunStatus,
       }));
+  }
+
+  /** Mode et détail d'un job selon son payload : prompt (agentTurn, systemEvent) ou script (command, script). */
+  private jobPayload(j: Json): Pick<Job, 'mode' | 'prompt' | 'script'> {
+    const p = j.payload ?? {};
+    if (p.kind === 'command') return { mode: 'script', script: Array.isArray(p.argv) ? p.argv.join(' ') : undefined };
+    if (p.kind === 'script') return { mode: 'script', script: str(p.script) };
+    return { mode: 'agent', prompt: str(p.message) ?? str(p.text) ?? str(j.description) };
   }
 
   private scheduleLabel(s: Json | undefined): string {
