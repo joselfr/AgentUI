@@ -9,6 +9,10 @@ export interface Conversation {
   running: boolean;
   /** Un message d'agent est arrivé depuis la dernière lecture. */
   unread: boolean;
+  /** Épinglée en tête de liste. */
+  favorite: boolean;
+  /** Discussion dédiée d'une tâche cron. */
+  cron: boolean;
   /** Dernière lecture avant l'ouverture en cours (ms) : sert à repérer les messages non lus. */
   lastReadAt: number;
 }
@@ -51,6 +55,7 @@ export const api = {
   markRead: (id: string) => call<{ ok: true }>('POST', `/conversations/${id}/read`),
   messages: (id: string) => call<{ conversation: Conversation; messages: Message[] }>('GET', `/conversations/${id}/messages`),
   rename: (id: string, title: string) => call('PATCH', `/conversations/${id}`, { title }),
+  setFavorite: (id: string, favorite: boolean) => call('PATCH', `/conversations/${id}`, { favorite }),
   remove: (id: string) => call('DELETE', `/conversations/${id}`),
   send: (id: string, text: string, attachments: OutgoingAttachment[] = [], interactive = false) =>
     call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments, interactive }),

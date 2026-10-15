@@ -201,8 +201,17 @@ export default function App() {
   const themeLabel = { auto: 'Système', light: 'Clair', dark: 'Sombre' };
 
   const closeDrawer = () => { if (!wide) setDrawer(false); };
+  const toggleFavorite = (c: Conversation) => {
+    const favorite = !c.favorite;
+    setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, favorite } : x)));
+    api.setFavorite(c.id, favorite).catch((e) => { setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, favorite: !favorite } : x))); guard(e); });
+  };
+  const renameConv = (c: Conversation, title: string) => {
+    setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title } : x)));
+    api.rename(c.id, title).catch((e) => { setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title: c.title } : x))); guard(e); });
+  };
   const deleteConv = (c: Conversation) => {
-    if (confirm('Supprimer cette conversation ?')) {
+    if (confirm('Supprimer cette conversation ? Sa session sera aussi supprimée chez l’agent.')) {
       api.remove(c.id).then(() => { setConvs((cs) => cs.filter((x) => x.id !== c.id)); if (c.id === currentId) setCurrentId(undefined); }).catch(guard);
     }
   };
@@ -215,7 +224,7 @@ export default function App() {
     <Sidebar agents={agents} convs={shownConvs} currentId={currentId}
       onSelectConv={(id) => { setCurrentId(id); closeDrawer(); }}
       onNew={() => { setNewDlg(true); closeDrawer(); }}
-      onDelete={deleteConv} onClose={() => (wide ? setListOpen(false) : setDrawer(false))} />
+      onDelete={deleteConv} onToggleFavorite={toggleFavorite} onRename={renameConv} onClose={() => (wide ? setListOpen(false) : setDrawer(false))} />
   );
   const drawerContent = wide ? sidebar : <Box sx={{ display: 'flex', height: '100%' }}>{nav}<Box sx={{ flex: 1, minWidth: 0 }}>{sidebar}</Box></Box>;
   const boot = (child: React.ReactNode) => <ThemeProvider theme={theme}><CssBaseline />{child}</ThemeProvider>;
