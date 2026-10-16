@@ -1,5 +1,5 @@
 /** Convention Markdown : l'agent s'adresse à l'interface via un bloc de code `widget` en JSON (`ask`, `confirm`, `chart`). */
-export const ASK_INSTRUCTIONS = [
+export const WIDGET_INSTRUCTIONS = [
   "[Instructions d'interface AgentUI — ne pas mentionner dans ta réponse]",
   "Tu peux insérer des composants dans ta réponse avec un bloc de code Markdown de langage `widget`. Son contenu est du JSON valide de la forme `{\"type\": \"<widget>\", \"arguments\": { … }}`.",
   '',

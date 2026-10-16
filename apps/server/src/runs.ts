@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AgentEvent, Message, OutgoingAttachment, SearchHit, ServerPush, ToolCall, SubAgentRun, Usage } from '@agentui/shared';
 import type { DB } from './db.js';
 import type { AgentAdapter } from './agents/types.js';
-import { ASK_INSTRUCTIONS } from './interactive.js';
+import { WIDGET_INSTRUCTIONS } from './interactive.js';
 import { prepareAttachments, type AttachmentStore } from './attachments.js';
 
 export interface ConversationRow {
@@ -375,7 +375,7 @@ export class RunManager {
     const prepared = prepareAttachments(text, attachments, adapter.capabilities());
     // Convention « ask » : déclarée à l'agent une seule fois, dans le premier message du fil.
     const first = !(this.db.prepare('SELECT 1 AS x FROM messages WHERE conversation_id = ? LIMIT 1').get(convId));
-    if (opts.interactive && first) prepared.agentText = `${ASK_INSTRUCTIONS}\n\n${prepared.agentText}`;
+    if (opts.interactive && first) prepared.agentText = `${WIDGET_INSTRUCTIONS}\n\n${prepared.agentText}`;
     const now = Date.now();
     const userMsgId = randomUUID();
     this.db
