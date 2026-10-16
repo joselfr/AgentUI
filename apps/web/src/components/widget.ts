@@ -44,9 +44,29 @@ function stripPartialToken(text: string): string {
 }
 const fence = (w: { type: string; arguments: Record<string, unknown> }) => '\n\n```widget\n' + JSON.stringify(w) + '\n```\n\n';
 
-/** Widget mis à jour par des appels ultérieurs (`update` = jeton du widget) : l'état d'un jeton est celui du dernier appel. */
-const isUpdate = (t: { args?: unknown }) => typeof (t.args as { update?: unknown } | undefined)?.update === 'string';
 const sameCall = (a: ToolCallLike, b: ToolCallLike) => (a.id !== undefined && b.id !== undefined ? a.id === b.id : a === b);
+
+/** Widgets qui vivent hors du texte : affichés dès leur premier appel d'outil (sans attendre que l'agent écrive le jeton), mis à jour sur place. */
+const OUT_OF_TEXT = new Set(['progress']);
+
+/**
+ * Widgets « hors texte » créés dans ce message (un par jeton, dans l'ordre de création), avec l'état du **dernier** appel de
+ * la discussion : un appel `update` (jeton du widget) remplace l'état affiché, il ne crée pas de second composant.
+ */
+export function outOfTextWidgets(own: ToolCallLike[], all: ToolCallLike[] = own): Array<{ token: string; type: string; arguments: Record<string, unknown> }> {
+  const latest = new Map<string, { type: string; arguments: Record<string, unknown> }>();
+  const first = new Map<string, ToolCallLike>();
+  for (const t of all) {
+    const token = tokenOf(t);
+    const w = token ? widgetOfTool(t) : undefined;
+    if (!token || !w || !OUT_OF_TEXT.has(w.type)) continue;
+    latest.set(token, w);
+    if (!first.has(token)) first.set(token, t);
+  }
+  const out: Array<{ token: string; type: string; arguments: Record<string, unknown> }> = [];
+  for (const [token, w] of latest) if (own.some((t) => sameCall(t, first.get(token)!))) out.push({ token, ...w });
+  return out;
+}
 
 /** Jeton (`[[agentui:<id>]]`) renvoyé par l'outil, lu dans son résultat. */
 const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[agentui:([0-9a-f]+)\]\]/)?.[1];
@@ -59,21 +79,18 @@ const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[a
  */
 export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolCallLike[] = own, done = true): string {
   const widgets = new Map<string, { type: string; arguments: Record<string, unknown> }>();
-  const firstCall = new Map<string, ToolCallLike>();
   for (const t of all) {
     const id = tokenOf(t);
     const w = id ? widgetOfTool(t) : undefined;
     if (id && w) {
-      widgets.set(id, w); // le dernier appel fait foi : une mise à jour remplace l'état affiché
-      if (!firstCall.has(id)) firstCall.set(id, t);
+      widgets.set(id, w);
     }
   }
   const used = new Set<string>();
   let out = text.replace(TOKEN, (_m, id: string) => {
     const w = widgets.get(id);
     if (!w) return '';
-    // Un widget mis à jour vit dans le message qui l'a créé : le jeton réécrit ailleurs ne le duplique pas.
-    if (w.type === 'progress' && !own.some((t) => sameCall(t, firstCall.get(id)!))) return '';
+    if (OUT_OF_TEXT.has(w.type)) return ''; // affiché par `outOfTextWidgets` ; un jeton écrit par l'agent est ignoré
     used.add(id);
     return fence(w);
   });
@@ -81,7 +98,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
   if (done) for (const t of own) {
     const id = tokenOf(t);
     const w = id ? widgets.get(id) : undefined;
-    if (id && w && !used.has(id) && !isUpdate(t)) out += fence(w);
+    if (id && w && !used.has(id) && !OUT_OF_TEXT.has(w.type)) out += fence(w);
   }
   return out;
 }

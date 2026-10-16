@@ -1133,7 +1133,8 @@ def _register_widget_tools(ctx) -> None:
             update = args.get("update") if key == "progress" else None
             if update:  # mise à jour : même jeton, le front affiche l'état du dernier appel
                 return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
-            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": spec["tokenInstruction"]}, ensure_ascii=False)
+            instruction = spec["progressInstruction"] if key == "progress" else spec["tokenInstruction"]
+            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction}, ensure_ascii=False)
 
         return handler
 

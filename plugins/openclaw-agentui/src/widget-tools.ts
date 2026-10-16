@@ -83,7 +83,7 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: args.update, updated: true, instruction: spec.updateInstruction }) }], details: { token: args.update } };
         }
         const token = `[[agentui:${randomBytes(3).toString('hex')}]]`;
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: spec.tokenInstruction }) }], details: { token } };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: key === 'progress' ? spec.progressInstruction : spec.tokenInstruction }) }], details: { token } };
       },
     }));
     return [...display, ...blocking];

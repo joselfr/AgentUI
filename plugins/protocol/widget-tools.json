@@ -212,7 +212,7 @@
       }
     },
     "progress": {
-      "description": "Affiche une checklist d'étapes avec barre d'avancement pour une tâche longue (plusieurs étapes, outils enchaînés), que tu mets à jour au fil du travail. Premier appel : renvoie un jeton [[agentui:…]] à écrire tel quel dans ta réponse, à l'endroit voulu. Pour chaque mise à jour, rappelle l'outil avec `update` = ce jeton et l'état COMPLET de toutes les étapes ; le composant déjà affiché change sur place (ne réécris pas le jeton). Passe l'étape en cours à `running`, termine-la à `done` (ou `failed`) avant de passer à la suivante. N'en crée qu'un par tâche ; inutile pour une tâche courte.",
+      "description": "Affiche une checklist d'étapes avec barre d'avancement pour une tâche longue (plusieurs étapes, outils enchaînés), que tu mets à jour au fil du travail. Le composant apparaît automatiquement en haut de ta réponse dès le premier appel : n'écris JAMAIS le jeton dans ton texte. Pour chaque mise à jour, rappelle l'outil avec `update` = le jeton renvoyé par le premier appel et l'état COMPLET de toutes les étapes ; le composant change sur place. Passe l'étape en cours à `running`, termine-la à `done` (ou `failed`) avant de passer à la suivante. N'en crée qu'un par tâche ; inutile pour une tâche courte.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -404,5 +404,6 @@
       }
     }
   },
-  "updateInstruction": "Mise à jour prise en compte : le composant déjà affiché a changé. Ne réécris pas le jeton."
+  "updateInstruction": "Mise à jour prise en compte : le composant affiché a changé. N'écris pas le jeton.",
+  "progressInstruction": "Le composant est déjà affiché dans la discussion : n'écris pas ce jeton dans ta réponse. Pour le mettre à jour, rappelle l'outil avec update = ce jeton et l'état complet des étapes."
 }
