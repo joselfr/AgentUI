@@ -21,6 +21,7 @@ export default function Chat(props: {
   const [drag, setDrag] = useState(false);
   const attachments = useAttachments(props.attach);
   const scroll = useStickToBottom(props.messages);
+  const lastAssistant = props.messages.findLastIndex((m) => m.role === 'assistant');
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDrag(true); } }}
@@ -41,13 +42,16 @@ export default function Chat(props: {
             </Box>)}
           {props.messages.map((m, i) => {
             const last = i === props.messages.length - 1;
-            const next = props.messages[i + 1];
+            // Réponses déjà données : les messages utilisateur qui suivent (une question de l'agent en plein run en reçoit plusieurs)
+            const answers: string[] = [];
+            for (let j = i + 1; props.messages[j]?.role === 'user'; j++) answers.push(props.messages[j]!.text);
+            const current = i === lastAssistant;
             return (
               <Fragment key={m.id}>
                 {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
                 <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName}
-                  answer={next?.role === 'user' ? next.text : undefined}
-                  onAnswer={last && (!props.running || props.awaiting) && m.role === 'assistant' ? (t) => void props.onSend(t, []) : undefined}
+                  answers={answers}
+                  onAnswer={current && (!props.running || props.awaiting) ? (t) => void props.onSend(t, []) : undefined}
                   working={props.running && m.role === 'assistant' && (last || m.status === 'streaming')} />
               </Fragment>);
           })}

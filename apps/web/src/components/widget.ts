@@ -6,3 +6,15 @@ export function parseWidget(raw: string): { type: string; arguments: Record<stri
     return { type: j.type, arguments: j.arguments as Record<string, unknown> };
   } catch { return undefined; }
 }
+
+const INTERACTIVE = new Set(['ask', 'confirm', 'form']);
+
+/** Blocs interactifs d'un texte (widgets `ask`/`confirm`/`form` et ancien bloc ```ask), dans l'ordre : chacun attend une réponse. */
+export function interactiveBlocks(text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(/```(widget|ask)[^\S\n]*\n([\s\S]*?)\n?```/g)) {
+    const raw = m[2]!;
+    if (m[1] === 'ask' || INTERACTIVE.has(parseWidget(raw)?.type ?? '')) out.push(raw);
+  }
+  return out;
+}

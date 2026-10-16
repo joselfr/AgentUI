@@ -10,7 +10,7 @@ import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
-import { parseWidget } from '../widget';
+import { interactiveBlocks, parseWidget } from '../widget';
 import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
@@ -53,21 +53,25 @@ function Attachments({ m }: { m: Message }) {
 }
 
 /** Une bulle de message : texte Markdown (ou carte de question « ask »), raisonnement, outils, pièces jointes. */
-export default function MessageBubble({ m, expandTools, agentName, answer, onAnswer, working }: {
-  m: Message; expandTools: boolean; agentName: string; answer?: string; onAnswer?: (t: string) => void; working?: boolean;
+export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, working }: {
+  m: Message; expandTools: boolean; agentName: string; answers?: string[]; onAnswer?: (t: string) => void; working?: boolean;
 }) {
   const mine = m.role === 'user';
   // `pre` doit garder la même identité d'un rendu à l'autre : sinon React le démonte et remonte, et les widgets
   // (saisie d'un formulaire, carte, cases cochées) perdent leur état et leur focus à chaque rendu du chat.
-  const latest = useRef({ m, answer, onAnswer });
-  latest.current = { m, answer, onAnswer };
+  const latest = useRef({ m, answers, onAnswer });
+  latest.current = { m, answers, onAnswer };
   const components = useMemo<Components>(() => ({
     pre: ({ children }) => {
-      const { m, answer, onAnswer } = latest.current;
+      const { m, answers, onAnswer: canAnswer } = latest.current;
       const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
       if ((m.status !== 'streaming' || isAwaiting(m)) && (lang === 'widget' || lang === 'ask')) {
         const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
+        // Un message peut poser plusieurs questions de suite (clarify) : la k-ième reçoit la k-ième réponse, seule la première sans réponse est active.
+        const k = interactiveBlocks(m.text).indexOf(raw);
+        const answer = k >= 0 ? answers[k] : undefined;
+        const onAnswer = k >= 0 && k !== answers.length ? undefined : canAnswer;
         if (lang === 'ask') return <AskCard ask={parseLegacyAsk(raw)} answer={answer} onAnswer={onAnswer} />;
         const w = parseWidget(raw);
         if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
