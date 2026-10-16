@@ -1,4 +1,4 @@
-import type { AgentInfo, Job, Message, OutgoingAttachment, SearchHit, Skill, SubAgent } from '@agentui/shared';
+import type { AgentInfo, Job, Message, ModelOption, OutgoingAttachment, SearchHit, Skill, SubAgent, Usage } from '@agentui/shared';
 
 export interface Conversation {
   id: string;
@@ -13,6 +13,8 @@ export interface Conversation {
   favorite: boolean;
   /** Rangée dans la section « Archivées ». */
   archived: boolean;
+  /** Modèle, tokens et coût de la session (derniers connus). */
+  usage?: Usage;
   /** Discussion dédiée d'une tâche cron. */
   cron: boolean;
   /** Dernière lecture avant l'ouverture en cours (ms) : sert à repérer les messages non lus. */
@@ -52,6 +54,10 @@ export const api = {
   jobs: (id: string, sub?: string) => call<Job[]>('GET', `/agents/${id}/jobs${q(sub)}`),
   jobAction: (id: string, jobId: string, action: string, sub?: string) =>
     call<{ ok: true }>('POST', `/agents/${id}/jobs/${encodeURIComponent(jobId)}/${action}${q(sub)}`),
+  models: (agentId: string) => call<ModelOption[]>('GET', `/agents/${agentId}/models`),
+  usage: (id: string) => call<Usage | null>('GET', `/conversations/${id}/usage`),
+  setModel: (id: string, model: string, provider?: string) =>
+    call<{ model: string; provider?: string; message?: string; usage?: Usage }>('PUT', `/conversations/${id}/model`, { model, provider }),
   search: (query: string) => call<SearchHit[]>('GET', `/search?q=${encodeURIComponent(query)}`),
   conversations: () => call<Conversation[]>('GET', '/conversations'),
   createConversation: (agentId: string, subAgentId?: string) => call<Conversation>('POST', '/conversations', { agentId, subAgentId }),

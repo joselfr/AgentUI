@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Alert, Avatar, Box, Button, CircularProgress, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import type { Capabilities, Message } from '@agentui/shared';
@@ -12,6 +12,8 @@ const alertSx = { mx: 'auto', mb: 1, width: 'min(836px, calc(100% - 24px))' } as
 
 /** Conversation : messages, demande d'autorisation, erreurs et zone de saisie ; dépôt de fichiers par glisser-déposer. */
 export default function Chat(props: {
+  /** Sélecteur de modèle, affiché sous la saisie. */
+  modelPicker?: ReactNode;
   unreadMark?: { id: string; count: number };
   title: string; agentName: string; messages: Message[]; loading: boolean; isNew: boolean; running: boolean; expandTools: boolean;
   canAbort: boolean; attach: Capabilities['attachments']; approval?: { id: string; description: string }; onApprove: (ok: boolean) => void; onSend: (t: string, files: File[]) => Promise<boolean>; onAbort: () => void; error?: string;
@@ -59,7 +61,7 @@ export default function Chat(props: {
         </Alert>)}
       {props.error && <Alert severity="error" variant="outlined" sx={alertSx}>{props.error}</Alert>}
       {attachments.error && <Alert severity="warning" variant="outlined" onClose={attachments.dismissError} sx={alertSx}>{attachments.error}</Alert>}
-      <Composer agentName={props.agentName} running={props.running} canAbort={props.canAbort} attachments={attachments} onAbort={props.onAbort}
+      <Composer agentName={props.agentName} running={props.running} canAbort={props.canAbort} attachments={attachments} onAbort={props.onAbort} modelPicker={props.modelPicker}
         onSubmit={(t, f) => { scroll.pin(); return props.onSend(t, f); }} />
     </Box>
   );

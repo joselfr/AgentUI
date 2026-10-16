@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Avatar, Box, Chip, Fab, IconButton, Paper, TextField, Tooltip } from '@mui/material';
 import AttachFile from '@mui/icons-material/AttachFile';
 import Close from '@mui/icons-material/Close';
@@ -9,8 +9,8 @@ import { formatSize } from '../../attachments';
 import type { useAttachments } from './useAttachments';
 
 /** Zone de saisie : texte (Entrée envoie, Maj+Entrée saute une ligne), fichiers joints (bouton, collage), envoi / arrêt. */
-export default function Composer({ agentName, running, canAbort, attachments, onSubmit, onAbort }: {
-  agentName: string; running: boolean; canAbort: boolean; attachments: ReturnType<typeof useAttachments>;
+export default function Composer({ agentName, running, canAbort, attachments, onSubmit, onAbort, modelPicker }: {
+  modelPicker?: ReactNode; agentName: string; running: boolean; canAbort: boolean; attachments: ReturnType<typeof useAttachments>;
   onSubmit: (text: string, files: File[]) => Promise<boolean>; onAbort: () => void;
 }) {
   const [text, setText] = useState('');
@@ -25,7 +25,7 @@ export default function Composer({ agentName, running, canAbort, attachments, on
   };
   return (
     <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 'max(12px, env(safe-area-inset-bottom))', pt: 0.5 }}>
-      <Paper sx={{ maxWidth: 860, mx: 'auto', borderRadius: 4, bgcolor: 'background.paper', '&:focus-within': { borderColor: 'primary.main' }, transition: 'border-color .15s' }}>
+      <Paper sx={{ maxWidth: 860, mx: 'auto', borderRadius: 1.5, bgcolor: 'background.paper', '&:focus-within': { borderColor: 'primary.main' }, transition: 'border-color .15s' }}>
         {files.length > 0 && (
           <Box sx={{ px: 1.5, pt: 1.25, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {files.map((f, i) => (
@@ -46,6 +46,7 @@ export default function Composer({ agentName, running, canAbort, attachments, on
             : <IconButton onClick={() => void send()} disabled={!canSend} aria-label="Envoyer"
                 sx={{ flexShrink: 0, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}><SendIcon /></IconButton>}
         </Box>
+        {modelPicker && <Box sx={{ px: 1.25, pb: 1, display: 'flex' }}>{modelPicker}</Box>}
       </Paper>
     </Box>
   );

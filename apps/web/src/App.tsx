@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CircularProgress, CssBaseline, Drawer, ThemeProvider, Typography, useMediaQuery } from '@mui/material';
-import type { AgentInfo, Message } from '@agentui/shared';
+import type { AgentInfo, Message, ModelOption, Usage } from '@agentui/shared';
 import { api, UnauthorizedError, type Conversation } from './api';
 import { makeTheme } from './theme';
 import { applyEvent } from './reducer';
@@ -13,6 +13,7 @@ import Sidebar, { DRAWER } from './components/Sidebar';
 import NavRail, { NAV, type View } from './components/NavRail';
 import Chat from './components/Chat';
 import ChatHeader from './components/ChatHeader';
+import ModelChip from './components/ModelChip';
 import NewConversation from './components/NewConversation';
 import SettingsDialog, { type ThemeMode } from './components/SettingsDialog';
 import { AgentsPage } from './components/pages/AgentsPage';
@@ -68,6 +69,8 @@ export default function App() {
   const onUnauth = useCallback(() => setAuth('out'), []);
   const { ask: askConfirm, dialog: confirmDialog } = useConfirm();
   const guard = useCallback((e: unknown) => { if (e instanceof UnauthorizedError) setAuth('out'); else setError((e as Error).message); }, []);
+
+  const setConvUsage = useCallback((id: string, usage: Usage) => setConvs((cs) => cs.map((c) => (c.id === id ? { ...c, usage } : c))), []);
 
   /** Rafraîchit la liste ; si la discussion est en cours de lecture, la marque lue d'abord (pas de flash « non lu »). */
   const syncConvs = useCallback((id?: string) => {
@@ -126,9 +129,12 @@ export default function App() {
     // Jamais les messages de la conversation précédente : cache local ou vide, le temps du chargement
     if (currentId && currentId === createdRef.current) { createdRef.current = undefined; openedRef.current = currentId; return; }
     setRunning(false);
-    if (currentId) { setMessages(msgCache.current.get(currentId) ?? []); setLoadingMsgs(true); loadMessages(currentId); }
+    if (currentId) {
+      setMessages(msgCache.current.get(currentId) ?? []); setLoadingMsgs(true); loadMessages(currentId);
+      api.usage(currentId).then((u) => { if (u) setConvUsage(currentId, u); }).catch(() => {}); // modèle et coût même pour une ancienne discussion
+    }
     else { setMessages([]); setLoadingMsgs(false); }
-  }, [auth, currentId, loadMessages]);
+  }, [auth, currentId, loadMessages, setConvUsage]);
 
   // Retour sur la page Discussions / l'onglet : ce qui est arrivé entre-temps est repéré comme non lu, puis marqué lu
   const wasViewing = useRef(viewing);
@@ -138,6 +144,7 @@ export default function App() {
   }, [viewing, currentId, auth, loadMessages]);
 
   const onEvent = useCallback((e: LiveEvent) => {
+    if (e.event.type === 'usage') { setConvUsage(e.sessionId, e.event.usage); return; } // consommation de la session : pas un message
     if (e.event.type === 'message.added') { // message proactif (cron, envoi spontané) : hors de tout run
       syncConvs(e.sessionId);
       if (e.sessionId === currentRef.current) loadMessages(e.sessionId);
@@ -155,7 +162,7 @@ export default function App() {
       return next;
     });
     if (!terminal) setRunning(true);
-  }, [loadMessages, syncConvs]);
+  }, [loadMessages, syncConvs, setConvUsage]);
 
   useLive({
     enabled: auth === 'in',
@@ -195,6 +202,21 @@ export default function App() {
     }
   };
 
+  const agentId = agent?.id;
+  const loadModels = useCallback(() => api.models(agentId!), [agentId]);
+  /** Change le modèle de la discussion ouverte ; sans discussion, on en crée une (vide) pour y rattacher le choix. */
+  const pickModel = async (o: ModelOption) => {
+    let id = currentId;
+    if (!id) {
+      if (!newAgent) throw new Error('Aucun agent configuré');
+      const c = await api.createConversation(newAgent, sub);
+      setConvs((cs) => [c, ...cs]);
+      currentRef.current = createdRef.current = id = c.id;
+      setCurrentId(id);
+    }
+    const r = await api.setModel(id, o.id, o.provider);
+    setConvUsage(id, r.usage ?? { inputTokens: 0, outputTokens: 0, model: r.model, provider: r.provider });
+  };
   const closeDrawer = () => { if (!wide) setDrawer(false); };
   const { toggleFavorite, renameConv, archiveConv, archiveMany, deleteConv, deleteMany } = useConversationActions({ setConvs, setCurrentId, currentRef, guard, ask: askConfirm });
   // Sur mobile, la barre de navigation vit dans le tiroir des discussions : fermer la liste libère toute la largeur.
@@ -228,6 +250,7 @@ export default function App() {
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {agent ? (
               <Chat title={current?.title ?? ''} agentName={agent.name} messages={messages} loading={loadingMsgs} isNew={!currentId} running={running} expandTools={expandTools}
+                modelPicker={<ModelChip key={agent.id} usage={current?.usage} canPick={!!agent.capabilities.models} disabled={running} load={loadModels} onPick={pickModel} />}
                 unreadMark={unreadMark} canAbort={agent.capabilities.abort} attach={agent.capabilities.attachments} error={error} approval={approval}
                 onApprove={(ok) => currentId && approval && api.approval(currentId, approval.id, ok).then(() => setApproval(undefined)).catch(guard)}
                 onSend={send} onAbort={() => currentId && api.abort(currentId).catch(guard)} />
