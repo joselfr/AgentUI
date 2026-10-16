@@ -3,6 +3,7 @@ import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, Di
 import SystemUpdateAlt from '@mui/icons-material/SystemUpdateAlt';
 import { api } from '../api';
 import { forceUpdate } from '../pwa';
+import { useBackClose } from '../useBackClose';
 import { disablePush, enablePush, pushState, type PushState } from '../push';
 
 export type ThemeMode = 'auto' | 'light' | 'dark';
@@ -15,6 +16,7 @@ export default function SettingsDialog({ open, onClose, onLogout, themeMode, onT
   expandTools: boolean; onExpandTools: (v: boolean) => void;
   askUser: boolean; onAskUser: (v: boolean) => void;
 }) {
+  useBackClose(open, onClose);
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle sx={{ fontWeight: 650 }}>Réglages</DialogTitle>

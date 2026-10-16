@@ -8,6 +8,7 @@ import { useLive, type LiveEvent } from './useLive';
 import { useConversationActions } from './useConversationActions';
 import Login from './components/Login';
 import { useConfirm } from './components/Confirm';
+import { useBackClose } from './useBackClose';
 import { load, save, usePersisted } from './storage';
 import Sidebar, { DRAWER } from './components/Sidebar';
 import NavRail, { NAV, type View } from './components/NavRail';
@@ -41,6 +42,7 @@ export default function App() {
   const [approval, setApproval] = useState<{ id: string; description: string }>();
   const [error, setError] = useState<string>();
   const [drawer, setDrawer] = useState(false);
+  useBackClose(!wide && drawer, () => setDrawer(false));
   const [listOpen, setListOpen] = useState(() => load<boolean>('listOpen', true));
   const [view, setView] = useState<View>(() => load<View>('view', 'chats'));
   const [settings, setSettings] = useState(false);

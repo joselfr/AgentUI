@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, ListItemButton, ListItemText, Typography } from '@mui/material';
 import type { AgentInfo, SubAgent } from '@agentui/shared';
 import { api } from '../api';
+import { useBackClose } from '../useBackClose';
 import StatusDot from './StatusDot';
 
 export default function NewConversation(props: {
@@ -9,6 +10,7 @@ export default function NewConversation(props: {
   onClose: () => void; onStart: (agentId: string, sub?: string) => void;
 }) {
   const { open, agents } = props;
+  useBackClose(open, props.onClose);
   const [agentId, setAgentId] = useState<string>();
   const [sub, setSub] = useState<string>();
   const [subs, setSubs] = useState<SubAgent[]>([]);

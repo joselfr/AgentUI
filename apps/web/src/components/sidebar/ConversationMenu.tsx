@@ -8,6 +8,7 @@ import Star from '@mui/icons-material/Star';
 import StarBorder from '@mui/icons-material/StarBorder';
 import Unarchive from '@mui/icons-material/Unarchive';
 import type { Conversation } from '../../api';
+import { useBackClose } from '../../useBackClose';
 import type { ItemMenu } from './useItemMenu';
 
 /** Menu clic droit / appui long d'une discussion. Chaque action ferme le menu avant de s'exécuter. */
@@ -17,6 +18,7 @@ export default function ConversationMenu({ menu, onRequestClose, onClose, onTogg
   onSelect: (c: Conversation) => void; onDelete: (c: Conversation) => void;
 }) {
   const c = menu?.item;
+  useBackClose(!!menu, onRequestClose);
   const run = (fn: (c: Conversation) => void) => () => { if (c) fn(c); onClose(); };
   return (
     <Menu open={!!menu} onClose={onRequestClose} anchorReference="anchorPosition" anchorPosition={menu ? { top: menu.y, left: menu.x } : undefined}
@@ -45,6 +47,7 @@ export default function ConversationMenu({ menu, onRequestClose, onClose, onTogg
 /** Modale de renommage ; `conv` non défini = fermée. */
 export function RenameDialog({ conv, onSubmit, onClose }: { conv?: Conversation; onSubmit: (c: Conversation, title: string) => void; onClose: () => void }) {
   const [title, setTitle] = useState('');
+  useBackClose(!!conv, onClose);
   useEffect(() => { if (conv) setTitle(conv.title); }, [conv]);
   const submit = () => {
     const t = title.trim();

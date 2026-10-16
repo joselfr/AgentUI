@@ -4,6 +4,7 @@ import ArrowDropDown from '@mui/icons-material/ArrowDropDown';
 import Check from '@mui/icons-material/Check';
 import Memory from '@mui/icons-material/Memory';
 import type { ModelOption, Usage } from '@agentui/shared';
+import { useBackClose } from '../useBackClose';
 
 /**
  * Modèle de la discussion, dans la zone de saisie. Cliquable quand l'agent sait changer de modèle : le menu liste les
@@ -19,6 +20,7 @@ export default function ModelChip({ usage, canPick, disabled, load, onPick }: {
   useEffect(() => {
     if (anchor && !options) load().then(setOptions).catch((e) => setError((e as Error).message));
   }, [anchor, options, load]);
+  useBackClose(!!anchor, () => { if (!busy) setAnchor(null); });
   if (!usage?.model && !canPick) return null;
 
   const clickable = canPick && !disabled;

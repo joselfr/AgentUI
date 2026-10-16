@@ -8,6 +8,7 @@ import Forum from '@mui/icons-material/Forum';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import type { AgentInfo, Job } from '@agentui/shared';
 import { api } from '../../api';
+import { useBackClose } from '../../useBackClose';
 import { MONO } from '../../theme';
 import { useConfirm } from '../Confirm';
 import { card, useLoad, Page, Status, Pickers, useScope } from './shared';
@@ -27,6 +28,7 @@ function RunState({ j, launched }: { j: Job; launched: boolean }) {
 
 /** Popup de détail d'une tâche : planification, dernière exécution, script exécuté et prompt confié à l'agent. */
 function JobDialog({ j, onClose }: { j?: Job; onClose: () => void }) {
+  useBackClose(!!j, onClose);
   const field = (label: string, value: ReactNode) => (
     <Box>
       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{label}</Typography>

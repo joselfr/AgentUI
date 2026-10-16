@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { useBackClose } from '../useBackClose';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import HelpOutline from '@mui/icons-material/HelpOutline';
 
@@ -23,6 +24,7 @@ export function useConfirm() {
     setOpts(o);
   }), []);
   const close = (ok: boolean) => { resolver.current?.(ok); resolver.current = undefined; setOpts(undefined); };
+  useBackClose(!!opts, () => close(false));
   // Le contenu est gardé pendant l'animation de fermeture (opts devient undefined aussitôt)
   const last = useRef<ConfirmOptions>();
   if (opts) last.current = opts;
