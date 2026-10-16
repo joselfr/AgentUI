@@ -591,6 +591,27 @@
         {
           "properties": {
             "type": {
+              "const": "reply"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "runId",
+            "text"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
               "const": "approval"
             },
             "conversationId": {

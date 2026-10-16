@@ -105,6 +105,7 @@ class FakeAgent:
         self.adapter = adapter
         self.chats = []
         self.release = threading.Event()
+        self.answers = {}
 
     async def __call__(self, event):
         if event.text == "/stop":
@@ -136,6 +137,19 @@ class FakeAgent:
                 )
                 assert fut.result(5).success
                 self.release.wait(5)
+                return "fait"
+            if event.text.startswith("clarify"):  # outil clarify : question en plein run, le tour attend la réponse
+                from tools import clarify_gateway as cg
+
+                choices = ["Un", "Deux"] if event.text == "clarify-choix" else None
+                cg.register(clarify_id=f"cl-{chat}", session_key=f"k-{chat}", question="Lequel ?", choices=choices)
+                hook("pre_tool_call")(tool_name="clarify", args={}, session_id=f"s-{chat}", tool_call_id="t-cl")
+                fut = asyncio.run_coroutine_threadsafe(
+                    self.adapter.send_clarify(chat_id=chat, question="Lequel ?", choices=choices, clarify_id=f"cl-{chat}", session_key=f"k-{chat}"),
+                    self.adapter._loop,
+                )
+                assert fut.result(5).success
+                self.answers[chat] = cg.wait_for_response(f"cl-{chat}", 5)
                 return "fait"
             if event.text == "long":
                 self.release.wait(10)
@@ -251,6 +265,21 @@ async def main():
         await server.until(lambda f: f.get("runId") == "r3" and f["event"]["type"] == "run.completed")
         agent.release.clear()
         print("✓ approbation (resolve_gateway_approval)")
+
+        # 4bis. question de l'agent (clarify) : widget ask, puis la réponse (trame reply) débloque l'outil dans le run en cours
+        await server.send({"type": "inbound", "conversationId": "c3b", "runId": "r3b", "text": "clarify-choix"})
+        frames = await server.until(lambda f: "```widget" in json.dumps(f, ensure_ascii=False))
+        blob = json.dumps(frames[-1], ensure_ascii=False)
+        assert '\\"type\\": \\"ask\\"' in blob and "Lequel ?" in blob and "Deux" in blob, blob
+        await server.send({"type": "reply", "conversationId": "c3b", "runId": "r3b", "text": "2"})
+        await server.until(lambda f: f.get("runId") == "r3b" and f["event"]["type"] == "run.completed")
+        assert agent.answers["c3b"] == "Deux", agent.answers  # « 2 » → la 2e option, comme sur Telegram
+        await server.send({"type": "inbound", "conversationId": "c3c", "runId": "r3c", "text": "clarify-libre"})
+        await server.until(lambda f: f.get("runId") == "r3c" and "Lequel ?" in json.dumps(f, ensure_ascii=False))
+        await server.send({"type": "reply", "conversationId": "c3c", "runId": "r3c", "text": "ma réponse"})
+        await server.until(lambda f: f.get("runId") == "r3c" and f["event"]["type"] == "run.completed")
+        assert agent.answers["c3c"] == "ma réponse", agent.answers
+        print("✓ question clarify : réponse reply → outil débloqué, run mené à terme")
 
         # 5. arrêt : run.aborted, et la confirmation de /stop n'est pas relayée
         await server.send({"type": "inbound", "conversationId": "c4", "runId": "r4", "text": "long"})

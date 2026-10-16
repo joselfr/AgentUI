@@ -15,7 +15,7 @@ export default function Chat(props: {
   /** Sélecteur de modèle, affiché sous la saisie. */
   modelPicker?: ReactNode;
   unreadMark?: { id: string; count: number };
-  title: string; agentName: string; messages: Message[]; loading: boolean; isNew: boolean; running: boolean; expandTools: boolean;
+  title: string; agentName: string; messages: Message[]; loading: boolean; isNew: boolean; running: boolean; awaiting: boolean; expandTools: boolean;
   canAbort: boolean; attach: Capabilities['attachments']; approval?: { id: string; description: string }; onApprove: (ok: boolean) => void; onSend: (t: string, files: File[]) => Promise<boolean>; onAbort: () => void; error?: string;
 }) {
   const [drag, setDrag] = useState(false);
@@ -47,8 +47,8 @@ export default function Chat(props: {
                 {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
                 <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName}
                   answer={next?.role === 'user' ? next.text : undefined}
-                  onAnswer={last && !props.running && m.role === 'assistant' ? (t) => void props.onSend(t, []) : undefined}
-                  working={last && props.running && m.role === 'assistant'} />
+                  onAnswer={last && (!props.running || props.awaiting) && m.role === 'assistant' ? (t) => void props.onSend(t, []) : undefined}
+                  working={props.running && m.role === 'assistant' && (last || m.status === 'streaming')} />
               </Fragment>);
           })}
         </Box>
@@ -61,7 +61,7 @@ export default function Chat(props: {
         </Alert>)}
       {props.error && <Alert severity="error" variant="outlined" sx={alertSx}>{props.error}</Alert>}
       {attachments.error && <Alert severity="warning" variant="outlined" onClose={attachments.dismissError} sx={alertSx}>{attachments.error}</Alert>}
-      <Composer agentName={props.agentName} running={props.running} canAbort={props.canAbort} attachments={attachments} onAbort={props.onAbort} modelPicker={props.modelPicker}
+      <Composer agentName={props.agentName} running={props.running} awaiting={props.awaiting} canAbort={props.canAbort} attachments={attachments} onAbort={props.onAbort} modelPicker={props.modelPicker}
         onSubmit={(t, f) => { scroll.pin(); return props.onSend(t, f); }} />
     </Box>
   );

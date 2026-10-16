@@ -480,6 +480,30 @@ export class RunManager {
     await this.adapters.get(a.agentId)?.abort(a.runId, a.remoteSessionId);
   }
 
+  /** Vrai si le run en cours attend une réponse de l'utilisateur (outil `clarify` en cours) et que l'agent sait la recevoir. */
+  awaitingReply(convId: string): boolean {
+    const a = this.active.get(convId);
+    if (!a || !this.adapters.get(a.agentId)?.reply) return false;
+    return !!this.db
+      .prepare(
+        `SELECT 1 FROM tool_calls t JOIN messages m ON m.id = t.message_id
+         WHERE m.conversation_id = ? AND m.run_id = ? AND t.name = 'clarify' AND t.status = 'running' LIMIT 1`,
+      )
+      .get(convId, a.runId);
+  }
+
+  /** Transmet la réponse de l'utilisateur à la question posée par l'agent ; le run en cours se poursuit. */
+  async reply(convId: string, text: string): Promise<{ runId: string; messageId: string }> {
+    const a = this.active.get(convId);
+    if (!a || !this.awaitingReply(convId)) throw new Error('Un run est déjà en cours dans cette conversation');
+    await this.adapters.get(a.agentId)!.reply!(a.runId, a.remoteSessionId, text);
+    this.db
+      .prepare('INSERT INTO messages (id, conversation_id, role, text, status, created_at) VALUES (?,?,?,?,?,?)')
+      .run(randomUUID(), convId, 'user', text, 'done', Date.now());
+    const m = this.db.prepare('SELECT id FROM messages WHERE conversation_id = ? AND run_id = ?').get(convId, a.runId) as { id: string };
+    return { runId: a.runId, messageId: m.id };
+  }
+
   async approve(convId: string, approvalId: string, approve: boolean) {
     const a = this.active.get(convId);
     if (!a) throw new Error('Aucun run actif');

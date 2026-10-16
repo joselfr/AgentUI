@@ -3,7 +3,7 @@ import { Box, CircularProgress, CssBaseline, Drawer, ThemeProvider, Typography, 
 import type { AgentInfo, Message, ModelOption, Usage } from '@agentui/shared';
 import { api, UnauthorizedError, type Conversation } from './api';
 import { makeTheme } from './theme';
-import { applyEvent } from './reducer';
+import { applyEvent, awaitingReply } from './reducer';
 import { useLive, type LiveEvent } from './useLive';
 import { useConversationActions } from './useConversationActions';
 import Login from './components/Login';
@@ -187,11 +187,12 @@ export default function App() {
         currentRef.current = createdRef.current = id = c.id;
         setCurrentId(id);
       }
+      const answering = running && awaitingReply(messages); // réponse à une question de l'agent : le run en cours se poursuit
       const attachments = await toOutgoing(files);
       const views: AttachmentView[] = files.map((f, i) => ({ id: `local-${Date.now()}-${i}`, name: f.name, mimeType: f.type, size: f.size, url: URL.createObjectURL(f) }));
       setMessages((m) => [...m,
         { id: `local-${Date.now()}`, role: 'user', text, attachments: views, createdAt: Date.now(), status: 'done' },
-        { id: `local-a-${Date.now()}`, role: 'assistant', text: '', createdAt: Date.now(), status: 'streaming' }]);
+        ...(answering ? [] : [{ id: `local-a-${Date.now()}`, role: 'assistant' as const, text: '', createdAt: Date.now(), status: 'streaming' as const }])]);
       optimistic = true;
       setRunning(true);
       await api.send(id, text, attachments, askUser);
@@ -251,7 +252,7 @@ export default function App() {
           <ChatHeader title={current?.title ?? 'Nouvelle conversation'} agent={agent} showListButton={!wide || !listOpen} onShowList={() => (wide ? setListOpen(true) : setDrawer(true))} />
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {agent ? (
-              <Chat title={current?.title ?? ''} agentName={agent.name} messages={messages} loading={loadingMsgs} isNew={!currentId} running={running} expandTools={expandTools}
+              <Chat title={current?.title ?? ''} agentName={agent.name} messages={messages} loading={loadingMsgs} isNew={!currentId} running={running} awaiting={running && awaitingReply(messages)} expandTools={expandTools}
                 modelPicker={<ModelChip key={agent.id} usage={current?.usage} canPick={!!agent.capabilities.models} disabled={running} load={loadModels} onPick={pickModel} />}
                 unreadMark={unreadMark} canAbort={agent.capabilities.abort} attach={agent.capabilities.attachments} error={error} approval={approval}
                 onApprove={(ok) => currentId && approval && api.approval(currentId, approval.id, ok).then(() => setApproval(undefined)).catch(guard)}

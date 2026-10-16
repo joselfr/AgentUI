@@ -74,6 +74,7 @@ export type GatewayMessage =
   | { type: 'welcome'; protocol: number }
   | { type: 'inbound'; conversationId: string; runId: string; text: string; subAgentId?: string; attachments?: Media[] }
   | { type: 'abort'; conversationId: string; runId: string }
+  | { type: 'reply'; conversationId: string; runId: string; text: string }
   | { type: 'approval'; conversationId: string; runId: string; id: string; approve: boolean; scope?: 'once' | 'session' | 'always' }
   | { type: 'rpc'; id: string; method: string; params?: unknown }
   | { type: 'ping' };

@@ -28,7 +28,7 @@ import urllib.request
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from gateway.config import Platform
 from gateway.platforms.base import (
@@ -346,6 +346,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._lock = threading.Lock()  # protège les tables ci-dessous (thread de l'agent + boucle asyncio)
         self._runs: Dict[str, _Run] = {}  # conversationId → run en cours
         self._approvals: Dict[str, str] = {}  # id d'approbation → session_key Hermes
+        self._clarifies: Dict[str, Tuple[str, str]] = {}  # discussion → (session_key, clarify_id) de la question en attente
         self._session_chat: Dict[str, str] = {}  # session_id Hermes (agent ou sous-agent) → conversationId
         self._session_subagent: Dict[str, str] = {}  # session_id d'un sous-agent → id de sous-agent AgentUI
         self._closing = False
@@ -473,6 +474,7 @@ class AgentUIAdapter(BasePlatformAdapter):
     def _finish(self, conversation_id: str, event: dict) -> None:
         with self._lock:
             run = self._runs.pop(conversation_id, None)
+            self._clarifies.pop(conversation_id, None)
         if run is not None:
             self._post({"type": "event", "conversationId": conversation_id, "runId": run.run_id, "event": event})
 
@@ -486,6 +488,8 @@ class AgentUIAdapter(BasePlatformAdapter):
             await self._on_abort(msg)
         elif kind == "approval":
             self._on_approval(msg)
+        elif kind == "reply":
+            self._on_reply(msg)
         elif kind == "rpc":
             asyncio.create_task(self._on_rpc(msg))
         elif kind == "ping":
@@ -549,6 +553,24 @@ class AgentUIAdapter(BasePlatformAdapter):
             resolve_gateway_approval(session_key, choice)
         except Exception:
             logger.exception("AgentUI: échec de résolution de l'approbation")
+
+    def _on_reply(self, msg: dict) -> None:
+        """Réponse à une question `clarify` en attente : elle débloque l'outil, le run en cours reprend."""
+        conv, text = msg.get("conversationId", ""), msg.get("text", "")
+        with self._lock:
+            pending = self._clarifies.pop(conv, None)
+        if pending is None:
+            logger.warning("AgentUI: réponse sans question en attente (discussion %s)", conv)
+            return
+        session_key, clarify_id = pending
+        try:
+            from tools import clarify_gateway as cg
+
+            # « 2 » ou le libellé d'une option → l'option ; une sélection invalide ou une réponse libre → le texte tel quel
+            if cg.attempt_text_response_for_session(session_key, text) != cg.TEXT_RESOLVED:
+                cg.resolve_gateway_clarify(clarify_id, text)
+        except Exception:
+            logger.exception("AgentUI: échec de résolution de la question")
 
     def _delete_session(self, conversation_id: str) -> dict:
         """Supprime la session Hermes d'une discussion AgentUI (une discussion = un chat_id = une session).
@@ -776,6 +798,22 @@ class AgentUIAdapter(BasePlatformAdapter):
                 self._approvals.pop(approval_id, None)
             return SendResult(success=False, error="aucun run AgentUI pour cette discussion")
         return SendResult(success=True, message_id=approval_id)
+
+    async def send_clarify(self, chat_id: str, question: str, choices: Optional[list], clarify_id: str, session_key: str, metadata: Optional[Dict[str, Any]] = None) -> SendResult:
+        """Question de l'agent en plein run (outil `clarify`). Avec des choix : widget `ask` (boutons) ; la réponse revient
+        par la trame `reply` et débloque l'outil, au lieu de passer pour un nouveau message (le run est toujours en cours)."""
+        from tools import clarify_gateway as cg
+
+        with self._lock:
+            self._clarifies[chat_id] = (session_key, clarify_id)
+        if choices:
+            multi = bool(getattr(cg._entries.get(clarify_id), "multi_select", False))  # même lecture que l'adaptateur de base
+            cg.mark_awaiting_text(clarify_id)  # les réponses par texte (« 2 », libellé, texte libre) sont aussi acceptées
+            widget = {"type": "ask", "arguments": {"question": question, "options": [str(c) for c in choices], **({"multiple": True} if multi else {})}}
+            content = "```widget\n" + json.dumps(widget, ensure_ascii=False) + "\n```"
+        else:
+            content = f"❓ {question}"
+        return await self.send(chat_id=chat_id, content=content, metadata=metadata)
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         pass  # AgentUI affiche déjà l'état du run

@@ -341,6 +341,12 @@ export class GatewayAdapter implements AgentAdapter {
     }
   }
 
+  async reply(runId: string, sessionId: string, text: string): Promise<void> {
+    if (!this.write({ type: 'reply', conversationId: this.runs.get(runId)?.conversationId ?? sessionId, runId, text })) {
+      throw new Error('plugin non connecté');
+    }
+  }
+
   async fetchMedia(url: string): Promise<{ data: Buffer; mimeType: string }> {
     const m = this.media.get(url);
     if (!m) throw new Error('média expiré');

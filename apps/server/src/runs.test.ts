@@ -2,7 +2,8 @@ import { createServer, type Server } from 'node:http';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import type { AgentEvent } from '@agentui/shared';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { openDb } from './db.js';
 import { HermesAdapter } from './agents/hermes.js';
 import type { AgentAdapter } from './agents/types.js';
@@ -325,4 +326,50 @@ test('consommation : l’événement usage est mémorisé, rediffusé et ne pert
   const sid = runs.ensureRemoteSession(fresh.id);
   expect(sid).toBeTruthy();
   expect(runs.ensureRemoteSession(fresh.id)).toBe(sid);
+});
+
+test('question de l\'agent (clarify) : la réponse reprend le run en cours, sans en ouvrir un autre', async () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const replies: string[] = [];
+  let push!: (e: AgentEvent) => void;
+  let end!: () => void;
+  const queue: AgentEvent[] = [];
+  let wake: (() => void) | undefined;
+  push = (e) => { queue.push(e); wake?.(); };
+  end = () => push({ type: 'run.completed' });
+  const adapter = {
+    capabilities: () => ({}),
+    async send() {
+      async function* events() {
+        for (;;) {
+          while (!queue.length) await new Promise<void>((r) => (wake = r));
+          const e = queue.shift()!;
+          yield e;
+          if (e.type === 'run.completed') return;
+        }
+      }
+      return { runId: 'r1', sessionId: 's1', events: events() };
+    },
+    async reply(_runId: string, _sessionId: string, text: string) { replies.push(text); },
+  } as unknown as AgentAdapter;
+  const runs = new RunManager(db, new Map([['a', adapter]]));
+  const finished = new Promise<string>((r) => (runs.onRunFinished = (_c, o) => r(o)));
+  const conv = runs.createConversation('a');
+  await runs.start(conv.id, 'refais un form');
+  expect(runs.awaitingReply(conv.id)).toBe(false);
+  await expect(runs.reply(conv.id, 'x')).rejects.toThrow(); // pas de question en attente → pas de réponse
+  push({ type: 'tool.started', id: 't1', name: 'clarify' });
+  await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(true));
+
+  await runs.reply(conv.id, 'Un autre thème');
+  expect(replies).toEqual(['Un autre thème']);
+  push({ type: 'tool.completed', id: 't1', name: 'clarify' });
+  await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(false));
+  push({ type: 'message.delta', text: 'Voici' });
+  end();
+  expect(await finished).toBe('completed');
+  const msgs = runs.getMessages(conv.id);
+  expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user']); // un seul run, la réponse est enregistrée
+  expect(msgs[1]!.text).toBe('Voici');
+  expect(msgs[2]!.text).toBe('Un autre thème');
 });

@@ -9,14 +9,15 @@ import { formatSize } from '../../attachments';
 import type { useAttachments } from './useAttachments';
 
 /** Zone de saisie : texte (Entrée envoie, Maj+Entrée saute une ligne), fichiers joints (bouton, collage), envoi / arrêt. */
-export default function Composer({ agentName, running, canAbort, attachments, onSubmit, onAbort, modelPicker }: {
-  modelPicker?: ReactNode; agentName: string; running: boolean; canAbort: boolean; attachments: ReturnType<typeof useAttachments>;
+export default function Composer({ agentName, running, awaiting, canAbort, attachments, onSubmit, onAbort, modelPicker }: {
+  modelPicker?: ReactNode; agentName: string; running: boolean; awaiting: boolean; canAbort: boolean; attachments: ReturnType<typeof useAttachments>;
   onSubmit: (text: string, files: File[]) => Promise<boolean>; onAbort: () => void;
 }) {
   const [text, setText] = useState('');
   const picker = useRef<HTMLInputElement>(null);
   const { files, previews } = attachments;
-  const canSend = (text.trim() || files.length) && !running;
+  // Pendant une question de l'agent, le texte est la réponse (sans pièce jointe) ; sans texte, le bouton reste « Arrêter ».
+  const canSend = awaiting ? !!text.trim() && !files.length : (text.trim() || files.length) && !running;
   const send = async () => {
     if (!canSend) return;
     const t = text, f = files;
@@ -41,7 +42,7 @@ export default function Composer({ agentName, running, canAbort, attachments, on
             onChange={(e) => setText(e.target.value)}
             onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); attachments.add(e.clipboardData.files); } }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-          {running && canAbort
+          {running && canAbort && !canSend
             ? <Fab color="error" size="small" onClick={onAbort} aria-label="Arrêter" sx={{ flexShrink: 0, boxShadow: 'none' }}><StopIcon /></Fab>
             : <IconButton onClick={() => void send()} disabled={!canSend} aria-label="Envoyer"
                 sx={{ flexShrink: 0, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}><SendIcon /></IconButton>}
