@@ -62,6 +62,7 @@ CAPABILITIES = {
     "jobs": True,
     "jobControl": True,
     "sessionDelete": True,
+    "models": True,
     "attachments": {"images": True, "files": True, "maxBytes": MAX_MEDIA},
 }
 
@@ -237,6 +238,75 @@ def _strip_cursor(text: str) -> str:
     return text
 
 
+def _session_usage(conversation_id: str) -> Optional[dict]:
+    """Modèle et consommation cumulée de la session Hermes d'une discussion, lus dans sa base (None si inconnue)."""
+    import sqlite3
+
+    from hermes_state import SessionDB
+
+    db = SessionDB(read_only=True)
+    try:
+        path = str(db.db_path)
+    finally:
+        db.close()
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)
+    try:
+        con.row_factory = sqlite3.Row
+        row = con.execute(
+            "SELECT model, billing_provider, input_tokens, output_tokens, cache_read_tokens, reasoning_tokens,"
+            " estimated_cost_usd, actual_cost_usd FROM sessions WHERE source = ? AND chat_id = ? ORDER BY started_at DESC LIMIT 1",
+            (PLATFORM, conversation_id),
+        ).fetchone()
+    finally:
+        con.close()
+    if row is None:
+        return None
+    model = row["model"] or _default_model()
+    usage: Dict[str, Any] = {"inputTokens": int(row["input_tokens"] or 0), "outputTokens": int(row["output_tokens"] or 0)}
+    if model:
+        usage["model"] = str(model)
+    if row["billing_provider"]:
+        usage["provider"] = str(row["billing_provider"])
+    for key, col in (("cacheReadTokens", "cache_read_tokens"), ("reasoningTokens", "reasoning_tokens")):
+        if row[col]:
+            usage[key] = int(row[col])
+    actual, estimated = row["actual_cost_usd"], row["estimated_cost_usd"]
+    if actual or estimated:
+        usage["costUsd"] = float(actual or estimated)
+        usage["costEstimated"] = not actual
+    return usage
+
+
+def _default_model() -> Optional[str]:
+    """Modèle par défaut de la configuration Hermes (pour une session qui n'en a pas encore enregistré)."""
+    try:
+        from hermes_cli.config import load_config
+
+        model = (load_config() or {}).get("model")
+        return (model.get("default") if isinstance(model, dict) else model) or None
+    except Exception:
+        return None
+
+
+def _list_models() -> List[dict]:
+    """Modèles des fournisseurs authentifiés, à plat : [{provider, providerName, id}]."""
+    from hermes_cli.model_switch import list_authenticated_providers
+
+    cfg_model: Any = {}
+    try:
+        from hermes_cli.config import load_config
+
+        cfg_model = (load_config() or {}).get("model") or {}
+    except Exception:
+        pass
+    current_provider = cfg_model.get("provider", "") if isinstance(cfg_model, dict) else ""
+    out: List[dict] = []
+    for p in list_authenticated_providers(current_provider=current_provider):
+        for m in p.get("models") or []:
+            out.append({"provider": str(p.get("slug", "")), "providerName": str(p.get("name") or p.get("slug", "")), "id": str(m)})
+    return out
+
+
 @dataclass
 class _Run:
     run_id: str
@@ -268,6 +338,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._outbox: Optional[asyncio.Queue] = None
         self._unsent: Optional[dict] = None
         self._welcomed: Optional[asyncio.Event] = None
+        self._captures: Dict[str, asyncio.Future] = {}  # réponses de commandes de contrôle (/model) à renvoyer en rpc
         self._muted_until: Dict[str, float] = {}  # discussions arrêtées : on ignore la confirmation de /stop
         self._lock = threading.Lock()  # protège les tables ci-dessous (thread de l'agent + boucle asyncio)
         self._runs: Dict[str, _Run] = {}  # conversationId → run en cours
@@ -501,9 +572,50 @@ class AgentUIAdapter(BasePlatformAdapter):
             db.close()  # 0.19 n'a pas de gestionnaire de contexte sur SessionDB
         return {"ok": True, "deleted": bool(deleted)}
 
+    async def _control(self, conversation_id: str, text: str, timeout: float = 20.0) -> str:
+        """Passe une commande de contrôle (/model…) à la gateway comme si l'utilisateur l'avait tapée, et renvoie sa
+        réponse au lieu de l'afficher dans la discussion."""
+        fut: asyncio.Future = asyncio.get_running_loop().create_future()
+        with self._lock:
+            if conversation_id in self._captures:
+                raise RuntimeError("une commande est déjà en cours dans cette discussion")
+            self._captures[conversation_id] = fut
+        source = self.build_source(chat_id=conversation_id, chat_name=conversation_id, chat_type="dm", user_id=OWNER_ID, user_name="AgentUI")
+        try:
+            await self.handle_message(MessageEvent(text=text, message_type=MessageType.COMMAND, source=source, message_id=f"ctl-{uuid.uuid4().hex[:8]}"))
+            return await asyncio.wait_for(fut, timeout)
+        except asyncio.TimeoutError:
+            raise RuntimeError("Hermes n'a pas répondu à temps")
+        finally:
+            with self._lock:
+                self._captures.pop(conversation_id, None)
+
+    async def _set_model(self, params: dict) -> dict:
+        """Fixe le modèle de la session d'une discussion (commande /model de la gateway, limitée à la session)."""
+        conv, model, provider = str(params.get("conversationId", "")), str(params.get("model", "")).strip(), str(params.get("provider", "")).strip()
+        if not conv or not model:
+            raise ValueError("conversationId et model sont requis")
+        with self._lock:
+            if conv in self._runs:
+                raise RuntimeError("un run est en cours dans cette discussion")
+        reply = await self._control(conv, f"/model {model}" + (f" --provider {provider}" if provider else "") + " --session")
+        if not reply.lstrip().startswith("✓"):
+            raise RuntimeError(reply.lstrip("❌✗🟡 \n").strip() or "changement de modèle refusé")
+        usage = await asyncio.to_thread(_session_usage, conv)
+        return {"model": (usage or {}).get("model") or model, **({"provider": provider} if provider else {}), "message": reply.strip()}
+
     async def _on_rpc(self, msg: dict) -> None:
         method, params = msg.get("method"), msg.get("params") or {}
+        if method == "setModel":
+            try:
+                self._post({"type": "rpc.result", "id": msg.get("id"), "result": await self._set_model(params)})
+            except Exception as e:
+                logger.warning("AgentUI: rpc setModel en échec : %s", e)
+                self._post({"type": "rpc.result", "id": msg.get("id"), "error": str(e) or type(e).__name__})
+            return
         handlers = {
+            "listModels": _list_models,
+            "sessionUsage": lambda: _session_usage(str(params.get("conversationId", ""))),
             "listSubAgents": _sub_agents,
             "listJobs": _list_jobs,
             "listSkills": _list_skills,
@@ -531,6 +643,12 @@ class AgentUIAdapter(BasePlatformAdapter):
             return  # /stop ou message déjà terminé
         if run.emitted and not run.settled:
             self._emit(conv, {"type": "message.final", "text": run.emitted})  # fige le texte (sans curseur)
+        try:  # consommation cumulée de la session (même interrompue, les tokens sont consommés) : AgentUI l'affiche
+            usage = await asyncio.to_thread(_session_usage, conv)
+            if usage:
+                self._emit(conv, {"type": "usage", "usage": usage})
+        except Exception:
+            logger.debug("AgentUI: lecture de la consommation impossible", exc_info=True)
         if outcome is ProcessingOutcome.SUCCESS:
             self._finish(conv, {"type": "run.completed"})
         elif outcome is ProcessingOutcome.CANCELLED or run.aborted:
@@ -565,6 +683,12 @@ class AgentUIAdapter(BasePlatformAdapter):
 
     async def send(self, chat_id: str, content: str, reply_to: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> SendResult:
         message_id = uuid.uuid4().hex
+        with self._lock:
+            capture = self._captures.get(chat_id)
+        if capture is not None:  # réponse d'une commande de contrôle (rpc setModel), pas un message de la discussion
+            if not capture.done():
+                self._loop.call_soon_threadsafe(lambda: capture.done() or capture.set_result(content))
+            return SendResult(success=True, message_id=message_id)
         job_id = (metadata or {}).get("job_id")
         if job_id:
             # Livraison d'une tâche cron : toujours un message à part, jamais mêlé à une réponse en cours.

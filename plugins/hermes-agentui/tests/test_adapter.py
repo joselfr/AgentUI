@@ -109,6 +109,10 @@ class FakeAgent:
     async def __call__(self, event):
         if event.text == "/stop":
             return "⏹ Stopped."
+        if event.text.startswith("/model"):
+            if "refusé" in event.text:
+                return "❌ Modèle inconnu"
+            return "✓ Modèle changé : " + event.text.split()[1]
         chat = event.source.chat_id
         self.chats.append(chat)
         ctx = contextvars.copy_context()
@@ -313,6 +317,49 @@ async def main():
         await server.until(lambda f: f.get("runId") == "r9" and f["event"]["type"].startswith("run."))
         agent.release.clear()
         print("✓ suppression refusée pendant un run")
+
+        # 5quinquies. modèle et coût : sessionUsage, listModels, setModel, événement usage en fin de run
+        import sqlite3
+
+        assert server.hello["capabilities"]["models"] is True
+        assert (await rpc("sessionUsage", {"conversationId": "inconnue"}))["result"] is None
+        seeded = SessionDB(read_only=False)
+        seeded.create_session("s-use-1", "agentui")
+        seeded.record_gateway_session_peer("s-use-1", source="agentui", session_key="agent:main:agentui:dm:c-use", chat_id="c-use")
+        db_path = str(seeded.db_path)
+        seeded.close()
+        con = sqlite3.connect(db_path)
+        con.execute("UPDATE sessions SET model = 'deepseek-flash', billing_provider = 'deepseek', input_tokens = 1200, output_tokens = 340,"
+                    " cache_read_tokens = 5000, estimated_cost_usd = 0.0123 WHERE id = 's-use-1'")
+        con.commit()
+        con.close()
+        usage = (await rpc("sessionUsage", {"conversationId": "c-use"}))["result"]
+        assert usage == {"inputTokens": 1200, "outputTokens": 340, "model": "deepseek-flash", "provider": "deepseek",
+                         "cacheReadTokens": 5000, "costUsd": 0.0123, "costEstimated": True}, usage
+        models = (await rpc("listModels", {}))
+        assert "error" not in models and isinstance(models["result"], list), models
+        for m in models["result"]:
+            assert set(m) == {"provider", "providerName", "id"}, m
+        # setModel : la commande /model est exécutée par la gateway, sa réponse n'apparaît pas dans la discussion
+        res = await rpc("setModel", {"conversationId": "c-use", "model": "deepseek-v4-pro", "provider": "deepseek"})
+        assert res["result"]["model"] == "deepseek-flash" and "Modèle changé" in res["result"]["message"], res  # modèle relu en base
+        res = await rpc("setModel", {"conversationId": "c-use", "model": "refusé"})
+        assert "Modèle inconnu" in res["error"], res
+        assert "error" in await rpc("setModel", {"conversationId": "c-use"}), "paramètres manquants"
+        # fin de run : la consommation de la session suit run.completed
+        await server.send({"type": "inbound", "conversationId": "c-use", "runId": "r-use", "text": "bonjour"})
+        got = await server.until(lambda f: f.get("runId") == "r-use" and f["event"]["type"].startswith("run."))
+        kinds = [e["type"] for e in events_of(got, "r-use")]
+        assert kinds.index("usage") < kinds.index("run.completed"), kinds
+        assert [e for e in events_of(got, "r-use") if e["type"] == "usage"][0]["usage"]["costUsd"] == 0.0123
+        # setModel refusé pendant un run
+        await server.send({"type": "inbound", "conversationId": "c9", "runId": "r-use2", "text": "long"})
+        await asyncio.sleep(0.3)
+        assert "run est en cours" in (await rpc("setModel", {"conversationId": "c9", "model": "x"}))["error"]
+        agent.release.set()
+        await server.until(lambda f: f.get("runId") == "r-use2" and f["event"]["type"].startswith("run."))
+        agent.release.clear()
+        print("✓ modèle et coût (sessionUsage, listModels, setModel, événement usage)")
 
         # 6. livraison cron hors gateway (connexion send-only)
         res = await adapter_mod._standalone_send(PlatformConfig(enabled=True, extra={"url": url, "token": TOKEN}), "home", "Cron du matin")

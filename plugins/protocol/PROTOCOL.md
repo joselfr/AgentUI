@@ -30,7 +30,7 @@ d'agents (Hermes, OpenClaw…). Schéma JSON : [`channel.schema.json`](channel.s
 | `inbound` | `conversationId`, `runId`, `text`, `subAgentId?`, `attachments?: Media[]` | Message de l'utilisateur. **Chaque `conversationId` est un chat distinct** pour la plateforme, et donc une session distincte (fils multiples). Le `runId` est choisi par AgentUI. |
 | `abort` | `conversationId`, `runId` | Arrêter le run. |
 | `approval` | `conversationId`, `runId`, `id`, `approve: boolean`, `scope?: "once" \| "session" \| "always"` | Réponse à un `approval.request`. |
-| `rpc` | `id`, `method`, `params?` | Appel optionnel. Méthode inconnue : `rpc.result` avec `error`. Méthodes : `listSubAgents` → `[{ id, name, description?, isDefault? }]` ; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (si `capabilities.jobs`) ; `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (si `capabilities.jobControl`) ; `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (si `capabilities.skills`) ; `deleteSession {conversationId}` → `{ ok: true }` (si `capabilities.sessionDelete`). Dates en millisecondes. |
+| `rpc` | `id`, `method`, `params?` | Appel optionnel. Méthode inconnue : `rpc.result` avec `error`. Méthodes : `listSubAgents` → `[{ id, name, description?, isDefault? }]` ; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (si `capabilities.jobs`) ; `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (si `capabilities.jobControl`) ; `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (si `capabilities.skills`) ; `deleteSession {conversationId}` → `{ ok: true }` (si `capabilities.sessionDelete`) ; `listModels` → `[{ provider, providerName, id }]`, `setModel {conversationId, model, provider?}` → `{ model, provider?, message? }` et `sessionUsage {conversationId}` → `Usage` ou `null` (si `capabilities.models`). Dates en millisecondes. |
 | `ping` | — | Maintien de la connexion. |
 
 ## Événements (`event.event`)
@@ -46,6 +46,7 @@ Identiques au type `AgentEvent` de `packages/shared` (une seule exception : `mes
 | `tool.completed` | `id`, `name?`, `result?`, `truncated?`, `failed?` |
 | `subagent.start` / `subagent.sync` / `subagent.end` | `id`, `name`, `sessionId?` / `id` / `id`, `failed?` |
 | `message.media` | `name`, `mimeType`, `data` (base64) — **au lieu de `url`** : le plugin pousse le contenu |
+| `usage` | `usage` : `{ model?, provider?, inputTokens, outputTokens, cacheReadTokens?, reasoningTokens?, costUsd?, costEstimated? }` — consommation **cumulée de la session**, émise avant `run.completed` (si `capabilities.models`) |
 | `approval.request` | `id`, `description`, `payload?` |
 | `run.completed` / `run.failed` (`error`) / `run.aborted` | — |
 

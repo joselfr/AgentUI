@@ -97,6 +97,9 @@
               "minimum": 0
             }
           }
+        },
+        "models": {
+          "type": "boolean"
         }
       }
     },
@@ -277,6 +280,49 @@
           "required": [
             "id",
             "description"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "usage"
+            },
+            "usage": {
+              "type": "object",
+              "required": [
+                "inputTokens",
+                "outputTokens"
+              ],
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "inputTokens": {
+                  "type": "number"
+                },
+                "outputTokens": {
+                  "type": "number"
+                },
+                "cacheReadTokens": {
+                  "type": "number"
+                },
+                "reasoningTokens": {
+                  "type": "number"
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "costEstimated": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "required": [
+            "usage"
           ]
         },
         {
