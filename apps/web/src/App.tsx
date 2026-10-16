@@ -15,7 +15,9 @@ import Chat from './components/Chat';
 import ChatHeader from './components/ChatHeader';
 import NewConversation from './components/NewConversation';
 import SettingsDialog, { type ThemeMode } from './components/SettingsDialog';
-import { AgentsPage, JobsPage, SkillsPage } from './components/Pages';
+import { AgentsPage } from './components/pages/AgentsPage';
+import { JobsPage } from './components/pages/JobsPage';
+import { SkillsPage } from './components/pages/SkillsPage';
 import { toOutgoing, type AttachmentView } from './attachments';
 
 export default function App() {
