@@ -390,7 +390,7 @@ test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI',
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
   const tools = factory({ messageChannel: 'agentui' });
   assert.deepEqual(tools.map((t) => t.name), opts.names);
@@ -403,6 +403,11 @@ test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI',
   await assert.rejects(tools[0].execute('t3', { kind: 'pie', x: ['a'], series: [{ name: 's', y: [1] }, { name: 't', y: [2] }] }), /camembert/);
   await assert.rejects(tools[1].execute('t4', { points: [] }), /au moins un point/);
   await assert.rejects(tools[2].execute('t5', { code: ' ' }), /vide/);
+  const table = tools.find((t) => t.name === 'agentui_table');
+  const okTable = await table.execute('t6', { columns: [{ label: 'A' }, { label: 'B', kind: 'number' }], rows: [['x', 1], ['y', null]] });
+  assert.match(okTable.details.token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
+  await assert.rejects(table.execute('t7', { columns: [{ label: 'A' }, { label: 'B' }], rows: [['x']] }), /ligne 1 a 1 valeurs, il en faut 2/);
+  await assert.rejects(table.execute('t8', { columns: [{ label: 'A' }], rows: [[{ a: 1 }]] }), /ni texte/);
 });
 
 test('suppression : deleteSession efface la session de chaque agent (une discussion = un pair direct)', async () => {

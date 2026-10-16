@@ -17,6 +17,12 @@ export function widgetError(key: string, args: Args): string | undefined {
     const series: Array<{ name?: string; y?: unknown[] }> = args.series ?? [];
     for (const s of series) if ((s.y ?? []).length !== x.length) return `La série « ${s.name} » doit avoir ${x.length} valeurs (autant que x), elle en a ${(s.y ?? []).length}.`;
     if (args.kind === 'pie' && series.length !== 1) return "Un camembert (pie) n'a qu'une seule série.";
+  } else if (key === 'table') {
+    const n = (args.columns ?? []).length;
+    for (const [i, row] of ((args.rows ?? []) as unknown[][]).entries()) {
+      if (row.length !== n) return `La ligne ${i + 1} a ${row.length} valeurs, il en faut ${n} (une par colonne).`;
+      if (row.some((v) => v !== null && typeof v === 'object')) return `La ligne ${i + 1} contient une valeur qui n'est ni texte, ni nombre, ni booléen, ni null.`;
+    }
   } else if (key === 'map' && !args.points?.length) return 'Il faut au moins un point.';
   else if (key === 'code' && !String(args.code ?? '').trim()) return 'Le code est vide.';
   return undefined;

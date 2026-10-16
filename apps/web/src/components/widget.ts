@@ -1,4 +1,4 @@
-/** Bloc ```widget : JSON `{ "type": "ask" | "confirm" | "chart", "arguments": { … } }`. `undefined` si invalide. */
+/** Bloc ```widget : JSON `{ "type": "ask" | "confirm" | "chart" | …, "arguments": { … } }`. `undefined` si invalide. */
 export function parseWidget(raw: string): { type: string; arguments: Record<string, unknown> } | undefined {
   try {
     const j = JSON.parse(raw) as { type?: unknown; arguments?: unknown };
@@ -22,7 +22,7 @@ export function interactiveBlocks(text: string): string[] {
 /** Les plugins exposent chaque widget d'affichage comme un outil `agentui_<type>` (ex. `agentui_chart`) : ses arguments sont ceux du widget. */
 const WIDGET_TOOL_PREFIX = 'agentui_';
 export type ToolCallLike = { name: string; args?: unknown; resultPreview?: string };
-const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code']);
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table']);
 
 export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
   if (!t.name.startsWith(WIDGET_TOOL_PREFIX)) return undefined;

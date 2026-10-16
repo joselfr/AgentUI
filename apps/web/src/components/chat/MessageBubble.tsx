@@ -15,6 +15,7 @@ import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
 import MapCard, { parseMap } from '../MapCard';
+import TableCard, { parseTable } from '../TableCard';
 import CodeCard, { parseCode } from '../CodeCard';
 import FormCard, { parseForm } from '../FormCard';
 
@@ -57,6 +58,7 @@ function Attachments({ m }: { m: Message }) {
 function displayWidget(w?: { type: string; arguments: Record<string, unknown> }): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
+  if (w?.type === 'table') { const table = parseTable(w.arguments); if (table) return <TableCard table={table} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }

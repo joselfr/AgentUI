@@ -1073,6 +1073,13 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
                 return f"La série « {s.get('name')} » doit avoir {len(x)} valeurs (autant que x), elle en a {len(s.get('y') or [])}."
         if args.get("kind") == "pie" and len(series) != 1:
             return "Un camembert (pie) n'a qu'une seule série."
+    elif key == "table":
+        n = len(args.get("columns") or [])
+        for i, row in enumerate(args.get("rows") or []):
+            if len(row) != n:
+                return f"La ligne {i + 1} a {len(row)} valeurs, il en faut {n} (une par colonne)."
+            if any(isinstance(v, (dict, list)) for v in row):
+                return f"La ligne {i + 1} contient une valeur qui n'est ni texte, ni nombre, ni booléen, ni null."
     elif key == "map" and not args.get("points"):
         return "Il faut au moins un point."
     elif key == "code" and not str(args.get("code") or "").strip():
@@ -1099,7 +1106,7 @@ def _ask_error(key: str, args: Dict[str, Any]) -> Optional[str]:
 
 
 def _register_widget_tools(ctx) -> None:
-    """Un outil par widget (`agentui_chart`, `agentui_map`, `agentui_code`) : le modèle valide ses arguments par le schéma
+    """Un outil par widget (`agentui_chart`, `agentui_map`, `agentui_code`, `agentui_table`) : le modèle valide ses arguments par le schéma
     de l'outil au lieu d'écrire un bloc ```widget. L'outil renvoie un jeton `[[agentui:<id>]]` que l'agent place dans son
     texte ; AgentUI le remplace par le widget (arguments de `tool.started`, jeton dans le résultat de `tool.completed`)."""
     spec = json.loads((Path(__file__).parent / "widget_tools.json").read_text(encoding="utf-8"))
