@@ -95,7 +95,7 @@ export function ToolsBlock({ tools, subRuns, expandAll }: { tools: ToolCall[]; s
   return (
     <Box sx={{ mb: 1 }}>
       <Chip size="small" icon={<BuildOutlined />} label={`${tools.length} outil${tools.length > 1 ? 's' : ''} utilisé${tools.length > 1 ? 's' : ''}`}
-        onClick={() => setOpen(!open)} variant="outlined" sx={{ mb: 0.5, borderRadius: 2, fontFamily: MONO, fontSize: 12 }} />
+        onClick={() => setOpen(!open)} variant="outlined" sx={{ mb: 0.5, borderRadius: 0.5, fontFamily: MONO, fontSize: 12, '& .MuiChip-icon': { p: '2px', boxSizing: 'content-box' } }} />
       <Collapse in={showAll || running}>
         {runs.map((s) => (
           <SubRunCard key={s.id} run={s} expandAll={expandAll} tools={visible.filter((t) => t.parentSubAgentRunId === s.id)} />
