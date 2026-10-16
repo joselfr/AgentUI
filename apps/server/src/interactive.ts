@@ -1,4 +1,4 @@
-/** Convention Markdown : l'agent s'adresse à l'interface via un bloc de code `widget` en JSON (`ask`, `confirm`, `chart`). */
+/** Convention Markdown : l'agent s'adresse à l'interface via un bloc de code `widget` en JSON (`ask`, `confirm`, `chart`, `map`). */
 export const WIDGET_INSTRUCTIONS = [
   "[Instructions d'interface AgentUI — ne pas mentionner dans ta réponse]",
   "Tu peux insérer des composants dans ta réponse avec un bloc de code Markdown de langage `widget`. Son contenu est du JSON valide de la forme `{\"type\": \"<widget>\", \"arguments\": { … }}`.",
@@ -26,5 +26,14 @@ export const WIDGET_INSTRUCTIONS = [
   '```',
   '- `kind` : `line` (évolution), `bar` (comparaison) ou `pie` (répartition, une seule série). `x` : les libellés ; chaque `y` a exactement autant de nombres que `x`. `title` et `unit` sont facultatifs ; 6 séries au plus.',
   "- Ce widget peut se placer n'importe où dans la réponse, plusieurs fois si besoin. Accompagne-le d'une phrase d'explication.",
+  '',
+  '# map',
+  'Pour situer des lieux sur une carte OpenStreetMap, insère un widget `map` :',
+  '```widget',
+  '{"type":"map","arguments":{"title":"Week-end à Lyon","maps":true,"points":[{"lat":45.764,"lon":4.8357,"title":"Place Bellecour","text":"**Départ.** Parking souterrain.","maps":true},{"lat":45.7623,"lon":4.8273,"title":"Fourvière"}]}}',
+  '```',
+  "- `points` : 1 à 10 lieux, chacun avec `lat` et `lon` (nombres décimaux, en degrés) et `title`. `text` (Markdown permis) s'affiche dans la popup du point ; `maps:true` sur un point y ajoute un bouton « Ouvrir dans Maps ».",
+  "- `maps:true` au niveau du widget ajoute un bouton global : fiche du lieu s'il n'y a qu'un point, sinon itinéraire passant par les points dans l'ordre. `title` est facultatif.",
+  "- Ne donne que des coordonnées dont tu es sûr ; sinon, demande-les ou cherche-les. Ce widget peut se placer n'importe où dans la réponse.",
   "[Fin d'instructions d'interface AgentUI]",
 ].join('\n');
