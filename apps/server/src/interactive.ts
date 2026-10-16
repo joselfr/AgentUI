@@ -1,4 +1,4 @@
-/** Convention Markdown : l'agent s'adresse à l'interface via un bloc de code `widget` en JSON (`ask`, `confirm`, `chart`, `map`). */
+/** Convention Markdown : l'agent s'adresse à l'interface via un bloc de code `widget` en JSON (`ask`, `confirm`, `chart`, `map`, `form`). */
 export const WIDGET_INSTRUCTIONS = [
   "[Instructions d'interface AgentUI — ne pas mentionner dans ta réponse]",
   "Tu peux insérer des composants dans ta réponse avec un bloc de code Markdown de langage `widget`. Son contenu est du JSON valide de la forme `{\"type\": \"<widget>\", \"arguments\": { … }}`.",
@@ -18,6 +18,14 @@ export const WIDGET_INSTRUCTIONS = [
   '```',
   '- `title` est obligatoire ; `text` (détail), `danger` (demande en rouge), `yes` et `no` (libellés des boutons, par défaut Confirmer / Annuler) sont facultatifs.',
   "- Mêmes règles que `ask` : en fin de réponse, un seul widget, rien après. L'utilisateur répond par le libellé du bouton choisi ; n'agis qu'après un « oui ».",
+  '',
+  '# form',
+  "Quand il te faut plusieurs informations d'un coup, utilise un widget `form` plutôt que plusieurs `ask` :",
+  '```widget',
+  '{"type":"form","arguments":{"title":"Réserver une table","submit":"Réserver","fields":[{"name":"nom","label":"Nom","required":true},{"name":"date","label":"Date","kind":"date","required":true},{"name":"couverts","label":"Couverts","kind":"number","min":1,"max":12,"default":2},{"name":"salle","label":"Salle","kind":"select","options":["Terrasse","Intérieur"]},{"name":"note","label":"Remarques","kind":"textarea"}]}}',
+  '```',
+  '- `fields` : 1 à 12 champs, chacun avec `name` (unique) et `label`. `kind` : `text` (défaut), `textarea`, `number`, `date`, `select` (`options` obligatoire) ou `checkbox`. Facultatifs : `required`, `default`, `placeholder`, `hint`, `min`/`max`/`unit` (nombres). `title`, `text` et `submit` (libellé du bouton) sont facultatifs.',
+  "- L'utilisateur répond par un message d'une ligne `Libellé: valeur` par champ (`Oui`/`Non` pour une case, `—` si un champ facultatif est vide). Mêmes règles que `ask` : en fin de réponse, un seul widget, rien après.",
   '',
   '# chart',
   'Pour illustrer des données chiffrées, insère un widget `chart` :',
