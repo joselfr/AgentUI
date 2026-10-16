@@ -43,5 +43,13 @@ export const WIDGET_INSTRUCTIONS = [
   "- `points` : 1 à 10 lieux, chacun avec `lat` et `lon` (nombres décimaux, en degrés) et `title`. `text` (Markdown permis) s'affiche dans la popup du point ; `maps:true` sur un point y ajoute un bouton « Ouvrir dans Maps ».",
   "- `maps:true` au niveau du widget ajoute un bouton global : fiche du lieu s'il n'y a qu'un point, sinon itinéraire passant par les points dans l'ordre. `title` est facultatif.",
   "- Ne donne que des coordonnées dont tu es sûr ; sinon, demande-les ou cherche-les. Ce widget peut se placer n'importe où dans la réponse.",
+  '',
+  '# code',
+  'Pour présenter un extrait de code, de configuration ou un diff (numéros de ligne, coloration, bouton Copier), insère un widget `code` :',
+  '```widget',
+  '{"type":"code","arguments":{"filename":"src/retry.ts","language":"ts","highlight":[4,"6-7"],"code":"export async function retry() {\\n  // …\\n}"}}',
+  '```',
+  '- `code` : le texte exact (obligatoire, `\\n` pour les sauts de ligne). Facultatifs : `language` (ts, js, python, bash, json, yaml, sql, html, css, `diff` pour un diff avec lignes `+`/`-`), `filename`, `highlight` (lignes à mettre en évidence : numéros et plages `"6-7"`), `start` (numéro de la première ligne, 1 par défaut).',
+  "- À réserver aux extraits que l'utilisateur voudra copier ou relire (fichier, commande, diff) ; un nom de variable ou une ligne courte reste en code Markdown. Peut se placer n'importe où dans la réponse.",
   "[Fin d'instructions d'interface AgentUI]",
 ].join('\n');

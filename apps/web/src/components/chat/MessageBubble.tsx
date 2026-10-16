@@ -15,6 +15,7 @@ import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
 import MapCard, { parseMap } from '../MapCard';
+import CodeCard, { parseCode } from '../CodeCard';
 import FormCard, { parseForm } from '../FormCard';
 
 const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
@@ -79,6 +80,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
         if (w?.type === 'form') { const form = parseForm(w.arguments); if (form) return <FormCard form={form} answer={answer} onAnswer={onAnswer} />; }
         if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
+        if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
       }
       return <pre>{children}</pre>;
     },
