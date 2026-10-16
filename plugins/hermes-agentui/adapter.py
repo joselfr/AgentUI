@@ -1022,9 +1022,62 @@ def _set_display_defaults() -> None:
         logger.debug("AgentUI: valeurs d'affichage par défaut non appliquées", exc_info=True)
 
 
+def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
+    """Contrôles que le schéma JSON ne sait pas exprimer : le modèle corrige et réessaie d'après ce message."""
+    if key == "chart":
+        x, series = args.get("x") or [], args.get("series") or []
+        for s in series:
+            if len(s.get("y") or []) != len(x):
+                return f"La série « {s.get('name')} » doit avoir {len(x)} valeurs (autant que x), elle en a {len(s.get('y') or [])}."
+        if args.get("kind") == "pie" and len(series) != 1:
+            return "Un camembert (pie) n'a qu'une seule série."
+    elif key == "map" and not args.get("points"):
+        return "Il faut au moins un point."
+    elif key == "code" and not str(args.get("code") or "").strip():
+        return "Le code est vide."
+    return None
+
+
+def _register_widget_tools(ctx) -> None:
+    """Un outil par widget (`agentui_chart`, `agentui_map`, `agentui_code`) : le modèle valide ses arguments par le schéma
+    de l'outil au lieu d'écrire un bloc ```widget. L'outil renvoie un jeton `[[agentui:<id>]]` que l'agent place dans son
+    texte ; AgentUI le remplace par le widget (arguments de `tool.started`, jeton dans le résultat de `tool.completed`)."""
+    spec = json.loads((Path(__file__).parent / "widget_tools.json").read_text(encoding="utf-8"))
+
+    def make_handler(key: str):
+        def handler(args: Dict[str, Any], **_kw: Any) -> str:
+            # Hermes expose les outils d'un plugin sur toutes les plateformes (le `check_fn` est mis en cache 30 s, donc
+            # inutilisable pour filtrer par session) : hors AgentUI, l'appel est refusé avec une consigne de repli.
+            try:
+                from gateway.session_context import get_session_env
+
+                if get_session_env("HERMES_SESSION_PLATFORM") != PLATFORM:
+                    return json.dumps({"error": "Ce composant n'existe que dans AgentUI ; présente le contenu en Markdown."}, ensure_ascii=False)
+            except Exception:
+                pass
+            problem = _widget_error(key, args)
+            if problem:
+                return json.dumps({"error": problem}, ensure_ascii=False)
+            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": spec["tokenInstruction"]}, ensure_ascii=False)
+
+        return handler
+
+    for key, tool in spec["tools"].items():
+        name = spec["prefix"] + key
+        ctx.register_tool(
+            name=name,
+            toolset="agentui",
+            schema={"name": name, "description": tool["description"], "parameters": tool["parameters"]},
+            handler=make_handler(key),
+            description=tool["description"],
+            emoji="🖥️",
+        )
+
+
 def register(ctx):
     """Point d'entrée du plugin Hermes."""
     _set_display_defaults()
+    _register_widget_tools(ctx)
     ctx.register_platform(
         name=PLATFORM,
         label="AgentUI",

@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { Alert, Avatar, Box, Button, CircularProgress, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import type { Capabilities, Message } from '@agentui/shared';
@@ -22,6 +22,7 @@ export default function Chat(props: {
   const attachments = useAttachments(props.attach);
   const scroll = useStickToBottom(props.messages);
   const lastAssistant = props.messages.findLastIndex((m) => m.role === 'assistant');
+  const allTools = useMemo(() => props.messages.flatMap((m) => m.toolCalls ?? []), [props.messages]);
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDrag(true); } }}
@@ -49,7 +50,7 @@ export default function Chat(props: {
             return (
               <Fragment key={m.id}>
                 {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
-                <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName}
+                <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName} allTools={allTools}
                   answers={answers}
                   onAnswer={current && (!props.running || props.awaiting) ? (t) => void props.onSend(t, []) : undefined}
                   working={props.running && m.role === 'assistant' && (last || m.status === 'streaming')} />

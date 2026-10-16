@@ -10,7 +10,7 @@ import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
-import { interactiveBlocks, parseWidget } from '../widget';
+import { expandWidgetTokens, interactiveBlocks, parseWidget, widgetOfTool, type ToolCallLike } from '../widget';
 import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
@@ -53,11 +53,23 @@ function Attachments({ m }: { m: Message }) {
   );
 }
 
+/** Widgets d'affichage (sans réponse) : bloc ```widget ou outil `agentui_<type>`. `undefined` si le type ou les arguments sont invalides. */
+function displayWidget(w?: { type: string; arguments: Record<string, unknown> }): ReactElement | undefined {
+  if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
+  if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
+  if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
+  return undefined;
+}
+
 /** Une bulle de message : texte Markdown (ou carte de question « ask »), raisonnement, outils, pièces jointes. */
-export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, working }: {
+export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, working, allTools }: {
   m: Message; expandTools: boolean; agentName: string; answers?: string[]; onAnswer?: (t: string) => void; working?: boolean;
+  /** Appels d'outils de toute la discussion : l'agent peut réutiliser le jeton d'un widget d'un message précédent. */
+  allTools?: ToolCallLike[];
 }) {
   const mine = m.role === 'user';
+  // Les outils `agentui_<type>` ne sont pas de l'activité : leur widget prend la place du jeton que l'agent a écrit dans son texte.
+  const text = useMemo(() => (m.role === 'user' ? m.text : expandWidgetTokens(m.text, m.toolCalls ?? [], allTools, m.status !== 'streaming')), [m.role, m.text, m.toolCalls, m.status, allTools]);
   // `pre` doit garder la même identité d'un rendu à l'autre : sinon React le démonte et remonte, et les widgets
   // (saisie d'un formulaire, carte, cases cochées) perdent leur état et leur focus à chaque rendu du chat.
   const latest = useRef({ m, answers, onAnswer });
@@ -77,10 +89,9 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         const w = parseWidget(raw);
         if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
         if (w?.type === 'confirm') { const confirm = parseConfirm(w.arguments); if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />; }
-        if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
+        const display = displayWidget(w);
+        if (display) return display;
         if (w?.type === 'form') { const form = parseForm(w.arguments); if (form) return <FormCard form={form} answer={answer} onAnswer={onAnswer} />; }
-        if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
-        if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
       }
       return <pre>{children}</pre>;
     },
@@ -107,10 +118,10 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         },
         overflowWrap: 'anywhere', minWidth: 0,
       }}>
-        {!mine && <ActivityBlock reasoning={m.reasoning} tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
+        {!mine && <ActivityBlock reasoning={m.reasoning} tools={(m.toolCalls ?? []).filter((t) => !widgetOfTool(t))} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
         {mine && <Attachments m={m} />}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
-          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{m.text}</ReactMarkdown>}
+          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{text}</ReactMarkdown>}
         {!mine && <Attachments m={m} />}
         {working && <Working m={m} />}
         {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">⏹ interrompu</Typography>}

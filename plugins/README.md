@@ -21,6 +21,11 @@ Côté AgentUI : déclarer l'agent dans `agents.config.yaml` (`type: gateway`, `
 Le plugin se connecte à `ws(s)://<agentui>/gateway` ; en Docker sur le même réseau : `ws://agentui:8080/gateway`.
 Les adapters directs (`hermes` via api_server, `openclaw` via le WebSocket opérateur) restent disponibles en parallèle.
 
+Les widgets `chart`, `map` et `code` sont aussi exposés comme outils de plugin (`agentui_chart`, `agentui_map`, `agentui_code`,
+voir `SPIKE.md`). Leurs schémas sont dans `protocol/widget-tools.json` : après modification, lancer
+`node plugins/sync-widget-tools.mjs` pour les recopier dans les deux plugins (Hermes : le fichier `widget_tools.json` doit
+être copié avec `adapter.py`).
+
 ## Tester un plugin sans AgentUI (faux serveur)
 
 ```bash
@@ -37,7 +42,7 @@ par exemple `ssh -R 8790:127.0.0.1:8790 root@jlfr.io`, puis utiliser `ws://127.0
 ## Hermes Agent (≥ 0.19, validé en 0.21)
 
 ```bash
-cp plugins/hermes-agentui/{plugin.yaml,__init__.py,adapter.py} ~/.hermes/plugins/agentui/
+cp plugins/hermes-agentui/{plugin.yaml,__init__.py,adapter.py,widget_tools.json} ~/.hermes/plugins/agentui/
 hermes plugins enable agentui-platform     # les plugins sont opt-in
 ```
 

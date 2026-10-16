@@ -53,6 +53,15 @@ Identiques au type `AgentEvent` de `packages/shared` (une seule exception : `mes
 | `question.resolved` | `id` | La question `id` n'attend plus de réponse : répondue, annulée ou expirée. Un `run.*` terminal la ferme aussi. |
 | `run.completed` / `run.failed` (`error`) / `run.aborted` | — |
 
+## Widgets comme outils
+
+Les widgets d'affichage `chart`, `map` et `code` ne sont **plus décrits à l'agent par une convention Markdown** : un plugin les
+expose comme outils `agentui_<type>`. L'outil valide ses arguments et renvoie un **jeton** `[[agentui:<id>]]` dans son résultat ;
+l'agent place ce jeton dans son texte. AgentUI le remplace à l'affichage par le widget, dont les arguments sont ceux de
+`tool.started`. Aucun événement spécifique : les plugins transmettent `tool.started` / `tool.completed` comme pour tout outil.
+Schémas : `widget-tools.json` (copié dans chaque plugin par `plugins/sync-widget-tools.mjs`). Un agent sans plugin n'a donc pas
+ces widgets. `ask`, `confirm` et `form` restent des blocs ```` ```widget ```` décrits dans les instructions d'interface.
+
 ## Règles
 
 1. **Le plugin possède le cycle de vie du run** : tout `inbound` reçoit exactement **un** événement terminal

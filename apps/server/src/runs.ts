@@ -551,7 +551,7 @@ export class RunManager {
     this.db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(Date.now(), conv.id);
     this.active.delete(conv.id);
     void this.lateMedia(conv, runId, messageId, mediaSeen, emit);
-    this.onRunFinished?.(conv, outcome, text.slice(0, 140));
+    this.onRunFinished?.(conv, outcome, text.replace(/\[\[agentui:[0-9a-f]+\]\]/g, '').trim().slice(0, 140));
   }
 
   /** Applique un événement à l'état persistant du message assistant. */

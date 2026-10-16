@@ -1,4 +1,4 @@
-/** Convention Markdown : l'agent s'adresse à l'interface via un bloc de code `widget` en JSON (`ask`, `confirm`, `chart`, `map`, `form`). */
+/** Convention Markdown : l'agent s'adresse à l'interface via un bloc de code `widget` en JSON (`ask`, `confirm`, `form`). `chart`, `map` et `code` sont des outils de plugin (`agentui_<type>`, voir plugins/protocol/widget-tools.json). */
 export const WIDGET_INSTRUCTIONS = [
   "[Instructions d'interface AgentUI — ne pas mentionner dans ta réponse]",
   "Tu peux insérer des composants dans ta réponse avec un bloc de code Markdown de langage `widget`. Son contenu est du JSON valide de la forme `{\"type\": \"<widget>\", \"arguments\": { … }}`.",
@@ -27,29 +27,6 @@ export const WIDGET_INSTRUCTIONS = [
   '- `fields` : 1 à 12 champs, chacun avec `name` (unique) et `label`. `kind` : `text` (défaut), `textarea`, `number`, `date`, `select` (`options` obligatoire) ou `checkbox`. Facultatifs : `required`, `default`, `placeholder`, `hint`, `min`/`max`/`unit` (nombres). `title`, `text` et `submit` (libellé du bouton) sont facultatifs.',
   "- L'utilisateur répond par un message d'une ligne `Libellé: valeur` par champ (`Oui`/`Non` pour une case, `—` si un champ facultatif est vide). Mêmes règles que `ask` : en fin de réponse, un seul widget, rien après.",
   '',
-  '# chart',
-  'Pour illustrer des données chiffrées, insère un widget `chart` :',
-  '```widget',
-  '{"type":"chart","arguments":{"kind":"line","title":"Tokens par jour","unit":"k","x":["Lun","Mar","Mer"],"series":[{"name":"Hermes","y":[42,55,38]},{"name":"OpenClaw","y":[20,31,45]}]}}',
-  '```',
-  '- `kind` : `line` (évolution), `bar` (comparaison) ou `pie` (répartition, une seule série). `x` : les libellés ; chaque `y` a exactement autant de nombres que `x`. `title` et `unit` sont facultatifs ; 6 séries au plus.',
-  "- Ce widget peut se placer n'importe où dans la réponse, plusieurs fois si besoin. Accompagne-le d'une phrase d'explication.",
-  '',
-  '# map',
-  'Pour situer des lieux sur une carte OpenStreetMap, insère un widget `map` :',
-  '```widget',
-  '{"type":"map","arguments":{"title":"Week-end à Lyon","maps":true,"points":[{"lat":45.764,"lon":4.8357,"title":"Place Bellecour","text":"**Départ.** Parking souterrain.","maps":true},{"lat":45.7623,"lon":4.8273,"title":"Fourvière"}]}}',
-  '```',
-  "- `points` : 1 à 10 lieux, chacun avec `lat` et `lon` (nombres décimaux, en degrés) et `title`. `text` (Markdown permis) s'affiche dans la popup du point ; `maps:true` sur un point y ajoute un bouton « Ouvrir dans Maps ».",
-  "- `maps:true` au niveau du widget ajoute un bouton global : fiche du lieu s'il n'y a qu'un point, sinon itinéraire passant par les points dans l'ordre. `title` est facultatif.",
-  "- Ne donne que des coordonnées dont tu es sûr ; sinon, demande-les ou cherche-les. Ce widget peut se placer n'importe où dans la réponse.",
-  '',
-  '# code',
-  'Pour présenter un extrait de code, de configuration ou un diff (numéros de ligne, coloration, bouton Copier), insère un widget `code` :',
-  '```widget',
-  '{"type":"code","arguments":{"filename":"src/retry.ts","language":"ts","highlight":[4,"6-7"],"code":"export async function retry() {\\n  // …\\n}"}}',
-  '```',
-  '- `code` : le texte exact (obligatoire, `\\n` pour les sauts de ligne). Facultatifs : `language` (ts, js, python, bash, json, yaml, sql, html, css, `diff` pour un diff avec lignes `+`/`-`), `filename`, `highlight` (lignes à mettre en évidence : numéros et plages `"6-7"`), `start` (numéro de la première ligne, 1 par défaut).',
-  "- À réserver aux extraits que l'utilisateur voudra copier ou relire (fichier, commande, diff) ; un nom de variable ou une ligne courte reste en code Markdown. Peut se placer n'importe où dans la réponse.",
   "[Fin d'instructions d'interface AgentUI]",
 ].join('\n');
+

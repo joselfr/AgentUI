@@ -18,3 +18,60 @@ export function interactiveBlocks(text: string): string[] {
   }
   return out;
 }
+
+/** Les plugins exposent chaque widget d'affichage comme un outil `agentui_<type>` (ex. `agentui_chart`) : ses arguments sont ceux du widget. */
+const WIDGET_TOOL_PREFIX = 'agentui_';
+export type ToolCallLike = { name: string; args?: unknown; resultPreview?: string };
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code']);
+
+export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
+  if (!t.name.startsWith(WIDGET_TOOL_PREFIX)) return undefined;
+  const type = t.name.slice(WIDGET_TOOL_PREFIX.length);
+  const args = t.args;
+  if (!DISPLAY_WIDGETS.has(type) || !args || typeof args !== 'object' || Array.isArray(args)) return undefined;
+  return { type, arguments: args as Record<string, unknown> };
+}
+
+const TOKEN = /\[\[agentui:([0-9a-f]+)\]\]/g;
+const HEAD = '[[agentui:';
+/** Retire un jeton en cours de frappe en fin de texte (« [[agent », « [[agentui:a3f », « [[agentui:a3f9c1] »). */
+function stripPartialToken(text: string): string {
+  for (let i = Math.min(text.length, HEAD.length + 7); i > 0; i--) {
+    const tail = text.slice(-i);
+    if (HEAD.startsWith(tail) || (tail.startsWith(HEAD) && /^\[\[agentui:[0-9a-f]*\]?$/.test(tail))) return text.slice(0, -i);
+  }
+  return text;
+}
+const fence = (w: { type: string; arguments: Record<string, unknown> }) => '\n\n```widget\n' + JSON.stringify(w) + '\n```\n\n';
+
+/** Jeton (`[[agentui:<id>]]`) renvoyé par l'outil, lu dans son résultat. */
+const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[agentui:([0-9a-f]+)\]\]/)?.[1];
+
+/**
+ * Remplace par leur widget les jetons que l'agent a placés dans son texte après un appel d'outil `agentui_<type>`.
+ * Les arguments du widget sont ceux de l'appel (`own` : outils du message ; `all` : toute la discussion, car l'agent peut
+ * réutiliser un jeton d'un message précédent). Un jeton inconnu ou en cours de frappe disparaît ; un widget dont le jeton
+ * n'a jamais été écrit est ajouté en fin de message une fois celui-ci terminé, pour qu'il ne soit pas perdu.
+ */
+export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolCallLike[] = own, done = true): string {
+  const widgets = new Map<string, { type: string; arguments: Record<string, unknown> }>();
+  for (const t of all) {
+    const id = tokenOf(t);
+    const w = id ? widgetOfTool(t) : undefined;
+    if (id && w) widgets.set(id, w);
+  }
+  const used = new Set<string>();
+  let out = text.replace(TOKEN, (_m, id: string) => {
+    const w = widgets.get(id);
+    if (!w) return '';
+    used.add(id);
+    return fence(w);
+  });
+  out = stripPartialToken(out);
+  if (done) for (const t of own) {
+    const id = tokenOf(t);
+    const w = id ? widgets.get(id) : undefined;
+    if (id && w && !used.has(id)) out += fence(w);
+  }
+  return out;
+}

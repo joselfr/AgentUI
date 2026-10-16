@@ -2,6 +2,7 @@ import { defineChannelPluginEntry } from 'openclaw/plugin-sdk/channel-core';
 import { agentUIPlugin } from './src/channel.js';
 import { setAgentUIRuntime } from './src/runtime.js';
 import { setCronAccess } from './src/cron.js';
+import { registerWidgetTools } from './src/widget-tools.js';
 
 export default defineChannelPluginEntry({
   id: 'agentui',
@@ -10,6 +11,7 @@ export default defineChannelPluginEntry({
   plugin: agentUIPlugin,
   setRuntime: setAgentUIRuntime,
   registerFull(api) {
+    registerWidgetTools(api);
     // Accès au planificateur pour la page « Tâches » d'AgentUI (réservé aux services hébergés par la gateway).
     api.registerService({
       id: 'agentui-cron',

@@ -53,3 +53,25 @@ Conclusion : **les deux plateformes exposent assez de choses à un plugin pour c
   hooks `VALID_HOOKS`) sont l'API publique documentée des plugins.
 - Ni l'un ni l'autre n'a été exécuté contre une vraie instance pendant ce spike (les agents tournent sur jlfr.io). Il faudra
   valider avec `dev/mock-gateway.mjs`.
+
+## Widgets comme outils de plugin (`agentui_chart`, `agentui_map`, `agentui_code`) : jetons
+
+Au lieu du bloc ```` ```widget ````, chaque widget d'affichage est un outil fourni par le plugin. L'outil valide ses arguments
+(schéma JSON + contrôles sémantiques : longueur de `y`, un seul camembert…) et renvoie un **jeton** `[[agentui:<id>]]` que
+l'agent écrit dans son texte, à l'endroit voulu. AgentUI remplace le jeton par le widget **au rendu** (front,
+`expandWidgetTokens`) : les arguments viennent de `tool.started`, le jeton de `tool.completed`. Aucun événement nouveau,
+rien à développer dans les plugins pour l'expansion, et l'historique rechargé fonctionne tel quel.
+
+- Schémas : source unique `protocol/widget-tools.json`, copiée dans chaque plugin par `node plugins/sync-widget-tools.mjs` (à relancer après modification).
+- Les sections `chart`/`map`/`code` ont été **retirées** des instructions d'interface (`WIDGET_INSTRUCTIONS`) : seuls les outils existent pour ces widgets, donc un agent sans plugin ne les a pas. `ask`/`confirm`/`form` restent en convention.
+- Jeton en cours de frappe (streaming) : masqué ; jeton inconnu : supprimé ; widget dont le jeton n'a jamais été écrit : ajouté en fin de message une fois terminé.
+
+| | Hermes 0.19 | OpenClaw 2026.10.3 |
+|---|---|---|
+| Enregistrement | `ctx.register_tool(name, toolset, schema, handler)` ✅ vérifié sur une vraie instance | `api.registerTool(factory, { names })` + `contracts.tools` dans le manifeste ✅ (tests + `tsc`, pas de vraie gateway) |
+| Visible seulement dans AgentUI | ❌ les outils de plugin sont activés sur **toutes** les plateformes (vérifié : Telegram les voit) ; `check_fn` est mis en cache 30 s donc inutilisable par session. Repli : le handler refuse hors AgentUI. Ou désactiver le toolset `agentui` des autres plateformes (`hermes tools`). | ✅ la fabrique reçoit `ctx.messageChannel` et renvoie `null` hors `agentui` |
+| Outil bloquant (widgets interactifs, non migrés) | possible (handler synchrone dans le thread de l'agent, comme `clarify`) | possible (`execute` asynchrone) ; `ctx.nativeChannelId` = `conversationId` |
+
+Reste hors périmètre : `ask`/`confirm`/`form` (il faut une trame `reply` qui débloque l'outil, comme `clarify`). Le front sait
+toujours rendre un bloc ```` ```widget ```` de ces types, mais plus aucune consigne ne le demande. Non vérifié : le comportement d'un vrai modèle
+(pose-t-il le jeton ?) et OpenClaw sur une vraie gateway.

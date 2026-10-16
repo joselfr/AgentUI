@@ -319,7 +319,7 @@ test('messages proactifs : outbound.sendText / sendMedia', async () => {
 test('tâches cron : service du planificateur + RPC listJobs / jobAction', async () => {
   const entry = (await import('../dist/index.js')).default;
   let service;
-  entry.registerFull({ registerService: (svc) => (service = svc) });
+  entry.registerFull({ registerService: (svc) => (service = svc), registerTool: () => {} });
   const calls = [];
   const jobs = [{ id: 'j1', name: 'rapport', enabled: true, schedule: { kind: 'every', everyMs: 3_600_000 }, payload: { message: 'Fais le rapport' }, state: { nextRunAtMs: 1, lastStatus: 'ok' } }];
   service.start({
@@ -340,6 +340,25 @@ test('tâches cron : service du planificateur + RPC listJobs / jobAction', async
   service.stop();
   assert.match((await rpc('listJobs', {})).error, /indisponible/);
   assert.equal(hello.capabilities.jobs, true);
+});
+
+test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI', async () => {
+  const entry = (await import('../dist/index.js')).default;
+  let factory, opts;
+  entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code']);
+  assert.equal(factory({ messageChannel: 'telegram' }), null);
+  const tools = factory({ messageChannel: 'agentui' });
+  assert.deepEqual(tools.map((t) => t.name), opts.names);
+  assert.deepEqual(tools[0].parameters.required, ['kind', 'x', 'series']);
+  const ok = await tools[0].execute('t1', { kind: 'bar', x: ['a', 'b'], series: [{ name: 's', y: [1, 2] }] });
+  const token = ok.details.token;
+  assert.match(token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
+  assert.equal(JSON.parse(ok.content[0].text).widget, token);
+  await assert.rejects(tools[0].execute('t2', { kind: 'bar', x: ['a', 'b'], series: [{ name: 's', y: [1] }] }), /doit avoir 2 valeurs/);
+  await assert.rejects(tools[0].execute('t3', { kind: 'pie', x: ['a'], series: [{ name: 's', y: [1] }, { name: 't', y: [2] }] }), /camembert/);
+  await assert.rejects(tools[1].execute('t4', { points: [] }), /au moins un point/);
+  await assert.rejects(tools[2].execute('t5', { code: ' ' }), /vide/);
 });
 
 test('suppression : deleteSession efface la session de chaque agent (une discussion = un pair direct)', async () => {
