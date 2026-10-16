@@ -247,6 +247,9 @@ class _Run:
     bubbles: Dict[str, str] = field(default_factory=dict)
     emitted: str = ""  # texte déjà transmis à AgentUI (deltas cumulés)
     settled: bool = False  # le dernier envoi était un message.final complet
+    # Sérialise `_sync` : appelé depuis la boucle asyncio et le thread de l'agent, deux appels simultanés
+    # partiraient du même `emitted` et enverraient des deltas qui se chevauchent (texte répété à l'écran).
+    sync_lock: threading.RLock = field(default_factory=threading.RLock)
     aborted: bool = False
 
 
@@ -541,16 +544,19 @@ class AgentUIAdapter(BasePlatformAdapter):
     # mécanique interne de streaming de la version de Hermes.
 
     def _sync(self, run: "_Run") -> None:
-        full = "\n\n".join(t.strip() for t in run.bubbles.values() if t.strip())
-        if full == run.emitted:
-            return
-        if full.startswith(run.emitted):
-            self._emit(run.conversation_id, {"type": "message.delta", "text": full[len(run.emitted):]})
-            run.settled = False
-        else:  # réécriture (fin de curseur, aperçu supprimé…) : AgentUI remplace le texte accumulé
-            self._emit(run.conversation_id, {"type": "message.final", "text": full})
-            run.settled = True
-        run.emitted = full
+        with run.sync_lock:
+            with self._lock:
+                texts = list(run.bubbles.values())
+            full = "\n\n".join(t.strip() for t in texts if t.strip())
+            if full == run.emitted:
+                return
+            if full.startswith(run.emitted):
+                self._emit(run.conversation_id, {"type": "message.delta", "text": full[len(run.emitted):]})
+                run.settled = False
+            else:  # réécriture (fin de curseur, aperçu supprimé…) : AgentUI remplace le texte accumulé
+                self._emit(run.conversation_id, {"type": "message.final", "text": full})
+                run.settled = True
+            run.emitted = full
 
     def format_tool_event(self, event: Any, *, mode: str = "all", preview_max_len: int = 40) -> Optional[str]:
         return None  # pas de « bulles » d'outils : les cartes viennent des hooks pre/post_tool_call
