@@ -248,10 +248,10 @@ export default function App() {
   // La discussion qu'on est en train de lire n'est jamais « non lue » à l'écran (le marquage côté serveur suit)
   const shownConvs = useMemo(() => convs.map((c) => (c.unread && viewing && c.id === currentId ? { ...c, unread: false } : c)), [convs, viewing, currentId]);
   const unreadCount = shownConvs.filter((c) => c.unread && !c.archived).length;
-  const nav = <NavRail unread={unreadCount} view={view} onView={(v) => { navigate(v === 'chats' ? chatPath.current : `/${v}`); if (v === 'chats') setDrawer(true); else closeDrawer(); }} onSettings={() => { setSettings(true); closeDrawer(); }} settingsOpen={settings} />;
+  const nav = <NavRail unread={unreadCount} view={view} onView={(v) => { navigate(v === 'chats' ? chatPath.current : `/${v}`, { replace: !wide && drawer && v !== 'chats' }); if (v === 'chats') setDrawer(true); else closeDrawer(); }} onSettings={() => { setSettings(true); closeDrawer(); }} settingsOpen={settings} />;
   const sidebar = (
     <Sidebar agents={agents} convs={shownConvs} currentId={currentId}
-      onSelectConv={(id) => { setCurrentId(id); closeDrawer(); }}
+      onSelectConv={(id) => { setCurrentId(id, !wide && drawer); closeDrawer(); }}
       onNew={() => { setNewDlg(true); closeDrawer(); }}
       onDelete={deleteConv} onArchive={archiveConv} onArchiveMany={archiveMany} onDeleteMany={deleteMany} onToggleFavorite={toggleFavorite} onRename={renameConv} onClose={() => (wide ? setListOpen(false) : setDrawer(false))} />
   );
