@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandWidgetTokens, outOfTextWidgets } from './widget';
+import { expandWidgetTokens, outOfTextWidgets, stepTimes } from './widget';
 
 const chart = { kind: 'bar', x: ['a'], series: [{ name: 's', y: [1] }] };
 const tool = (id: string, token = 'a3f9c1', args: unknown = chart, name = 'agentui_chart') =>
@@ -68,3 +68,26 @@ describe('widget progress (hors du texte)', () => {
     expect(outOfTextWidgets(calls).map((w) => w.token)).toEqual(['aaaaaa', 'bbbbbb']);
   });
 });
+
+describe('stepTimes : durée des étapes', () => {
+  const call = (at: number, ...status: string[]) => ({ name: 'agentui_progress', startedAt: at - 100, endedAt: at, args: { steps: status.map((s) => ({ label: 'x', status: s })) } });
+
+  it('une étape dure de son passage en running à son passage en done', () => {
+    const t = stepTimes([call(1000, 'running', 'pending'), call(13000, 'done', 'running'), call(20000, 'done', 'done')]);
+    expect(t[0]).toEqual({ start: 1000, end: 13000 });
+    expect(t[1]).toEqual({ start: 13000, end: 20000 });
+  });
+  it("une étape encore en cours n'a pas de fin", () => {
+    expect(stepTimes([call(1000, 'running'), call(5000, 'running')])[0]).toEqual({ start: 1000 });
+  });
+  it("une étape vue directement terminée commence au précédent appel ; inconnue à la création", () => {
+    const t = stepTimes([call(1000, 'done', 'running'), call(9000, 'done', 'done')]);
+    expect(t[0]).toEqual({ end: 1000 });
+    expect(t[1]).toEqual({ start: 1000, end: 9000 });
+  });
+  it('est fournie avec le widget', () => {
+    const calls = [{ ...call(1000, 'running'), id: 't1', resultPreview: '{"widget": "[[agentui:c0ffee]]"}' }, { ...call(4000, 'done'), id: 't2', resultPreview: '{"widget": "[[agentui:c0ffee]]"}' }];
+    expect(outOfTextWidgets(calls)[0]!.times).toEqual([{ start: 1000, end: 4000 }]);
+  });
+});
+

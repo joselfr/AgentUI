@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseProgress } from './ProgressCard';
+import { fmtDuration, parseProgress } from './ProgressCard';
 import { widgetOfTool } from './widget';
 
 const ok = { title: 'T', steps: [{ label: 'A', status: 'done' }, { label: 'B', status: 'running', detail: '2/3' }], update: '[[agentui:ab12cd]]' };
@@ -19,5 +19,15 @@ describe('parseProgress', () => {
   });
   it("l'outil agentui_progress est un widget d'affichage", () => {
     expect(widgetOfTool({ name: 'agentui_progress', args: ok })?.type).toBe('progress');
+  });
+});
+
+describe('fmtDuration', () => {
+  it('formate en français selon l\'ordre de grandeur', () => {
+    expect(fmtDuration(3200)).toBe('3,2 s');
+    expect(fmtDuration(42_400)).toBe('42 s');
+    expect(fmtDuration(125_000)).toBe('2 min 05 s');
+    expect(fmtDuration(3_900_000)).toBe('1 h 05 min');
+    expect(fmtDuration(-5)).toBe('0,0 s');
   });
 });

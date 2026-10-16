@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
+import type { StepTime } from './widget';
 
 export type StepStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
 interface Step { label: string; status: StepStatus; detail?: string }
@@ -22,6 +24,16 @@ export function parseProgress(a: Record<string, unknown>): Progress | undefined 
   return { ...(typeof a.title === 'string' && a.title ? { title: a.title } : {}), steps: out };
 }
 
+/** Durée en français : « 3,2 s », « 42 s », « 2 min 05 s », « 1 h 05 min ». */
+export function fmtDuration(ms: number): string {
+  const s = Math.max(0, ms) / 1000;
+  if (s < 10) return `${s.toFixed(1).replace('.', ',')} s`;
+  if (s < 60) return `${Math.round(s)} s`;
+  const m = Math.floor(s / 60), r = Math.round(s % 60);
+  if (m < 60) return `${m} min ${String(r).padStart(2, '0')} s`;
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+}
+
 const spin = keyframes`to { transform: rotate(360deg); }`;
 
 type Shown = StepStatus | 'interrupted';
@@ -38,7 +50,22 @@ function Icon({ status }: { status: Shown }) {
 }
 
 /** `ended` : le message est terminé (ou arrêté) : une étape encore en cours ou en attente n'a pas été mise à jour par l'agent, on la montre « interrompue ». */
-export default function ProgressCard({ progress: p, ended = false }: { progress: Progress; ended?: boolean }) {
+export default function ProgressCard({ progress: p, ended = false, times = [] }: { progress: Progress; ended?: boolean; times?: StepTime[] }) {
+  const ticking = !ended && p.steps.some((s, i) => s.status === 'running' && times[i]?.start !== undefined);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!ticking) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [ticking]);
+  /** Durée affichée : écoulée en direct pour l'étape en cours, figée pour une étape terminée ; rien pour une étape interrompue. */
+  const elapsed = (i: number, status: Shown): string => {
+    const t = times[i];
+    if (!t || t.start === undefined) return '';
+    if (status === 'running') return fmtDuration(now - t.start);
+    return (status === 'done' || status === 'failed') && t.end !== undefined ? fmtDuration(t.end - t.start) : '';
+  };
   const steps = p.steps.map((s) => (ended && (s.status === 'running' || s.status === 'pending') ? { ...s, shown: 'interrupted' as Shown } : { ...s, shown: s.status as Shown }));
   const counted = p.steps.filter((s) => s.status !== 'skipped');
   const done = counted.filter((s) => s.status === 'done').length;
@@ -80,6 +107,7 @@ export default function ProgressCard({ progress: p, ended = false }: { progress:
                 </Typography>
               )}
             </Typography>
+            <Typography component="span" variant="caption" sx={{ ml: 'auto', pl: 1, flex: 'none', color: 'text.secondary', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', mt: '2px' }}>{elapsed(folded + i, s.shown)}</Typography>
           </Box>
         ))}
       </Box>

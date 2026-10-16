@@ -124,7 +124,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         overflowWrap: 'anywhere', minWidth: 0,
       }}>
         {!mine && <ActivityBlock reasoning={m.reasoning} tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
-        {live.map((w) => { const progress = parseProgress(w.arguments); return progress ? <ProgressCard key={w.token} progress={progress} ended={m.status !== 'streaming'} /> : null; })}
+        {live.map((w) => { const progress = parseProgress(w.arguments); return progress ? <ProgressCard key={w.token} progress={progress} ended={m.status !== 'streaming'} times={w.times} /> : null; })}
         {mine && <Attachments m={m} />}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
           : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{text}</ReactMarkdown>}

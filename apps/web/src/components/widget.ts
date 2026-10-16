@@ -21,7 +21,7 @@ export function interactiveBlocks(text: string): string[] {
 
 /** Les plugins exposent chaque widget d'affichage comme un outil `agentui_<type>` (ex. `agentui_chart`) : ses arguments sont ceux du widget. */
 const WIDGET_TOOL_PREFIX = 'agentui_';
-export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string };
+export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string; startedAt?: number; endedAt?: number };
 const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress']);
 
 export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
@@ -53,19 +53,49 @@ const OUT_OF_TEXT = new Set(['progress']);
  * Widgets « hors texte » créés dans ce message (un par jeton, dans l'ordre de création), avec l'état du **dernier** appel de
  * la discussion : un appel `update` (jeton du widget) remplace l'état affiché, il ne crée pas de second composant.
  */
-export function outOfTextWidgets(own: ToolCallLike[], all: ToolCallLike[] = own): Array<{ token: string; type: string; arguments: Record<string, unknown> }> {
+export function outOfTextWidgets(own: ToolCallLike[], all: ToolCallLike[] = own): OutOfTextWidget[] {
   const latest = new Map<string, { type: string; arguments: Record<string, unknown> }>();
   const first = new Map<string, ToolCallLike>();
+  const calls = new Map<string, ToolCallLike[]>();
   for (const t of all) {
     const token = tokenOf(t);
     const w = token ? widgetOfTool(t) : undefined;
     if (!token || !w || !OUT_OF_TEXT.has(w.type)) continue;
     latest.set(token, w);
     if (!first.has(token)) first.set(token, t);
+    calls.set(token, [...(calls.get(token) ?? []), t]);
   }
-  const out: Array<{ token: string; type: string; arguments: Record<string, unknown> }> = [];
-  for (const [token, w] of latest) if (own.some((t) => sameCall(t, first.get(token)!))) out.push({ token, ...w });
+  const out: OutOfTextWidget[] = [];
+  for (const [token, w] of latest) if (own.some((t) => sameCall(t, first.get(token)!))) out.push({ token, ...w, times: stepTimes(calls.get(token)!) });
   return out;
+}
+
+export interface StepTime { start?: number; end?: number }
+export interface OutOfTextWidget { token: string; type: string; arguments: Record<string, unknown>; times: StepTime[] }
+
+/**
+ * Durée de chaque étape d'une progression, déduite de l'instant de chaque appel (création puis mises à jour) : une étape
+ * commence quand un appel la montre `running`, et se termine quand un appel la montre `done`/`failed`. Une étape vue
+ * directement terminée a commencé au précédent appel ; à la création, sa durée est inconnue.
+ */
+export function stepTimes(calls: ToolCallLike[]): StepTime[] {
+  const times: StepTime[] = [];
+  let prev: number | undefined;
+  for (const c of calls) {
+    const at = c.endedAt ?? c.startedAt;
+    const steps = (c.args as { steps?: Array<{ status?: unknown }> } | undefined)?.steps;
+    if (at === undefined || !Array.isArray(steps)) continue;
+    steps.forEach((s, i) => {
+      const t = (times[i] ??= {});
+      if (s.status === 'running' && t.start === undefined) t.start = at;
+      if ((s.status === 'done' || s.status === 'failed') && t.end === undefined) {
+        t.end = at;
+        t.start ??= prev;
+      }
+    });
+    prev = at;
+  }
+  return times;
 }
 
 /** Jeton (`[[agentui:<id>]]`) renvoyé par l'outil, lu dans son résultat. */
