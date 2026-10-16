@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // un retour à la ligne = une ligne (sorties de cron, messages courts)
 import type { Message } from '@agentui/shared';
+import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import { ToolsBlock } from '../ToolCard';
 import AskCard from '../AskCard';
@@ -61,7 +62,17 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
         bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
         '& pre': { overflow: 'auto', p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: 1, borderColor: 'divider', fontSize: 13 },
         '& code': { fontSize: '0.88em' }, '& :not(pre) > code': { px: 0.6, py: 0.15, borderRadius: 1, bgcolor: 'action.selected' },
-        '& p': { my: 0.5 }, '& a': { color: 'primary.main' }, '& table': { borderCollapse: 'collapse' }, '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5 },
+        '& p': { my: 0.5 }, '& a': { color: 'primary.main' }, '& table': { borderCollapse: 'collapse', display: 'block', maxWidth: '100%', overflowX: 'auto' }, '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5 },
+        // Petit écran : un tableau de 3 colonnes ou plus devient une suite de cartes, une ligne par attribut
+        '@media (max-width: 599.95px)': {
+          '& table.stackable, & table.stackable tbody, & table.stackable tr, & table.stackable td': { display: 'block', overflowX: 'visible' },
+          '& table.stackable thead': { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' },
+          '& table.stackable tr': { border: 1, borderColor: 'divider', borderRadius: 1.5, mb: 1, p: 0.5 },
+          '& table.stackable td': { border: 0, display: 'flex', gap: 1, px: 1, py: 0.25 },
+          '& table.stackable td::before': { content: 'attr(data-label)', flex: '0 0 34%', color: 'text.secondary', fontWeight: 600 },
+          '& table.stackable td:not([data-label])::before': { content: 'none' },
+          '& table.stackable td:first-of-type': { fontWeight: 600 },
+        },
         overflowWrap: 'anywhere', minWidth: 0,
       }}>
         {!mine && m.reasoning && (
@@ -74,7 +85,7 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
         {!mine && <ToolsBlock tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
         {mine && <Attachments m={m} />}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
-          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={{
+          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={{
             pre: ({ children }) => {
               const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
               if (el?.props?.className?.includes('language-ask') && m.status !== 'streaming') return <AskCard raw={String(el.props.children ?? '').replace(/\n$/, '')} answer={answer} onAnswer={onAnswer} />;
