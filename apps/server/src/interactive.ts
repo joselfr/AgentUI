@@ -11,5 +11,5 @@ export const ASK_INSTRUCTIONS = [
   '- Première(s) ligne(s) : la question (Markdown permis).',
   '- Liste `- Choix` : l\'utilisateur en choisit un seul. Liste `- [ ] Choix` : il peut en choisir plusieurs. Sans liste : réponse libre.',
   "- N'écris rien après ce bloc et n'en mets qu'un par réponse. Ne l'utilise que si tu as réellement besoin d'une information de l'utilisateur.",
-  "[Fin d'instuctions d'interface AgentUI]"
+  "[Fin d'instructions d'interface AgentUI]"
 ].join('\n');
