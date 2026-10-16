@@ -12,6 +12,7 @@ import { makeTheme } from './theme';
 import { applyEvent } from './reducer';
 import { useLive, type LiveEvent } from './useLive';
 import Login from './components/Login';
+import { useConfirm } from './components/Confirm';
 import Sidebar, { DRAWER, StatusDot } from './components/Sidebar';
 import NavRail, { NAV, type View } from './components/NavRail';
 import Chat from './components/Chat';
@@ -70,6 +71,7 @@ export default function App() {
   const agent = agents.find((a) => a.id === (current?.agentId ?? newAgent));
 
   const onUnauth = useCallback(() => setAuth('out'), []);
+  const { ask: askConfirm, dialog: confirmDialog } = useConfirm();
   const guard = useCallback((e: unknown) => { if (e instanceof UnauthorizedError) setAuth('out'); else setError((e as Error).message); }, []);
 
   /** Rafraîchit la liste ; si la discussion est en cours de lecture, la marque lue d'abord (pas de flash « non lu »). */
@@ -210,8 +212,8 @@ export default function App() {
     setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title } : x)));
     api.rename(c.id, title).catch((e) => { setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title: c.title } : x))); guard(e); });
   };
-  const deleteConv = (c: Conversation) => {
-    if (confirm('Supprimer cette conversation ? Sa session sera aussi supprimée chez l’agent.')) {
+  const deleteConv = async (c: Conversation) => {
+    if (await askConfirm({ title: 'Supprimer cette conversation ?', text: <>« {c.title.length > 60 ? `${c.title.slice(0, 60)}…` : c.title} » sera supprimée, ainsi que sa session chez l’agent. Cette action est définitive.</>, confirmLabel: 'Supprimer', danger: true })) {
       api.remove(c.id).then(() => { setConvs((cs) => cs.filter((x) => x.id !== c.id)); if (c.id === currentId) setCurrentId(undefined); }).catch(guard);
     }
   };
@@ -271,6 +273,7 @@ export default function App() {
           </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}
           onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />
+        {confirmDialog}
         <Dialog open={settings} onClose={() => setSettings(false)} fullWidth maxWidth="xs">
           <DialogTitle sx={{ fontWeight: 650 }}>Réglages</DialogTitle>
           <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>

@@ -9,6 +9,7 @@ import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import type { AgentInfo, Job, Skill, SubAgent } from '@agentui/shared';
 import { api } from '../api';
 import { MONO } from '../theme';
+import { useConfirm } from './Confirm';
 import { StatusDot } from './Sidebar';
 
 const card = { display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '12px', bgcolor: 'background.paper' } as const;
@@ -185,6 +186,7 @@ function JobDialog({ j, onClose }: { j?: Job; onClose: () => void }) {
 }
 
 export function JobsPage({ agents, onOpenConversation }: { agents: AgentInfo[]; onOpenConversation: (id: string) => void }) {
+  const { ask, dialog: confirmDialog } = useConfirm();
   const sc = useScope(agents, (a) => a.capabilities.jobs);
   const jobs = useLoad<Job[]>(() => (sc.agent ? api.jobs(sc.agent.id, sc.sub) : Promise.resolve([])), [sc.agent?.id, sc.sub]);
   // Exécutions lancées depuis cette page, suivies jusqu'à leur fin (lastRunAt postérieur au lancement).
@@ -256,12 +258,13 @@ export function JobsPage({ agents, onOpenConversation }: { agents: AgentInfo[]; 
                 {sc.agent?.capabilities.jobControl && (<>
                   <Tooltip title={j.enabled ? 'Mettre en pause' : 'Reprendre'}><IconButton size="small" onClick={() => act(j, j.enabled ? 'pause' : 'resume')}>{j.enabled ? <Pause /> : <PlayArrow />}</IconButton></Tooltip>
                   <Tooltip title={busy ? 'Exécution en cours' : 'Exécuter maintenant'}><span><IconButton size="small" disabled={busy} onClick={() => act(j, 'run')}><Bolt /></IconButton></span></Tooltip>
-                  <Tooltip title="Supprimer"><IconButton size="small" onClick={() => confirm(`Supprimer « ${j.name} » ?`) && act(j, 'delete')}><Delete /></IconButton></Tooltip>
+                  <Tooltip title="Supprimer"><IconButton size="small" onClick={async () => { if (await ask({ title: 'Supprimer cette tâche ?', text: <>« {j.name} » sera supprimée définitivement.</>, confirmLabel: 'Supprimer', danger: true })) act(j, 'delete'); }}><Delete /></IconButton></Tooltip>
                 </>)}
               </Box>
             </Box>);
         })}
       </Box>
+      {confirmDialog}
       <JobDialog j={jobs.data?.find((x) => x.id === detail)} onClose={() => setDetail(undefined)} />
       <Snackbar open={!!notice} autoHideDuration={notice?.conversationId ? 15000 : 6000} onClose={() => setNotice(undefined)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity={notice?.ok ? 'success' : 'error'} variant="filled" onClose={() => setNotice(undefined)}
