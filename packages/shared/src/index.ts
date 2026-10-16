@@ -78,6 +78,7 @@ export interface SearchHit {
   title: string;
   updatedAt: number;
   favorite: boolean;
+  archived?: boolean;
   /** Le titre correspond (sinon seul un message correspond). */
   inTitle: boolean;
   /** Extrait du message le plus récent qui correspond. */

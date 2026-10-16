@@ -282,3 +282,16 @@ test('recherche : titres et messages, sans casse ni accents, tous les mots requi
   expect(runs.search('e')).toEqual([]);
   expect(runs.search('   ')).toEqual([]);
 });
+
+test('archivage : le drapeau est enregistré, conservé et restitué avec les discussions', () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const runs = new RunManager(db, new Map());
+  const c = runs.deliver('a', 's1', 'Bonjour archive', [], 'A', 'À ranger');
+  expect(!!runs.getConversation(c.id)!.archived).toBe(false);
+  runs.setArchived(c.id, true);
+  expect(!!runs.getConversation(c.id)!.archived).toBe(true);
+  expect(runs.listConversations('a').find((x) => x.id === c.id)!.archived).toBe(1);
+  expect(runs.search('archive')[0]!.archived).toBe(true); // retrouvée par la recherche, signalée archivée
+  runs.setArchived(c.id, false);
+  expect(!!runs.getConversation(c.id)!.archived).toBe(false);
+});

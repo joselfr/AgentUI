@@ -17,6 +17,8 @@ export interface ConversationRow {
   last_read_at: number | null;
   /** 1 si la discussion est épinglée en tête de liste. */
   favorite?: number;
+  /** 1 si la discussion est archivée (rangée hors de la liste principale). */
+  archived?: number;
   /** 1 si un message d'agent terminé est plus récent que la dernière lecture. */
   unread?: number;
 }
@@ -163,6 +165,9 @@ export class RunManager {
       .run(Date.now(), id);
     if (Number(r.changes)) this.broadcast({ type: 'conversation.read', conversationId: id });
   }
+  setArchived(id: string, archived: boolean) {
+    this.db.prepare('UPDATE conversations SET archived = ? WHERE id = ?').run(archived ? 1 : 0, id);
+  }
   setFavorite(id: string, favorite: boolean) {
     this.db.prepare('UPDATE conversations SET favorite = ? WHERE id = ?').run(favorite ? 1 : 0, id);
   }
@@ -175,10 +180,10 @@ export class RunManager {
     const words = [...new Set(fold(query).split(/\s+/).filter(Boolean))];
     if (!words.length || fold(query).length < 2) return [];
     const matches = (text: string) => { const f = fold(text); return words.every((w) => f.includes(w)); };
-    const convs = this.db.prepare('SELECT id, agent_id, title, updated_at, favorite FROM conversations').all() as any[];
+    const convs = this.db.prepare('SELECT id, agent_id, title, updated_at, favorite, archived FROM conversations').all() as any[];
     const hits = new Map<string, SearchHit>();
     for (const c of convs) {
-      if (matches(c.title)) hits.set(c.id, { id: c.id, agentId: c.agent_id, title: c.title, updatedAt: c.updated_at, favorite: !!c.favorite, inTitle: true });
+      if (matches(c.title)) hits.set(c.id, { id: c.id, agentId: c.agent_id, title: c.title, updatedAt: c.updated_at, favorite: !!c.favorite, archived: !!c.archived, inTitle: true });
     }
     const info = new Map(convs.map((c) => [c.id as string, c]));
     // Messages du plus récent au plus ancien : le premier qui correspond fournit l'extrait.
@@ -190,7 +195,7 @@ export class RunManager {
       const { snippet, marks } = makeSnippet(r.text, words);
       const c = info.get(r.conversation_id);
       if (!c) continue;
-      const hit = hits.get(c.id) ?? { id: c.id, agentId: c.agent_id, title: c.title, updatedAt: c.updated_at, favorite: !!c.favorite, inTitle: false };
+      const hit = hits.get(c.id) ?? { id: c.id, agentId: c.agent_id, title: c.title, updatedAt: c.updated_at, favorite: !!c.favorite, archived: !!c.archived, inTitle: false };
       hits.set(c.id, { ...hit, snippet, marks });
     }
     return [...hits.values()]

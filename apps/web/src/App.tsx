@@ -13,6 +13,7 @@ import { applyEvent } from './reducer';
 import { useLive, type LiveEvent } from './useLive';
 import Login from './components/Login';
 import { useConfirm } from './components/Confirm';
+import { load, save } from './storage';
 import Sidebar, { DRAWER, StatusDot } from './components/Sidebar';
 import NavRail, { NAV, type View } from './components/NavRail';
 import Chat from './components/Chat';
@@ -22,8 +23,6 @@ import { toOutgoing, type AttachmentView } from './attachments';
 import { forceUpdate } from './pwa';
 import { disablePush, enablePush, pushState, type PushState } from './push';
 
-const load = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v === null ? d : (JSON.parse(v) as T); } catch { return d; } };
-const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignoré */ } };
 
 export default function App() {
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
@@ -212,6 +211,25 @@ export default function App() {
     setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title } : x)));
     api.rename(c.id, title).catch((e) => { setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title: c.title } : x))); guard(e); });
   };
+  const archiveConv = (c: Conversation, archived: boolean) => archiveMany([c], archived);
+  const archiveMany = async (cs: Conversation[], archived: boolean) => {
+    const ids = new Set(cs.map((c) => c.id));
+    const set = (v: boolean) => setConvs((all) => all.map((x) => (ids.has(x.id) ? { ...x, archived: v } : x)));
+    set(archived);
+    try { await Promise.all(cs.map((c) => api.setArchived(c.id, archived))); } catch (e) { set(!archived); guard(e); }
+  };
+  /** Suppression groupée : une confirmation, puis une suppression par discussion (la session de l'agent est supprimée aussi). */
+  const deleteMany = async (cs: Conversation[]): Promise<boolean> => {
+    if (!(await askConfirm({ title: `Supprimer ${cs.length} conversations ?`, text: 'Elles seront supprimées, ainsi que leurs sessions chez l’agent. Cette action est définitive.', confirmLabel: 'Supprimer', danger: true }))) return false;
+    for (const c of cs) {
+      try {
+        await api.remove(c.id);
+        setConvs((all) => all.filter((x) => x.id !== c.id));
+        if (c.id === currentRef.current) setCurrentId(undefined);
+      } catch (e) { guard(e); break; } // on s'arrête à la première erreur : le reste est conservé
+    }
+    return true;
+  };
   const deleteConv = async (c: Conversation) => {
     if (await askConfirm({ title: 'Supprimer cette conversation ?', text: <>« {c.title.length > 60 ? `${c.title.slice(0, 60)}…` : c.title} » sera supprimée, ainsi que sa session chez l’agent. Cette action est définitive.</>, confirmLabel: 'Supprimer', danger: true })) {
       api.remove(c.id).then(() => { setConvs((cs) => cs.filter((x) => x.id !== c.id)); if (c.id === currentId) setCurrentId(undefined); }).catch(guard);
@@ -220,13 +238,13 @@ export default function App() {
   // Sur mobile, la barre de navigation vit dans le tiroir des discussions : fermer la liste libère toute la largeur.
   // La discussion qu'on est en train de lire n'est jamais « non lue » à l'écran (le marquage côté serveur suit)
   const shownConvs = useMemo(() => convs.map((c) => (c.unread && viewing && c.id === currentId ? { ...c, unread: false } : c)), [convs, viewing, currentId]);
-  const unreadCount = shownConvs.filter((c) => c.unread).length;
+  const unreadCount = shownConvs.filter((c) => c.unread && !c.archived).length;
   const nav = <NavRail unread={unreadCount} view={view} onView={(v) => { setView(v); if (v === 'chats') setDrawer(true); else closeDrawer(); }} onSettings={() => { setSettings(true); closeDrawer(); }} settingsOpen={settings} />;
   const sidebar = (
     <Sidebar agents={agents} convs={shownConvs} currentId={currentId}
       onSelectConv={(id) => { setCurrentId(id); closeDrawer(); }}
       onNew={() => { setNewDlg(true); closeDrawer(); }}
-      onDelete={deleteConv} onToggleFavorite={toggleFavorite} onRename={renameConv} onClose={() => (wide ? setListOpen(false) : setDrawer(false))} />
+      onDelete={deleteConv} onArchive={archiveConv} onArchiveMany={archiveMany} onDeleteMany={deleteMany} onToggleFavorite={toggleFavorite} onRename={renameConv} onClose={() => (wide ? setListOpen(false) : setDrawer(false))} />
   );
   const drawerContent = wide ? sidebar : <Box sx={{ display: 'flex', height: '100%' }}>{nav}<Box sx={{ flex: 1, minWidth: 0 }}>{sidebar}</Box></Box>;
   const boot = (child: React.ReactNode) => <ThemeProvider theme={theme}><CssBaseline />{child}</ThemeProvider>;

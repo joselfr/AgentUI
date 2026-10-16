@@ -11,6 +11,8 @@ export interface Conversation {
   unread: boolean;
   /** Épinglée en tête de liste. */
   favorite: boolean;
+  /** Rangée dans la section « Archivées ». */
+  archived: boolean;
   /** Discussion dédiée d'une tâche cron. */
   cron: boolean;
   /** Dernière lecture avant l'ouverture en cours (ms) : sert à repérer les messages non lus. */
@@ -57,6 +59,7 @@ export const api = {
   messages: (id: string) => call<{ conversation: Conversation; messages: Message[] }>('GET', `/conversations/${id}/messages`),
   rename: (id: string, title: string) => call('PATCH', `/conversations/${id}`, { title }),
   setFavorite: (id: string, favorite: boolean) => call('PATCH', `/conversations/${id}`, { favorite }),
+  setArchived: (id: string, archived: boolean) => call('PATCH', `/conversations/${id}`, { archived }),
   remove: (id: string) => call('DELETE', `/conversations/${id}`),
   send: (id: string, text: string, attachments: OutgoingAttachment[] = [], interactive = false) =>
     call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments, interactive }),

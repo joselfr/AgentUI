@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Box, Button, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem, TextField, Tooltip, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import Add from '@mui/icons-material/Add';
+import Archive from '@mui/icons-material/Archive';
+import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline';
+import Unarchive from '@mui/icons-material/Unarchive';
 import Close from '@mui/icons-material/Close';
 import Search from '@mui/icons-material/Search';
 import Delete from '@mui/icons-material/Delete';
@@ -13,6 +16,7 @@ import StarBorder from '@mui/icons-material/StarBorder';
 import MenuOpen from '@mui/icons-material/MenuOpen';
 import type { AgentInfo, ConnStatus, SearchHit } from '@agentui/shared';
 import { api, type Conversation } from '../api';
+import { load, save } from '../storage';
 
 export const DRAWER = 280;
 
@@ -42,12 +46,20 @@ function Snippet({ text, marks }: { text: string; marks: [number, number][] }) {
 
 export default function Sidebar(props: {
   agents: AgentInfo[]; convs: Conversation[]; currentId?: string;
-  onSelectConv: (id: string) => void; onNew: () => void; onDelete: (c: Conversation) => void; onToggleFavorite: (c: Conversation) => void; onRename: (c: Conversation, title: string) => void; onClose: () => void;
+  onSelectConv: (id: string) => void; onNew: () => void; onDelete: (c: Conversation) => void; onArchive: (c: Conversation, archived: boolean) => void;
+  onArchiveMany: (cs: Conversation[], archived: boolean) => void; onDeleteMany: (cs: Conversation[]) => Promise<boolean>; onToggleFavorite: (c: Conversation) => void; onRename: (c: Conversation, title: string) => void; onClose: () => void;
 }) {
   const { agents } = props;
   // Favoris en tête (tri stable : l'ordre par date de mise à jour est conservé dans chaque groupe)
   const convs = [...props.convs].sort((a, b) => Number(b.favorite) - Number(a.favorite));
-  const crons = convs.filter((c) => c.cron);
+  // Filtre par agent (mémorisé) : n'a de sens qu'avec plusieurs agents
+  const [agentFilter, setAgentFilter] = useState<string>(() => load('agentFilter', 'all'));
+  const filter = agents.some((a) => a.id === agentFilter) ? agentFilter : 'all';
+  const shown = convs.filter((c) => filter === 'all' || c.agentId === filter);
+  const active = shown.filter((c) => !c.archived);
+  const crons = active.filter((c) => c.cron);
+  const mains = active.filter((c) => !c.cron);
+  const archivedList = shown.filter((c) => c.archived);
   // Recherche plein texte (titres et messages) : remplace la liste tant que la requête fait au moins 2 caractères
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<SearchHit[]>();
@@ -69,7 +81,20 @@ export default function Sidebar(props: {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const [cronOpen, setCronOpen] = useState(false); // repliée par défaut
+  // Sections repliables : repliées par défaut, état mémorisé
+  const [cronOpen, setCronOpen] = useState(() => load('cronOpen', false));
+  const [archOpen, setArchOpen] = useState(() => load('archOpen', false));
+  const toggleCron = () => setCronOpen((o) => { save('cronOpen', !o); return !o; });
+  const toggleArch = () => setArchOpen((o) => { save('archOpen', !o); return !o; });
+  // Sélection multiple (archiver / supprimer plusieurs discussions)
+  const [selected, setSelected] = useState<Set<string>>();
+  const selecting = !!selected;
+  const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const selectable = [...mains, ...(cronOpen ? crons : []), ...(archOpen ? archivedList : [])];
+  const chosen = convs.filter((c) => selected?.has(c.id));
+  const allChosen = selectable.length > 0 && selectable.every((c) => selected?.has(c.id));
+  const allArchived = chosen.length > 0 && chosen.every((c) => c.archived);
+  useEffect(() => { if (selecting && searchActive) setSelected(undefined); }, [selecting, searchActive]);
   const [menu, setMenu] = useState<{ conv: Conversation; x: number; y: number }>();
   const [renaming, setRenaming] = useState<{ conv: Conversation; title: string }>();
   const submitRename = () => {
@@ -87,9 +112,10 @@ export default function Sidebar(props: {
   const agentName = (id: string) => agents.find((a) => a.id === id)?.name ?? id;
   const item = (c: Conversation) => (
     <ListItemButton key={c.id} selected={c.id === props.currentId}
-      onClick={() => { if (press.current.fired) { press.current.fired = false; return; } props.onSelectConv(c.id); }}
-      onContextMenu={(e) => { e.preventDefault(); cancelPress(); openMenu(c, e.clientX, e.clientY); }}
+      onClick={() => { if (press.current.fired) { press.current.fired = false; return; } if (selecting) toggleSel(c.id); else props.onSelectConv(c.id); }}
+      onContextMenu={(e) => { e.preventDefault(); if (selecting) return; cancelPress(); openMenu(c, e.clientX, e.clientY); }}
       onTouchStart={(e) => {
+        if (selecting) return;
         touch.current = { down: true, lastEvent: Date.now() };
         const t = e.touches[0]!;
         press.current = { fired: false, x: t.clientX, y: t.clientY, timer: window.setTimeout(() => { press.current.fired = true; openMenu(c, t.clientX, t.clientY); }, 500) };
@@ -97,6 +123,7 @@ export default function Sidebar(props: {
       onTouchMove={(e) => { const t = e.touches[0]!; if (Math.hypot(t.clientX - press.current.x, t.clientY - press.current.y) > 10) cancelPress(); }}
       onTouchEnd={(e) => { cancelPress(); touchEnded(); if (press.current.fired && e.cancelable) e.preventDefault(); }} onTouchCancel={() => { cancelPress(); touchEnded(); }}
       sx={{ gap: 1, px: 1.5, WebkitTouchCallout: 'none', userSelect: 'none' }}>
+      {selecting && <Checkbox size="small" edge="start" checked={!!selected?.has(c.id)} tabIndex={-1} disableRipple sx={{ p: 0.5 }} inputProps={{ 'aria-label': `Sélectionner ${c.title}` }} />}
       {c.favorite && <Star aria-label="Favori" sx={{ fontSize: 16, color: 'warning.main', flexShrink: 0 }} />}
       <ListItemText sx={{ minWidth: 0 }} primary={c.title} secondary={`${agentName(c.agentId)} · ${new Date(c.updatedAt).toLocaleDateString()}`}
         primaryTypographyProps={{ noWrap: true, fontWeight: c.unread ? 700 : 500 }}
@@ -108,10 +135,22 @@ export default function Sidebar(props: {
 
   return (
     <Box sx={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pr: 1, height: 64, flexShrink: 0 }}>
-        <Typography variant="subtitle1" sx={{ flex: 1 }}>Discussions</Typography>
-        <IconButton size="small" onClick={props.onClose} aria-label="Masquer les discussions" title="Masquer les discussions"><MenuOpen fontSize="small" /></IconButton>
-      </Box>
+      {selecting ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.5, pr: 1, height: 64, flexShrink: 0 }}>
+          <Checkbox size="small" checked={allChosen} indeterminate={!allChosen && chosen.length > 0} sx={{ p: 0.5 }} inputProps={{ 'aria-label': 'Tout sélectionner' }}
+            onChange={() => setSelected(allChosen ? new Set() : new Set(selectable.map((c) => c.id)))} />
+          <Typography variant="subtitle2" sx={{ flex: 1 }} noWrap>{chosen.length ? `${chosen.length} sélectionnée${chosen.length > 1 ? 's' : ''}` : 'Sélectionner'}</Typography>
+          <Tooltip title={allArchived ? 'Désarchiver' : 'Archiver'}><span><IconButton size="small" disabled={!chosen.length} aria-label={allArchived ? 'Désarchiver' : 'Archiver'}
+            onClick={() => { props.onArchiveMany(chosen, !allArchived); setSelected(undefined); }}>{allArchived ? <Unarchive fontSize="small" /> : <Archive fontSize="small" />}</IconButton></span></Tooltip>
+          <Tooltip title="Supprimer"><span><IconButton size="small" color="error" disabled={!chosen.length} aria-label="Supprimer la sélection"
+            onClick={() => { void props.onDeleteMany(chosen).then((done) => { if (done) setSelected(undefined); }); }}><Delete fontSize="small" /></IconButton></span></Tooltip>
+          <Tooltip title="Annuler"><IconButton size="small" aria-label="Quitter la sélection" onClick={() => setSelected(undefined)}><Close fontSize="small" /></IconButton></Tooltip>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pr: 1, height: 64, flexShrink: 0 }}>
+          <Typography variant="subtitle1" sx={{ flex: 1 }}>Discussions</Typography>
+          <IconButton size="small" onClick={props.onClose} aria-label="Masquer les discussions" title="Masquer les discussions"><MenuOpen fontSize="small" /></IconButton>
+        </Box>)}
       <Box sx={{ px: 1.5, pb: 0.5 }}>
         <Button fullWidth variant="contained" startIcon={<Add />} onClick={props.onNew}>Nouvelle conversation</Button>
       </Box>
@@ -128,6 +167,12 @@ export default function Sidebar(props: {
               </InputAdornment>) : undefined,
           }} />
       </Box>
+      {agents.length > 1 && !searchActive && (
+        <Box role="group" aria-label="Filtrer par agent" sx={{ display: 'flex', justifyContent: 'center', gap: 0.75, px: 1.5, pt: 1, pb: 0.5, flexWrap: 'wrap' }}>
+          {[{ id: 'all', name: 'Tous' }, ...agents].map((a) => (
+            <Chip key={a.id} size="small" label={a.name} clickable color={filter === a.id ? 'primary' : 'default'} variant={filter === a.id ? 'filled' : 'outlined'}
+              aria-pressed={filter === a.id} onClick={() => { setAgentFilter(a.id); save('agentFilter', a.id); }} />))}
+        </Box>)}
       <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', px: 1, pb: 1 }}>
         {searchActive && (
           <List dense disablePadding sx={{ mt: 1 }} aria-label="Résultats de la recherche">
@@ -139,7 +184,7 @@ export default function Sidebar(props: {
                   secondary={<>
                     {h.snippet && <Box sx={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere', color: 'text.primary', opacity: 0.85 }}>
                       <Snippet text={h.snippet} marks={h.marks ?? []} /></Box>}
-                    <Box sx={{ color: 'text.secondary', mt: 0.25 }}>{agentName(h.agentId)} · {new Date(h.updatedAt).toLocaleDateString()}</Box>
+                    <Box sx={{ color: 'text.secondary', mt: 0.25 }}>{agentName(h.agentId)} · {new Date(h.updatedAt).toLocaleDateString()}{h.archived ? ' · archivée' : ''}</Box>
                   </>} />
               </ListItemButton>))}
           </List>)}
@@ -147,7 +192,7 @@ export default function Sidebar(props: {
           <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 2, textAlign: 'center' }}>Aucun résultat pour « {q} »</Typography>)}
         {!searchActive && crons.length > 0 && (
           <Box sx={{ mt: 1, mb: 0.5 }}>
-            <ListItemButton onClick={() => setCronOpen((o) => !o)} aria-expanded={cronOpen} sx={{ gap: 1, px: 1.5 }}>
+            <ListItemButton onClick={toggleCron} aria-expanded={cronOpen} sx={{ gap: 1, px: 1.5 }}>
               {cronOpen ? <ExpandMore fontSize="small" /> : <ChevronRight fontSize="small" />}
               <ListItemText primary={`Tâches cron (${crons.length})`} primaryTypographyProps={{ noWrap: true, fontSize: 13, fontWeight: 600, color: 'text.secondary' }} />
               {!cronOpen && crons.some((c) => c.unread) && <Box component="span" role="img" aria-label="Messages non lus" sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />}
@@ -156,8 +201,18 @@ export default function Sidebar(props: {
           </Box>)}
         {!searchActive && (
           <List dense disablePadding sx={{ mt: 1 }}>
-            {convs.filter((c) => !c.cron).map(item)}
+            {mains.map(item)}
           </List>)}
+        {!searchActive && archivedList.length > 0 && (
+          <Box sx={{ mt: 1, mb: 0.5 }}>
+            <ListItemButton onClick={toggleArch} aria-expanded={archOpen} sx={{ gap: 1, px: 1.5 }}>
+              {archOpen ? <ExpandMore fontSize="small" /> : <ChevronRight fontSize="small" />}
+              <ListItemText primary={`Archivées (${archivedList.length})`} primaryTypographyProps={{ noWrap: true, fontSize: 13, fontWeight: 600, color: 'text.secondary' }} />
+            </ListItemButton>
+            <Collapse in={archOpen} unmountOnExit><List dense disablePadding>{archivedList.map(item)}</List></Collapse>
+          </Box>)}
+        {!searchActive && active.length === 0 && archivedList.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 2, textAlign: 'center' }}>Aucune discussion</Typography>)}
         <Menu open={!!menu} onClose={() => { if (!touch.current.down && Date.now() - touch.current.lastEvent > 600) setMenu(undefined); }} anchorReference="anchorPosition" anchorPosition={menu ? { top: menu.y, left: menu.x } : undefined}
           onContextMenu={(e) => e.preventDefault()}>
           <MenuItem onClick={() => { if (menu) props.onToggleFavorite(menu.conv); setMenu(undefined); }}>
@@ -166,6 +221,13 @@ export default function Sidebar(props: {
           </MenuItem>
           <MenuItem onClick={() => { if (menu) setRenaming({ conv: menu.conv, title: menu.conv.title }); setMenu(undefined); }}>
             <ListItemIcon><Edit fontSize="small" /></ListItemIcon>Renommer
+          </MenuItem>
+          <MenuItem onClick={() => { if (menu) props.onArchive(menu.conv, !menu.conv.archived); setMenu(undefined); }}>
+            <ListItemIcon>{menu?.conv.archived ? <Unarchive fontSize="small" /> : <Archive fontSize="small" />}</ListItemIcon>
+            {menu?.conv.archived ? 'Désarchiver' : 'Archiver'}
+          </MenuItem>
+          <MenuItem onClick={() => { if (menu) setSelected(new Set([menu.conv.id])); setMenu(undefined); }}>
+            <ListItemIcon><CheckCircleOutline fontSize="small" /></ListItemIcon>Sélectionner
           </MenuItem>
           <MenuItem onClick={() => { if (menu) props.onDelete(menu.conv); setMenu(undefined); }} sx={{ color: 'error.main' }}>
             <ListItemIcon sx={{ color: 'inherit' }}><Delete fontSize="small" /></ListItemIcon>Supprimer
