@@ -35,7 +35,8 @@ function parseLines(v: unknown): Set<number> | undefined {
   if (v === undefined) return out;
   if (!Array.isArray(v)) return undefined;
   for (const x of v) {
-    const m = typeof x === 'number' ? [x, x] : typeof x === 'string' ? /^(\d+)(?:-(\d+))?$/.exec(x.trim())?.slice(1).map(Number) : undefined;
+    // Un numéro seul peut arriver en chaîne ("7") : le groupe de fin de plage est alors absent, pas NaN.
+    const m = typeof x === 'number' ? [x, x] : typeof x === 'string' ? /^(\d+)(?:-(\d+))?$/.exec(x.trim())?.slice(1).map((n) => (n === undefined ? undefined : Number(n))) : undefined;
     const [a, b = a] = m ?? [];
     if (a === undefined || b === undefined || !Number.isInteger(a) || !Number.isInteger(b) || a < 1 || b < a || b - a > MAX_LINES) return undefined;
     for (let i = a; i <= b; i++) out.add(i);
