@@ -1,8 +1,8 @@
-import type { ReactElement, ReactNode } from 'react';
+import { useMemo, useRef, type ReactElement, type ReactNode } from 'react';
 import { Avatar, Box, Chip, Paper, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // un retour à la ligne = une ligne (sorties de cron, messages courts)
 import type { Message } from '@agentui/shared';
@@ -56,6 +56,28 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
   m: Message; expandTools: boolean; agentName: string; answer?: string; onAnswer?: (t: string) => void; working?: boolean;
 }) {
   const mine = m.role === 'user';
+  // `pre` doit garder la même identité d'un rendu à l'autre : sinon React le démonte et remonte, et les widgets
+  // (saisie d'un formulaire, carte, cases cochées) perdent leur état et leur focus à chaque rendu du chat.
+  const latest = useRef({ m, answer, onAnswer });
+  latest.current = { m, answer, onAnswer };
+  const components = useMemo<Components>(() => ({
+    pre: ({ children }) => {
+      const { m, answer, onAnswer } = latest.current;
+      const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
+      const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
+      if (m.status !== 'streaming' && (lang === 'widget' || lang === 'ask')) {
+        const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
+        if (lang === 'ask') return <AskCard ask={parseLegacyAsk(raw)} answer={answer} onAnswer={onAnswer} />;
+        const w = parseWidget(raw);
+        if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
+        if (w?.type === 'confirm') { const confirm = parseConfirm(w.arguments); if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />; }
+        if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
+        if (w?.type === 'form') { const form = parseForm(w.arguments); if (form) return <FormCard form={form} answer={answer} onAnswer={onAnswer} />; }
+        if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
+      }
+      return <pre>{children}</pre>;
+    },
+  }), []);
   return (
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
       {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
@@ -81,23 +103,7 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
         {!mine && <ActivityBlock reasoning={m.reasoning} tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
         {mine && <Attachments m={m} />}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
-          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={{
-            pre: ({ children }) => {
-              const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
-              const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
-              if (m.status !== 'streaming' && (lang === 'widget' || lang === 'ask')) {
-                const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
-                if (lang === 'ask') return <AskCard ask={parseLegacyAsk(raw)} answer={answer} onAnswer={onAnswer} />;
-                const w = parseWidget(raw);
-                if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
-                if (w?.type === 'confirm') { const confirm = parseConfirm(w.arguments); if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />; }
-                if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
-                if (w?.type === 'form') { const form = parseForm(w.arguments); if (form) return <FormCard form={form} answer={answer} onAnswer={onAnswer} />; }
-                if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
-              }
-              return <pre>{children}</pre>;
-            },
-          }}>{m.text}</ReactMarkdown>}
+          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{m.text}</ReactMarkdown>}
         {!mine && <Attachments m={m} />}
         {working && <Working m={m} />}
         {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">⏹ interrompu</Typography>}
