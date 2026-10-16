@@ -195,7 +195,7 @@ async function main() {
     if (!c) return reply.code(404).send({ error: 'not found' });
     const a = adapterOf(c.agent_id);
     if (!a.sessionUsage || !c.remote_session_id) return c.usage ? JSON.parse(c.usage) : null;
-    const usage = await a.sessionUsage(c.remote_session_id).catch(() => undefined);
+    const usage = await a.sessionUsage(c.remote_session_id, c.sub_agent_id ?? undefined).catch(() => undefined);
     if (usage) runs.setUsage(c.id, usage);
     return usage ?? (c.usage ? JSON.parse(c.usage) : null);
   });
@@ -208,8 +208,8 @@ async function main() {
     if (!a.setModel) return reply.code(501).send({ error: 'Cet agent ne sait pas changer de modèle' });
     if (runs.isRunning(c.id)) return reply.code(409).send({ error: 'Une réponse est en cours : attendez sa fin pour changer de modèle' });
     const sessionId = runs.ensureRemoteSession(c.id);
-    const r = await a.setModel(sessionId, b.model, b.provider);
-    const usage = (await a.sessionUsage?.(sessionId).catch(() => undefined)) ?? { ...(c.usage ? JSON.parse(c.usage) : { inputTokens: 0, outputTokens: 0 }), model: r.model, provider: r.provider };
+    const r = await a.setModel(sessionId, b.model, b.provider, c.sub_agent_id ?? undefined);
+    const usage = (await a.sessionUsage?.(sessionId, c.sub_agent_id ?? undefined).catch(() => undefined)) ?? { ...(c.usage ? JSON.parse(c.usage) : { inputTokens: 0, outputTokens: 0 }), model: r.model, provider: r.provider };
     runs.setUsage(c.id, { ...usage, model: r.model, provider: r.provider ?? usage.provider });
     return { ...r, usage: runs.getConversation(c.id)?.usage ? JSON.parse(runs.getConversation(c.id)!.usage!) : undefined };
   });

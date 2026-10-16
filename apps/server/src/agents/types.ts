@@ -39,9 +39,9 @@ export interface AgentAdapter {
   /** Modèles disponibles (adaptateurs qui savent en changer par session). */
   listModels?(): Promise<ModelOption[]>;
   /** Fixe le modèle d'une session ; renvoie le modèle effectivement retenu. */
-  setModel?(sessionId: string, model: string, provider?: string): Promise<{ model: string; provider?: string; message?: string }>;
+  setModel?(sessionId: string, model: string, provider?: string, subAgentId?: string): Promise<{ model: string; provider?: string; message?: string }>;
   /** Modèle courant et consommation d'une session existante (sans attendre un nouveau run). */
-  sessionUsage?(sessionId: string): Promise<Usage | undefined>;
+  sessionUsage?(sessionId: string, subAgentId?: string): Promise<Usage | undefined>;
 
   listSessions(): Promise<Session[]>;
   getMessages(sessionId: string): Promise<Message[]>;

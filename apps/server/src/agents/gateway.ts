@@ -374,17 +374,17 @@ export class GatewayAdapter implements AgentAdapter {
     if (!this.capabilities().models) return [];
     return this.rpc<ModelOption[]>('listModels', {});
   }
-  async setModel(sessionId: string, model: string, provider?: string) {
+  async setModel(sessionId: string, model: string, provider?: string, subAgentId?: string) {
     if (!this.capabilities().models) throw Object.assign(new Error(`${this.name} : ce plugin ne sait pas changer de modèle`), { statusCode: 501 });
     try {
-      return await this.rpc<{ model: string; provider?: string; message?: string }>('setModel', { conversationId: sessionId, model, ...(provider ? { provider } : {}) });
+      return await this.rpc<{ model: string; provider?: string; message?: string }>('setModel', { conversationId: sessionId, model, ...(provider ? { provider } : {}), ...(subAgentId ? { subAgentId } : {}) });
     } catch (e) {
       throw Object.assign(new Error((e as Error).message), { statusCode: 502 });
     }
   }
-  async sessionUsage(sessionId: string): Promise<Usage | undefined> {
+  async sessionUsage(sessionId: string, subAgentId?: string): Promise<Usage | undefined> {
     if (!this.capabilities().models) return undefined;
-    return (await this.rpc<Usage | null>('sessionUsage', { conversationId: sessionId })) ?? undefined;
+    return (await this.rpc<Usage | null>('sessionUsage', { conversationId: sessionId, ...(subAgentId ? { subAgentId } : {}) })) ?? undefined;
   }
   async deleteSession(sessionId: string): Promise<void> {
     if (!this.capabilities().sessionDelete) {
