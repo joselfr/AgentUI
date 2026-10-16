@@ -2,7 +2,6 @@
 // l'outil au lieu d'écrire un bloc ```widget. L'outil renvoie un jeton `[[agentui:<id>]]` que l'agent place dans son texte ;
 // AgentUI le remplace par le widget (arguments de `tool.started`, jeton dans le résultat de `tool.completed`).
 import { randomBytes } from 'node:crypto';
-import { Type } from 'typebox';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
 
@@ -30,7 +29,7 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
       name: spec.prefix + key,
       label: spec.prefix + key,
       description: tool.description,
-      parameters: Type.Unsafe<Args>(tool.parameters),
+      parameters: tool.parameters as any, // schéma JSON brut (pas de dépendance à typebox, absente de l'installation d'un plugin)
       async execute(_id: string, args: Args) {
         const problem = widgetError(key, args);
         if (problem) throw new Error(problem);

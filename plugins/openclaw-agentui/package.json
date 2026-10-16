@@ -35,8 +35,5 @@
       "pluginApi": ">=2026.9.9",
       "minGatewayVersion": "2026.9.9"
     }
-  },
-  "dependencies": {
-    "typebox": "^1.3.34"
   }
 }
