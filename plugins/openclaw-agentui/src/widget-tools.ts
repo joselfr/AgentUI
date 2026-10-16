@@ -23,6 +23,8 @@ export function widgetError(key: string, args: Args): string | undefined {
       if (row.length !== n) return `La ligne ${i + 1} a ${row.length} valeurs, il en faut ${n} (une par colonne).`;
       if (row.some((v) => v !== null && typeof v === 'object')) return `La ligne ${i + 1} contient une valeur qui n'est ni texte, ni nombre, ni booléen, ni null.`;
     }
+  } else if (key === 'progress') {
+    if (args.update !== undefined && !/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.update))) return '`update` doit être le jeton [[agentui:…]] renvoyé par le premier appel.';
   } else if (key === 'map' && !args.points?.length) return 'Il faut au moins un point.';
   else if (key === 'code' && !String(args.code ?? '').trim()) return 'Le code est vide.';
   return undefined;
@@ -76,6 +78,10 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
       async execute(_id: string, args: Args) {
         const problem = widgetError(key, args);
         if (problem) throw new Error(problem);
+        if (key === 'progress' && args.update) {
+          // Mise à jour : même jeton, le front affiche l'état du dernier appel.
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: args.update, updated: true, instruction: spec.updateInstruction }) }], details: { token: args.update } };
+        }
         const token = `[[agentui:${randomBytes(3).toString('hex')}]]`;
         return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: spec.tokenInstruction }) }], details: { token } };
       },

@@ -390,7 +390,7 @@ test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI',
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
   const tools = factory({ messageChannel: 'agentui' });
   assert.deepEqual(tools.map((t) => t.name), opts.names);
@@ -407,6 +407,14 @@ test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI',
   const okTable = await table.execute('t6', { columns: [{ label: 'A' }, { label: 'B', kind: 'number' }], rows: [['x', 1], ['y', null]] });
   assert.match(okTable.details.token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
   await assert.rejects(table.execute('t7', { columns: [{ label: 'A' }, { label: 'B' }], rows: [['x']] }), /ligne 1 a 1 valeurs, il en faut 2/);
+  const progress = tools.find((t) => t.name === 'agentui_progress');
+  const steps = [{ label: 'A', status: 'running' }, { label: 'B', status: 'pending' }];
+  const created = await progress.execute('t9', { steps });
+  const pToken = created.details.token;
+  assert.match(pToken, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
+  const updated = JSON.parse((await progress.execute('t10', { update: pToken, steps: [{ label: 'A', status: 'done' }, { label: 'B', status: 'running' }] })).content[0].text);
+  assert.deepEqual([updated.widget, updated.updated], [pToken, true], 'une mise à jour renvoie le même jeton');
+  await assert.rejects(progress.execute('t11', { update: 'abc', steps }), /doit être le jeton/);
   await assert.rejects(table.execute('t8', { columns: [{ label: 'A' }], rows: [[{ a: 1 }]] }), /ni texte/);
 });
 

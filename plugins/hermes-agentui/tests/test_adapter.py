@@ -163,6 +163,13 @@ class FakeAgent:
                     args = {"fields": [{"name": "a", "label": "A"}, {"name": "a", "label": "B"}]}
                 self.answers[chat] = json.loads(Ctx.tools["agentui_" + key](args))
                 return "fait"
+            if event.text == "prog-widget":  # widget progress : le 2e appel (update) renvoie le même jeton
+                steps = [{"label": "A", "status": "running"}]
+                first = json.loads(Ctx.tools["agentui_progress"]({"steps": steps}))
+                again = json.loads(Ctx.tools["agentui_progress"]({"steps": [{"label": "A", "status": "done"}], "update": first["widget"]}))
+                bad = json.loads(Ctx.tools["agentui_progress"]({"steps": steps, "update": "abc"}))
+                self.answers[chat] = (first, again, bad)
+                return "fait"
             if event.text == "long":
                 self.release.wait(10)
                 return "trop tard"
@@ -322,6 +329,13 @@ async def main():
         await server.until(lambda f: f.get("runId") == "r3f" and f["event"]["type"] == "run.completed")
         assert "deux fois" in agent.answers["c3f"]["error"], agent.answers
         print("✓ outils interactifs : widget, reply → résultat de l'outil, arrêt, validation")
+
+        await server.send({"type": "inbound", "conversationId": "c3g", "runId": "r3g", "text": "prog-widget"})
+        await server.until(lambda f: f.get("runId") == "r3g" and f["event"]["type"] == "run.completed")
+        first, again, bad = agent.answers["c3g"]
+        assert first["widget"].startswith("[[agentui:") and again["widget"] == first["widget"] and again["updated"] is True, agent.answers
+        assert "error" in bad, bad
+        print("✓ widget progress : jeton renvoyé puis réutilisé par update")
 
         # 5. arrêt : run.aborted, et la confirmation de /stop n'est pas relayée
         await server.send({"type": "inbound", "conversationId": "c4", "runId": "r4", "text": "long"})

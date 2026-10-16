@@ -62,6 +62,11 @@ l'agent place ce jeton dans son texte. AgentUI le remplace à l'affichage par le
 Schémas : `widget-tools.json` (copié dans chaque plugin par `plugins/sync-widget-tools.mjs`). Un agent sans plugin n'a donc pas
 ces widgets.
 
+Un widget d'affichage peut être **mis à jour** : `agentui_progress` (checklist d'étapes) accepte `update` = le jeton
+renvoyé par le premier appel, avec l'état complet. L'outil renvoie alors le même jeton (`"updated": true`) ; le front
+affiche, à la place du jeton, les arguments du **dernier** appel, pendant le streaming comme après, sans second composant.
+Les plugins n'ont aucun état à garder.
+
 Les widgets interactifs `ask`, `confirm` et `form` sont des outils **bloquants** (`agentui_ask`, `agentui_confirm`,
 `agentui_form`, section `blockingTools` du même fichier). L'outil émet `question.requested`, ajoute le bloc ```` ```widget ````
 `{"type": …, "arguments": …}` au texte du run, attend la trame `reply` et renvoie `{"answer": "<texte de la réponse>"}` à

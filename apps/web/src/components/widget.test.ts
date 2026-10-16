@@ -39,3 +39,25 @@ describe('expandWidgetTokens', () => {
     expect(expandWidgetTokens('x [[agentui:a3f9c1]]', [tool('t1', 'a3f9c1', chart, 'terminal')])).toBe('x ');
   });
 });
+
+describe('expandWidgetTokens : widget progress mis à jour', () => {
+  const steps = (...st: string[]) => ({ steps: st.map((status, i) => ({ label: `E${i + 1}`, status })) });
+  const prog = (id: string, args: unknown, token = 'c0ffee') => ({ id, name: 'agentui_progress', args, resultPreview: `{"widget": "[[agentui:${token}]]"}` });
+  const state = (out: string) => JSON.parse(/```widget\n(.*)\n```/.exec(out)![1]!).arguments.steps.map((s: { status: string }) => s.status);
+
+  it("affiche l'état du dernier appel à la place du jeton", () => {
+    const calls = [prog('t1', steps('running', 'pending')), prog('t2', { update: '[[agentui:c0ffee]]', ...steps('done', 'running') })];
+    expect(state(expandWidgetTokens('Voilà [[agentui:c0ffee]]', calls))).toEqual(['done', 'running']);
+  });
+  it("n'ajoute pas de seconde copie pour une mise à jour (jeton jamais écrit)", () => {
+    const calls = [prog('t1', steps('running')), prog('t2', { update: '[[agentui:c0ffee]]', ...steps('done') })];
+    expect(expandWidgetTokens('Texte', calls).match(/```widget/g)).toHaveLength(1);
+  });
+  it('un message suivant ne duplique pas le widget, même si le jeton y est réécrit', () => {
+    const first = prog('t1', steps('running'));
+    const update = prog('t2', { update: '[[agentui:c0ffee]]', ...steps('done') });
+    expect(expandWidgetTokens('Fini [[agentui:c0ffee]]', [update], [first, update])).toBe('Fini ');
+    expect(expandWidgetTokens('Fini', [update], [first, update])).toBe('Fini');
+  });
+});
+

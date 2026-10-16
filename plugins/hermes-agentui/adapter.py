@@ -22,6 +22,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import threading
 import time
 import urllib.request
@@ -1080,6 +1081,10 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
                 return f"La ligne {i + 1} a {len(row)} valeurs, il en faut {n} (une par colonne)."
             if any(isinstance(v, (dict, list)) for v in row):
                 return f"La ligne {i + 1} contient une valeur qui n'est ni texte, ni nombre, ni booléen, ni null."
+    elif key == "progress":
+        update = args.get("update")
+        if update is not None and not re.fullmatch(r"\[\[agentui:[0-9a-f]+\]\]", str(update)):
+            return "`update` doit être le jeton [[agentui:…]] renvoyé par le premier appel."
     elif key == "map" and not args.get("points"):
         return "Il faut au moins un point."
     elif key == "code" and not str(args.get("code") or "").strip():
@@ -1125,6 +1130,9 @@ def _register_widget_tools(ctx) -> None:
             problem = _widget_error(key, args)
             if problem:
                 return json.dumps({"error": problem}, ensure_ascii=False)
+            update = args.get("update") if key == "progress" else None
+            if update:  # mise à jour : même jeton, le front affiche l'état du dernier appel
+                return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
             return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": spec["tokenInstruction"]}, ensure_ascii=False)
 
         return handler

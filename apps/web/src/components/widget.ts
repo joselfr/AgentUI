@@ -21,8 +21,8 @@ export function interactiveBlocks(text: string): string[] {
 
 /** Les plugins exposent chaque widget d'affichage comme un outil `agentui_<type>` (ex. `agentui_chart`) : ses arguments sont ceux du widget. */
 const WIDGET_TOOL_PREFIX = 'agentui_';
-export type ToolCallLike = { name: string; args?: unknown; resultPreview?: string };
-const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table']);
+export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string };
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress']);
 
 export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
   if (!t.name.startsWith(WIDGET_TOOL_PREFIX)) return undefined;
@@ -44,6 +44,10 @@ function stripPartialToken(text: string): string {
 }
 const fence = (w: { type: string; arguments: Record<string, unknown> }) => '\n\n```widget\n' + JSON.stringify(w) + '\n```\n\n';
 
+/** Widget mis à jour par des appels ultérieurs (`update` = jeton du widget) : l'état d'un jeton est celui du dernier appel. */
+const isUpdate = (t: { args?: unknown }) => typeof (t.args as { update?: unknown } | undefined)?.update === 'string';
+const sameCall = (a: ToolCallLike, b: ToolCallLike) => (a.id !== undefined && b.id !== undefined ? a.id === b.id : a === b);
+
 /** Jeton (`[[agentui:<id>]]`) renvoyé par l'outil, lu dans son résultat. */
 const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[agentui:([0-9a-f]+)\]\]/)?.[1];
 
@@ -55,15 +59,21 @@ const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[a
  */
 export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolCallLike[] = own, done = true): string {
   const widgets = new Map<string, { type: string; arguments: Record<string, unknown> }>();
+  const firstCall = new Map<string, ToolCallLike>();
   for (const t of all) {
     const id = tokenOf(t);
     const w = id ? widgetOfTool(t) : undefined;
-    if (id && w) widgets.set(id, w);
+    if (id && w) {
+      widgets.set(id, w); // le dernier appel fait foi : une mise à jour remplace l'état affiché
+      if (!firstCall.has(id)) firstCall.set(id, t);
+    }
   }
   const used = new Set<string>();
   let out = text.replace(TOKEN, (_m, id: string) => {
     const w = widgets.get(id);
     if (!w) return '';
+    // Un widget mis à jour vit dans le message qui l'a créé : le jeton réécrit ailleurs ne le duplique pas.
+    if (w.type === 'progress' && !own.some((t) => sameCall(t, firstCall.get(id)!))) return '';
     used.add(id);
     return fence(w);
   });
@@ -71,7 +81,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
   if (done) for (const t of own) {
     const id = tokenOf(t);
     const w = id ? widgets.get(id) : undefined;
-    if (id && w && !used.has(id)) out += fence(w);
+    if (id && w && !used.has(id) && !isUpdate(t)) out += fence(w);
   }
   return out;
 }

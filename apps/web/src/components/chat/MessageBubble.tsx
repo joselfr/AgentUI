@@ -16,6 +16,7 @@ import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
 import MapCard, { parseMap } from '../MapCard';
 import TableCard, { parseTable } from '../TableCard';
+import ProgressCard, { parseProgress } from '../ProgressCard';
 import CodeCard, { parseCode } from '../CodeCard';
 import FormCard, { parseForm } from '../FormCard';
 
@@ -55,10 +56,11 @@ function Attachments({ m }: { m: Message }) {
 }
 
 /** Widgets d'affichage (sans réponse) : bloc ```widget ou outil `agentui_<type>`. `undefined` si le type ou les arguments sont invalides. */
-function displayWidget(w?: { type: string; arguments: Record<string, unknown> }): ReactElement | undefined {
+function displayWidget(w?: { type: string; arguments: Record<string, unknown> }, ended = true): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
   if (w?.type === 'table') { const table = parseTable(w.arguments); if (table) return <TableCard table={table} />; }
+  if (w?.type === 'progress') { const progress = parseProgress(w.arguments); if (progress) return <ProgressCard progress={progress} ended={ended} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }
@@ -81,8 +83,10 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
       const { m, answers, onAnswer: canAnswer } = latest.current;
       const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
-      if ((m.status !== 'streaming' || isAwaiting(m)) && (lang === 'widget' || lang === 'ask')) {
-        const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
+      const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
+      // Seule la progression se met à jour pendant le streaming ; les autres widgets attendent la fin du message.
+      const live = lang === 'widget' && m.status === 'streaming' && parseWidget(raw)?.type === 'progress';
+      if ((m.status !== 'streaming' || isAwaiting(m) || live) && (lang === 'widget' || lang === 'ask')) {
         // Un message peut poser plusieurs questions de suite (question.requested puis réponse) : la k-ième reçoit la k-ième réponse, seule la première sans réponse est active.
         const k = interactiveBlocks(m.text).indexOf(raw);
         const answer = k >= 0 ? answers[k] : undefined;
@@ -91,7 +95,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         const w = parseWidget(raw);
         if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
         if (w?.type === 'confirm') { const confirm = parseConfirm(w.arguments); if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />; }
-        const display = displayWidget(w);
+        const display = displayWidget(w, m.status !== 'streaming');
         if (display) return display;
         if (w?.type === 'form') { const form = parseForm(w.arguments); if (form) return <FormCard form={form} answer={answer} onAnswer={onAnswer} />; }
       }
