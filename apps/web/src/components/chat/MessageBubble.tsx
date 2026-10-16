@@ -10,7 +10,7 @@ import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
-import { expandWidgetTokens, interactiveBlocks, parseWidget, widgetOfTool, type ToolCallLike } from '../widget';
+import { expandWidgetTokens, interactiveBlocks, parseWidget, type ToolCallLike } from '../widget';
 import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
@@ -72,7 +72,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
   allTools?: ToolCallLike[];
 }) {
   const mine = m.role === 'user';
-  // Les outils `agentui_<type>` ne sont pas de l'activité : leur widget prend la place du jeton que l'agent a écrit dans son texte.
+  // Le widget d'un outil `agentui_<type>` prend la place du jeton que l'agent a écrit dans son texte ; l'appel reste aussi listé avec les autres outils.
   const text = useMemo(() => (m.role === 'user' ? m.text : expandWidgetTokens(m.text, m.toolCalls ?? [], allTools, m.status !== 'streaming')), [m.role, m.text, m.toolCalls, m.status, allTools]);
   // `pre` doit garder la même identité d'un rendu à l'autre : sinon React le démonte et remonte, et les widgets
   // (saisie d'un formulaire, carte, cases cochées) perdent leur état et leur focus à chaque rendu du chat.
@@ -124,7 +124,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         },
         overflowWrap: 'anywhere', minWidth: 0,
       }}>
-        {!mine && <ActivityBlock reasoning={m.reasoning} tools={(m.toolCalls ?? []).filter((t) => !widgetOfTool(t))} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
+        {!mine && <ActivityBlock reasoning={m.reasoning} tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
         {mine && <Attachments m={m} />}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
           : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{text}</ReactMarkdown>}
