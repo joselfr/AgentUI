@@ -1,4 +1,5 @@
 import { createChatChannelPlugin, type OpenClawConfig } from 'openclaw/plugin-sdk/channel-core';
+import { askHosts } from './asks.js';
 import { AgentUIBridge, CHANNEL, HOME_CONVERSATION, MAX_MEDIA, readMedia } from './bridge.js';
 import { AgentUIClient } from './client.js';
 import type { Capabilities, Media } from './protocol.js';
@@ -132,6 +133,7 @@ export const agentUIPlugin = createChatChannelPlugin<AgentUIAccount>({
           log,
         });
         agentUIClients.set(ctx.accountId, client);
+        askHosts.set(ctx.accountId, bridge);
         client.start();
         await new Promise<void>((resolve) => {
           if (ctx.abortSignal.aborted) return resolve();
@@ -139,6 +141,7 @@ export const agentUIPlugin = createChatChannelPlugin<AgentUIAccount>({
         });
         client.stop();
         agentUIClients.delete(ctx.accountId);
+        askHosts.delete(ctx.accountId);
       },
     },
   },

@@ -26,7 +26,6 @@ import { toOutgoing, type AttachmentView } from './attachments';
 export default function App() {
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
   const [themeMode, setThemeMode] = usePersisted<ThemeMode>('themeMode', 'dark');
-  const [askUser, setAskUser] = usePersisted<boolean>('askUser', true);
   const [expandTools, setExpandTools] = usePersisted<boolean>('expandTools', false);
   const theme = useMemo(() => makeTheme(themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode), [themeMode, prefersDark]);
   const wide = useMediaQuery(theme.breakpoints.up('md'));
@@ -218,7 +217,7 @@ export default function App() {
         ...(answering ? [] : [{ id: `local-a-${Date.now()}`, role: 'assistant' as const, text: '', createdAt: Date.now(), status: 'streaming' as const }])]);
       optimistic = true;
       setRunning(true);
-      await api.send(id, text, attachments, askUser);
+      await api.send(id, text, attachments);
       return true;
     } catch (e) {
       setRunning(false);
@@ -293,7 +292,7 @@ export default function App() {
           onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />
         {confirmDialog}
         <SettingsDialog open={settings} onClose={() => setSettings(false)} onLogout={() => api.logout().finally(() => { setAuth('out'); setCurrentId(undefined); })}
-          themeMode={themeMode} onThemeMode={setThemeMode} expandTools={expandTools} onExpandTools={setExpandTools} askUser={askUser} onAskUser={setAskUser} />
+          themeMode={themeMode} onThemeMode={setThemeMode} expandTools={expandTools} onExpandTools={setExpandTools} />
       </Box>
     </ThemeProvider>
   );

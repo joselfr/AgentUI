@@ -22,7 +22,9 @@ Le plugin se connecte à `ws(s)://<agentui>/gateway` ; en Docker sur le même r�
 Les adapters directs (`hermes` via api_server, `openclaw` via le WebSocket opérateur) restent disponibles en parallèle.
 
 Les widgets `chart`, `map` et `code` sont aussi exposés comme outils de plugin (`agentui_chart`, `agentui_map`, `agentui_code`,
-voir `SPIKE.md`). Leurs schémas sont dans `protocol/widget-tools.json` : après modification, lancer
+voir `SPIKE.md`), et les widgets interactifs `ask`, `confirm` et `form` comme outils **bloquants** (`agentui_ask`,
+`agentui_confirm`, `agentui_form` : l'outil affiche le widget, attend la trame `reply` et renvoie la réponse de l'utilisateur
+à l'agent, sans terminer son tour). Leurs schémas sont dans `protocol/widget-tools.json` : après modification, lancer
 `node plugins/sync-widget-tools.mjs` pour les recopier dans les deux plugins (Hermes : le fichier `widget_tools.json` doit
 être copié avec `adapter.py`).
 

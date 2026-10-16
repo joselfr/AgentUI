@@ -10,11 +10,10 @@ export type ThemeMode = 'auto' | 'light' | 'dark';
 const themeLabel: Record<ThemeMode, string> = { auto: 'Système', light: 'Clair', dark: 'Sombre' };
 const card = { p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 1 } as const;
 
-export default function SettingsDialog({ open, onClose, onLogout, themeMode, onThemeMode, expandTools, onExpandTools, askUser, onAskUser }: {
+export default function SettingsDialog({ open, onClose, onLogout, themeMode, onThemeMode, expandTools, onExpandTools }: {
   open: boolean; onClose: () => void; onLogout: () => void;
   themeMode: ThemeMode; onThemeMode: (m: ThemeMode) => void;
   expandTools: boolean; onExpandTools: (v: boolean) => void;
-  askUser: boolean; onAskUser: (v: boolean) => void;
 }) {
   useBackClose(open, onClose);
   return (
@@ -25,7 +24,6 @@ export default function SettingsDialog({ open, onClose, onLogout, themeMode, onT
           {(Object.keys(themeLabel) as ThemeMode[]).map((k) => <MenuItem key={k} value={k}>Thème : {themeLabel[k]}</MenuItem>)}
         </Select>
         <FormControlLabel sx={{ mx: 0, ...card }} control={<Switch checked={expandTools} onChange={(e) => onExpandTools(e.target.checked)} />} label="Déplier les outils par défaut" />
-        <FormControlLabel sx={{ mx: 0, ...card }} control={<Switch checked={askUser} onChange={(e) => onAskUser(e.target.checked)} />} label="Widgets interactifs de l'agent (ask, confirm, form, chart, map, code)" />
         <PushToggle />
         <UpdateButton />
         <PasswordForm />

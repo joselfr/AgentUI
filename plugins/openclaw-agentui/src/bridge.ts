@@ -10,6 +10,8 @@ import type { AgentEvent, GatewayMessage, Media, Usage } from './protocol.js';
 import { getAgentUIRuntime } from './runtime.js';
 import { listSubAgents } from './agents.js';
 import { jobAction, listJobs } from './cron.js';
+import { randomBytes } from 'node:crypto';
+import type { AskHost, AskResult } from './asks.js';
 import { resolveQuestion } from './question.js';
 import { askReplyText, askWidget, parseAskQuestions, type AskQuestion } from './ask.js';
 
@@ -32,6 +34,8 @@ interface Run {
   askQuestionId?: string;
   /** Appel d'outil `ask_user` en cours : sa fin (réponse, annulation, délai) ferme la question. */
   askToolId?: string;
+  /** Question d'un outil interactif (`agentui_ask`…) en attente : sa réponse (trame `reply`) débloque l'outil. */
+  toolAsk?: { id: string; answer: (text: string) => void; cancel: () => void };
   abort: AbortController;
   /** Segments de texte déjà terminés (avant un outil) et segment en cours de streaming. */
   segments: string[];
@@ -59,7 +63,9 @@ function splitRef(ref: string): { provider?: string; id: string } {
 
 const APPROVE_RE = /\/approve\s+([A-Za-z0-9_-]+)\s+allow-once/;
 
-export class AgentUIBridge {
+const ASK_TIMEOUT_MS = 30 * 60_000;
+
+export class AgentUIBridge implements AskHost {
   private runs = new Map<string, Run>();
 
   constructor(
@@ -240,6 +246,7 @@ export class AgentUIBridge {
   private async onReply(msg: Extract<GatewayMessage, { type: 'reply' }>): Promise<void> {
     const run = this.runs.get(msg.runId);
     if (!run || run.terminal) return this.p.log(`réponse sans run en cours (${msg.runId})`);
+    if (run.toolAsk) return run.toolAsk.answer(msg.text);
     const text = run.askQuestions ? askReplyText(run.askQuestions, msg.text) : msg.text;
     if (run.askQuestionId) {
       const id = run.askQuestionId;
@@ -261,6 +268,50 @@ export class AgentUIBridge {
       capture,
     }).catch((e) => this.p.log(`réponse ${msg.runId} en échec : ${String(e)}`));
     if (result && capture.length) this.p.log(`réponse ${msg.runId} : le cœur a répondu « ${capture.join(' ').slice(0, 200)} »`);
+  }
+
+  /**
+   * Outil interactif : affiche le widget `key` puis attend la réponse de l'utilisateur. La question est annoncée avant le
+   * widget (AgentUI sait alors qu'une réponse est attendue) et fermée à la réponse, à l'arrêt, à la fin du run ou au délai.
+   */
+  askBlocking(conversationId: string, key: string, args: Json, signal?: AbortSignal): Promise<AskResult> | undefined {
+    const run = [...this.runs.values()].find((r) => r.conversationId === conversationId && !r.terminal);
+    if (!run) return undefined;
+    if (run.toolAsk) return Promise.resolve({ error: "Une question est déjà en attente de réponse : attends-la avant d'en poser une autre." });
+    return new Promise<AskResult>((resolve) => {
+      const id = `ui_${randomBytes(6).toString('hex')}`;
+      const timer = setTimeout(() => settle({ error: "Pas de réponse de l'utilisateur (délai dépassé)." }), ASK_TIMEOUT_MS);
+      timer.unref?.();
+      const onAbort = () => settle({ error: 'Échange interrompu.' });
+      const settle = (res: AskResult) => {
+        if (run.toolAsk?.id !== id) return;
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        run.toolAsk = undefined;
+        this.emit(run, { type: 'question.resolved', id });
+        resolve(res);
+      };
+      run.toolAsk = { id, answer: (answer) => settle({ answer }), cancel: () => settle({ error: 'Échange interrompu.' }) };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      this.emit(run, { type: 'question.requested', id });
+      this.appendBlock(run, '```widget\n' + JSON.stringify({ type: key, arguments: args }) + '\n```');
+    });
+  }
+
+  /** Ajoute un bloc de texte à la réponse en cours, après ce qui a déjà été écrit. */
+  private appendBlock(run: Run, block: string): void {
+    const flushed = !!run.partial;
+    if (flushed) {
+      run.segments.push(run.partial);
+      run.partial = '';
+    }
+    run.segments.push(block);
+    if (run.delivered.length) {
+      run.delivered.push(block);
+      this.emit(run, { type: 'message.final', text: run.delivered.join('\n\n') });
+    } else {
+      this.emit(run, { type: 'message.delta', text: (flushed ? '\n\n' : '') + block });
+    }
   }
 
   /** La question n'attend plus de réponse : AgentUI rend la main au composer. */
@@ -475,6 +526,7 @@ export class AgentUIBridge {
 
   private finish(run: Run, event: AgentEvent): void {
     if (run.terminal) return;
+    run.toolAsk?.cancel(); // l'outil interactif en attente rend la main sans réponse
     if (!run.delivered.length && (run.segments.length || run.partial)) {
       this.emit(run, { type: 'message.final', text: [...run.segments, run.partial].filter(Boolean).join('\n\n') });
     }

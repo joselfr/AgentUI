@@ -58,6 +58,7 @@ const turns = [];
 const routes = [];
 let pendingAnswer; // question ask_user en attente : le prochain message texte de la session la résout (comme le cœur)
 const answers = [];
+const toolRuns = []; // résultats des outils interactifs
 const emitAgent = (evt) => listeners.forEach((l) => l(evt));
 const runtime = {
   events: { onAgentEvent: (l) => (listeners.add(l), () => listeners.delete(l)) },
@@ -88,6 +89,21 @@ const runtime = {
           await plan.delivery.deliver({ text: 'Question for you:\n\nTest\nReply with the number…', channelData: { askUser: { questionId: `ask_${'a'.repeat(32)}` } } }, { kind: 'block' });
           answers.push(await new Promise((resolve) => (pendingAnswer = resolve)));
           emitAgent({ runId: 'oc-run', stream: 'tool', data: { phase: 'result', toolCallId: 'ask1', name: 'ask_user', result: { content: [{ type: 'text', text: 'ok' }] } } });
+          await ro.onPartialReply({ delta: 'Merci.' });
+          ro.onAgentRunTerminalOutcome?.('completed');
+          return { dispatched: true };
+        }
+        if (input.rawText.startsWith('tool-')) {
+          // Outil interactif agentui_ask / confirm / form : s'exécute dans la gateway et bloque jusqu'à la réponse.
+          const entry = (await import('../dist/index.js')).default;
+          let factory;
+          entry.registerFull({ registerService: () => {}, registerTool: (f) => (factory = f) });
+          const tools = factory({ messageChannel: 'agentui', sessionKey: plan.route.sessionKey });
+          const key = input.rawText.slice(5);
+          const args = key === 'ask' ? { question: 'Quelle couleur ?', options: ['Rouge', 'Bleu'] } : key === 'confirm' ? { title: 'Supprimer ?', danger: true } : { fields: [{ name: 'a', label: 'A' }, { name: 'a', label: 'B' }] };
+          ro.onAgentRunStart?.('oc-run');
+          await ro.onPartialReply({ delta: 'Je demande. ' });
+          toolRuns.push(await tools.find((t) => t.name === `agentui_${key}`).execute('tc1', args, ro.abortSignal).then((r) => JSON.parse(r.content[0].text), (e) => ({ error: e.message })));
           await ro.onPartialReply({ delta: 'Merci.' });
           ro.onAgentRunTerminalOutcome?.('completed');
           return { dispatched: true };
@@ -342,11 +358,39 @@ test('tâches cron : service du planificateur + RPC listJobs / jobAction', async
   assert.equal(hello.capabilities.jobs, true);
 });
 
+test('outils interactifs : widget avant la réponse, reply → résultat de l\'outil, run poursuivi', async () => {
+  send({ type: 'inbound', conversationId: 'ct', runId: 'rt', text: 'tool-ask' });
+  const fs = await until((f) => f.type === 'event' && f.runId === 'rt' && f.event.type === 'question.requested');
+  const id = eventsOf(fs, 'rt').find((e) => e.type === 'question.requested').id;
+  const more = await until((f) => f.type === 'event' && f.runId === 'rt' && f.event.type === 'message.delta' && f.event.text.includes('```widget'));
+  const text = eventsOf(more, 'rt').find((e) => e.text?.includes('```widget')).text;
+  const w = JSON.parse(/```widget\n(.*)\n```/s.exec(text)[1]);
+  assert.deepEqual(w, { type: 'ask', arguments: { question: 'Quelle couleur ?', options: ['Rouge', 'Bleu'] } });
+  assert.ok(text.startsWith('\n\n'), 'séparé du texte déjà écrit');
+  send({ type: 'reply', conversationId: 'ct', runId: 'rt', text: 'Bleu' });
+  const ev = eventsOf(await until(isTerminal('rt')), 'rt');
+  assert.deepEqual(ev.filter((e) => e.type === 'question.resolved'), [{ type: 'question.resolved', id }]);
+  assert.deepEqual(toolRuns.at(-1), { answer: 'Bleu' });
+  assert.equal(ev.at(-1).type, 'run.completed');
+  assert.equal(ev.find((e) => e.type === 'message.final')?.text.includes('Merci.'), true);
+});
+
+test('outils interactifs : arrêt pendant l\'attente, arguments invalides', async () => {
+  send({ type: 'inbound', conversationId: 'cu', runId: 'ru', text: 'tool-confirm' });
+  await until((f) => f.type === 'event' && f.runId === 'ru' && f.event.type === 'question.requested');
+  send({ type: 'abort', conversationId: 'cu', runId: 'ru' });
+  await until(isTerminal('ru'));
+  assert.match(toolRuns.at(-1).error, /interrompu/);
+  send({ type: 'inbound', conversationId: 'cv', runId: 'rv', text: 'tool-form' });
+  await until(isTerminal('rv'));
+  assert.match(toolRuns.at(-1).error, /deux fois/);
+});
+
 test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI', async () => {
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code']);
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
   const tools = factory({ messageChannel: 'agentui' });
   assert.deepEqual(tools.map((t) => t.name), opts.names);

@@ -67,8 +67,8 @@ export const api = {
   setFavorite: (id: string, favorite: boolean) => call('PATCH', `/conversations/${id}`, { favorite }),
   setArchived: (id: string, archived: boolean) => call('PATCH', `/conversations/${id}`, { archived }),
   remove: (id: string) => call('DELETE', `/conversations/${id}`),
-  send: (id: string, text: string, attachments: OutgoingAttachment[] = [], interactive = false) =>
-    call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments, interactive }),
+  send: (id: string, text: string, attachments: OutgoingAttachment[] = []) =>
+    call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments }),
   abort: (id: string) => call('POST', `/conversations/${id}/abort`),
   approval: (id: string, approvalId: string, approve: boolean) => call('POST', `/conversations/${id}/approval`, { approvalId, approve }),
 };

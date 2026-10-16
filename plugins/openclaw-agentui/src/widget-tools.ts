@@ -4,8 +4,9 @@
 import { randomBytes } from 'node:crypto';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
+import { askUser } from './asks.js';
 
-export const WIDGET_TOOL_NAMES = Object.keys(spec.tools).map((k) => spec.prefix + k);
+export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools), ...Object.keys(spec.blockingTools)].map((k) => spec.prefix + k);
 
 type Args = Record<string, any>;
 
@@ -21,11 +22,47 @@ export function widgetError(key: string, args: Args): string | undefined {
   return undefined;
 }
 
+/** Contrôles des outils interactifs (ask / confirm / form), comme `widgetError` pour les widgets d'affichage. */
+export function askError(key: string, args: Args): string | undefined {
+  if (key === 'ask' && !String(args.question ?? '').trim()) return 'La question est vide.';
+  if (key === 'confirm' && !String(args.title ?? '').trim()) return 'Le titre est vide.';
+  if (key === 'form') {
+    const names = new Set<string>();
+    for (const f of (args.fields ?? []) as Array<{ name?: string; kind?: string; options?: unknown[] }>) {
+      if (names.has(String(f.name))) return `Le champ « ${f.name} » apparaît deux fois : les noms doivent être uniques.`;
+      names.add(String(f.name));
+      if (f.kind === 'select' && !f.options?.length) return `Le champ « ${f.name} » est de type select : il lui faut des options.`;
+    }
+  }
+  return undefined;
+}
+
+/** Discussion AgentUI d'un appel d'outil : la clé de session d'un pair direct se termine par `agentui:direct:<conversationId>`. */
+export function conversationOf(ctx: { sessionKey?: string; nativeChannelId?: string }): string | undefined {
+  return /:agentui:direct:(.+)$/.exec(ctx.sessionKey ?? '')?.[1] ?? ctx.nativeChannelId;
+}
+
 export function registerWidgetTools(api: OpenClawPluginApi): void {
   api.registerTool((ctx) => {
     // Les outils n'existent que dans les runs lancés depuis AgentUI (ailleurs, ils encombreraient le prompt).
     if (ctx.messageChannel !== 'agentui') return null;
-    return Object.entries(spec.tools).map(([key, tool]) => ({
+    const conversationId = conversationOf(ctx);
+    const blocking = Object.entries(spec.blockingTools).map(([key, tool]) => ({
+      name: spec.prefix + key,
+      label: spec.prefix + key,
+      description: tool.description,
+      parameters: tool.parameters as any,
+      // Bloque jusqu'à la réponse de l'utilisateur (trame `reply`), qui devient le résultat de l'outil.
+      async execute(_id: string, args: Args, signal?: AbortSignal) {
+        const problem = askError(key, args);
+        if (problem) throw new Error(problem);
+        if (!conversationId) throw new Error("Discussion AgentUI introuvable pour cet appel d'outil.");
+        const res = await askUser(conversationId, key, args, signal);
+        if ('error' in res) throw new Error(res.error);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ answer: res.answer }) }], details: { answer: res.answer } };
+      },
+    }));
+    const display = Object.entries(spec.tools).map(([key, tool]) => ({
       name: spec.prefix + key,
       label: spec.prefix + key,
       description: tool.description,
@@ -37,5 +74,6 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: spec.tokenInstruction }) }], details: { token } };
       },
     }));
+    return [...display, ...blocking];
   }, { names: WIDGET_TOOL_NAMES });
 }

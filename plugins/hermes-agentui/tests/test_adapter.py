@@ -48,6 +48,11 @@ class Ctx(PluginContext):
     """Vrai PluginContext (register_platform valide les arguments de PlatformEntry) ; hooks seulement collectés."""
 
     hooks: dict = {}
+    tools: dict = {}
+
+    def register_tool(self, name, *args, **kwargs):
+        Ctx.tools[name] = kwargs["handler"]
+        return super().register_tool(name, *args, **kwargs)
 
     def register_hook(self, name, fn):
         assert name in VALID_HOOKS, name
@@ -150,6 +155,13 @@ class FakeAgent:
                 )
                 assert fut.result(5).success
                 self.answers[chat] = cg.wait_for_response(f"cl-{chat}", 5)
+                return "fait"
+            if event.text.startswith("tool-"):  # outil interactif agentui_ask / agentui_confirm : bloque jusqu'à la réponse
+                key = event.text[5:]
+                args = {"question": "Quelle couleur ?", "options": ["Rouge", "Bleu"]} if key == "ask" else {"title": "Supprimer ?", "danger": True}
+                if key == "form":
+                    args = {"fields": [{"name": "a", "label": "A"}, {"name": "a", "label": "B"}]}
+                self.answers[chat] = json.loads(Ctx.tools["agentui_" + key](args))
                 return "fait"
             if event.text == "long":
                 self.release.wait(10)
@@ -283,6 +295,33 @@ async def main():
         await server.until(lambda f: f.get("runId") == "r3c" and f["event"]["type"] == "run.completed")
         assert agent.answers["c3c"] == "ma réponse", agent.answers
         print("✓ question clarify : réponse reply → outil débloqué, run mené à terme")
+
+        # 4ter. outils interactifs (agentui_ask…) : le widget part avant la réponse, la trame reply débloque l'outil
+        await server.send({"type": "inbound", "conversationId": "c3d", "runId": "r3d", "text": "tool-ask"})
+        frames = await server.until(lambda f: "```widget" in json.dumps(f, ensure_ascii=False))
+        blob = json.dumps(frames, ensure_ascii=False)
+        assert '\\"type\\": \\"ask\\"' in blob and "Quelle couleur ?" in blob and "Bleu" in blob, blob
+        requested = [f["event"]["id"] for f in frames if f.get("event", {}).get("type") == "question.requested"]
+        assert len(requested) == 1, frames  # émise avant le widget
+        await server.send({"type": "reply", "conversationId": "c3d", "runId": "r3d", "text": "Bleu"})
+        await server.until(lambda f: f.get("runId") == "r3d" and f["event"]["type"] == "question.resolved" and f["event"]["id"] == requested[0])
+        await server.until(lambda f: f.get("runId") == "r3d" and f["event"]["type"] == "run.completed")
+        assert agent.answers["c3d"] == {"answer": "Bleu"}, agent.answers
+        # arrêt pendant l'attente : l'outil rend la main sans réponse
+        await server.send({"type": "inbound", "conversationId": "c3e", "runId": "r3e", "text": "tool-confirm"})
+        await server.until(lambda f: f.get("runId") == "r3e" and '\\"type\\": \\"confirm\\"' in json.dumps(f, ensure_ascii=False))
+        await server.send({"type": "abort", "conversationId": "c3e", "runId": "r3e"})
+        await server.until(lambda f: f.get("runId") == "r3e" and f["event"]["type"] == "run.aborted")
+        for _ in range(50):
+            if "error" in agent.answers.get("c3e", {}):
+                break
+            await asyncio.sleep(0.1)
+        assert "error" in agent.answers["c3e"], agent.answers
+        # arguments invalides : refus immédiat, sans question
+        await server.send({"type": "inbound", "conversationId": "c3f", "runId": "r3f", "text": "tool-form"})
+        await server.until(lambda f: f.get("runId") == "r3f" and f["event"]["type"] == "run.completed")
+        assert "deux fois" in agent.answers["c3f"]["error"], agent.answers
+        print("✓ outils interactifs : widget, reply → résultat de l'outil, arrêt, validation")
 
         # 5. arrêt : run.aborted, et la confirmation de /stop n'est pas relayée
         await server.send({"type": "inbound", "conversationId": "c4", "runId": "r4", "text": "long"})

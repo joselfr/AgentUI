@@ -60,7 +60,13 @@ expose comme outils `agentui_<type>`. L'outil valide ses arguments et renvoie un
 l'agent place ce jeton dans son texte. AgentUI le remplace à l'affichage par le widget, dont les arguments sont ceux de
 `tool.started`. Aucun événement spécifique : les plugins transmettent `tool.started` / `tool.completed` comme pour tout outil.
 Schémas : `widget-tools.json` (copié dans chaque plugin par `plugins/sync-widget-tools.mjs`). Un agent sans plugin n'a donc pas
-ces widgets. `ask`, `confirm` et `form` restent des blocs ```` ```widget ```` décrits dans les instructions d'interface.
+ces widgets.
+
+Les widgets interactifs `ask`, `confirm` et `form` sont des outils **bloquants** (`agentui_ask`, `agentui_confirm`,
+`agentui_form`, section `blockingTools` du même fichier). L'outil émet `question.requested`, ajoute le bloc ```` ```widget ````
+`{"type": …, "arguments": …}` au texte du run, attend la trame `reply` et renvoie `{"answer": "<texte de la réponse>"}` à
+l'agent ; il émet ensuite `question.resolved`. Un `abort`, une fin de run ou un délai le débloquent avec une erreur. Le bloc
+Markdown reste une convention de repli pour un agent sans plugin.
 
 ## Règles
 

@@ -50,6 +50,7 @@ OWNER_ID = "agentui-owner"  # l'utilisateur est authentifié par AgentUI, pas pa
 MAX_RESULT = 20_000
 MAX_MEDIA = 20 * 1024 * 1024
 OUTBOX_LIMIT = 2_000
+ASK_TIMEOUT = 1800.0  # secondes d'attente de la réponse à un widget interactif (agentui_ask / confirm / form)
 
 CAPABILITIES = {
     "sessions": True,
@@ -311,6 +312,14 @@ def _list_models() -> List[dict]:
 
 
 @dataclass
+class _Ask:
+    """Question posée par un outil interactif (`agentui_ask`…) : le thread de l'agent attend `event`."""
+    id: str
+    event: threading.Event = field(default_factory=threading.Event)
+    answer: Optional[str] = None  # None à la fin de l'attente = annulée (run terminé) ou expirée
+
+
+@dataclass
 class _Run:
     run_id: str
     conversation_id: str
@@ -347,6 +356,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._runs: Dict[str, _Run] = {}  # conversationId → run en cours
         self._approvals: Dict[str, str] = {}  # id d'approbation → session_key Hermes
         self._clarifies: Dict[str, Tuple[str, str]] = {}  # discussion → (session_key, clarify_id) de la question en attente
+        self._asks: Dict[str, _Ask] = {}  # discussion → question d'un outil interactif en attente
         self._session_chat: Dict[str, str] = {}  # session_id Hermes (agent ou sous-agent) → conversationId
         self._session_subagent: Dict[str, str] = {}  # session_id d'un sous-agent → id de sous-agent AgentUI
         self._closing = False
@@ -475,6 +485,9 @@ class AgentUIAdapter(BasePlatformAdapter):
         with self._lock:
             run = self._runs.pop(conversation_id, None)
             self._clarifies.pop(conversation_id, None)
+            ask = self._asks.pop(conversation_id, None)
+        if ask is not None:
+            ask.event.set()  # run terminé ou arrêté : l'outil en attente rend la main sans réponse
         if run is not None:
             self._post({"type": "event", "conversationId": conversation_id, "runId": run.run_id, "event": event})
 
@@ -558,6 +571,11 @@ class AgentUIAdapter(BasePlatformAdapter):
         """Réponse à une question `clarify` en attente : elle débloque l'outil, le run en cours reprend."""
         conv, text = msg.get("conversationId", ""), msg.get("text", "")
         with self._lock:
+            ask = self._asks.get(conv)
+            if ask is not None and not ask.event.is_set():
+                ask.answer = text
+                ask.event.set()  # débloque l'outil interactif, qui émet lui-même `question.resolved`
+                return
             pending = self._clarifies.pop(conv, None)
         if pending is None:
             logger.warning("AgentUI: réponse sans question en attente (discussion %s)", conv)
@@ -821,6 +839,30 @@ class AgentUIAdapter(BasePlatformAdapter):
             content = f"❓ {question}"
         return await self.send(chat_id=chat_id, content=content, metadata=metadata)
 
+    def ask_blocking(self, chat: str, key: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Outil interactif (thread de l'agent) : affiche le widget `key` puis attend la réponse de l'utilisateur,
+        qui arrive par la trame `reply` comme pour `clarify`. Renvoie `{"answer": …}` ou `{"error": …}`."""
+        ask = _Ask(id=uuid.uuid4().hex[:12])
+        with self._lock:
+            run = self._runs.get(chat)
+            if run is None:
+                return {"error": "Aucun échange AgentUI en cours pour cette discussion."}
+            if chat in self._asks:
+                return {"error": "Une question est déjà en attente de réponse : attends-la avant d'en poser une autre."}
+            self._asks[chat] = ask
+            run.bubbles[uuid.uuid4().hex] = "```widget\n" + json.dumps({"type": key, "arguments": args}, ensure_ascii=False) + "\n```"
+        # Avant le widget : au moment où il arrive, AgentUI sait déjà que la réponse est attendue.
+        self._emit(chat, {"type": "question.requested", "id": ask.id})
+        self._sync(run)
+        ask.event.wait(ASK_TIMEOUT)
+        with self._lock:
+            if self._asks.get(chat) is ask:
+                del self._asks[chat]
+        self._emit(chat, {"type": "question.resolved", "id": ask.id})
+        if ask.answer is None:
+            return {"error": "Pas de réponse de l'utilisateur (échange interrompu ou délai dépassé)."}
+        return {"answer": ask.answer}
+
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         pass  # AgentUI affiche déjà l'état du run
 
@@ -1038,6 +1080,24 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _ask_error(key: str, args: Dict[str, Any]) -> Optional[str]:
+    """Contrôles sémantiques des outils interactifs (le schéma JSON ne les exprime pas)."""
+    if key == "ask" and not str(args.get("question") or "").strip():
+        return "La question est vide."
+    if key == "confirm" and not str(args.get("title") or "").strip():
+        return "Le titre est vide."
+    if key == "form":
+        names = set()
+        for f in args.get("fields") or []:
+            name = f.get("name")
+            if name in names:
+                return f"Le champ « {name} » apparaît deux fois : les noms doivent être uniques."
+            names.add(name)
+            if f.get("kind") == "select" and not f.get("options"):
+                return f"Le champ « {name} » est de type select : il lui faut des options."
+    return None
+
+
 def _register_widget_tools(ctx) -> None:
     """Un outil par widget (`agentui_chart`, `agentui_map`, `agentui_code`) : le modèle valide ses arguments par le schéma
     de l'outil au lieu d'écrire un bloc ```widget. L'outil renvoie un jeton `[[agentui:<id>]]` que l'agent place dans son
@@ -1062,16 +1122,35 @@ def _register_widget_tools(ctx) -> None:
 
         return handler
 
-    for key, tool in spec["tools"].items():
-        name = spec["prefix"] + key
-        ctx.register_tool(
-            name=name,
-            toolset="agentui",
-            schema={"name": name, "description": tool["description"], "parameters": tool["parameters"]},
-            handler=make_handler(key),
-            description=tool["description"],
-            emoji="🖥️",
-        )
+    def make_blocking_handler(key: str):
+        def handler(args: Dict[str, Any], **_kw: Any) -> str:
+            try:
+                from gateway.session_context import get_session_env
+
+                chat = get_session_env("HERMES_SESSION_CHAT_ID") if get_session_env("HERMES_SESSION_PLATFORM") == PLATFORM else None
+            except Exception:
+                chat = None
+            adapter = _ACTIVE
+            if not chat or adapter is None:
+                return json.dumps({"error": "Ce composant n'existe que dans AgentUI ; pose ta question dans ta réponse."}, ensure_ascii=False)
+            problem = _ask_error(key, args)
+            if problem:
+                return json.dumps({"error": problem}, ensure_ascii=False)
+            return json.dumps(adapter.ask_blocking(chat, key, args), ensure_ascii=False)
+
+        return handler
+
+    for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler)):
+        for key, tool in spec.get(kind, {}).items():
+            name = spec["prefix"] + key
+            ctx.register_tool(
+                name=name,
+                toolset="agentui",
+                schema={"name": name, "description": tool["description"], "parameters": tool["parameters"]},
+                handler=handlers(key),
+                description=tool["description"],
+                emoji="🖥️",
+            )
 
 
 def register(ctx):

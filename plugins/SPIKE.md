@@ -72,6 +72,14 @@ rien à développer dans les plugins pour l'expansion, et l'historique rechargé
 | Visible seulement dans AgentUI | ❌ les outils de plugin sont activés sur **toutes** les plateformes (vérifié : Telegram les voit) ; `check_fn` est mis en cache 30 s donc inutilisable par session. Repli : le handler refuse hors AgentUI. Ou désactiver le toolset `agentui` des autres plateformes (`hermes tools`). | ✅ la fabrique reçoit `ctx.messageChannel` et renvoie `null` hors `agentui` |
 | Outil bloquant (widgets interactifs, non migrés) | possible (handler synchrone dans le thread de l'agent, comme `clarify`) | possible (`execute` asynchrone) ; `ctx.nativeChannelId` = `conversationId` |
 
-Reste hors périmètre : `ask`/`confirm`/`form` (il faut une trame `reply` qui débloque l'outil, comme `clarify`). Le front sait
-toujours rendre un bloc ```` ```widget ```` de ces types, mais plus aucune consigne ne le demande. Non vérifié : le comportement d'un vrai modèle
-(pose-t-il le jeton ?) et OpenClaw sur une vraie gateway.
+## Widgets interactifs comme outils bloquants (`agentui_ask`, `agentui_confirm`, `agentui_form`)
+
+Schémas dans `protocol/widget-tools.json`, section `blockingTools`. Contrairement aux outils d'affichage, l'outil **bloque** :
+il émet `question.requested`, ajoute le bloc ```` ```widget ```` au texte de la réponse en cours, puis attend la trame `reply`
+(déjà utilisée pour `clarify` / `ask_user`). La réponse de l'utilisateur (libellé du bouton, `Libellé: valeur` par champ d'un
+formulaire) devient le résultat de l'outil `{"answer": …}`, `question.resolved` est émis, et le tour de l'agent se poursuit.
+Un arrêt, la fin du run ou un délai de 30 min débloquent l'outil avec une erreur ; une seule question à la fois par discussion.
+
+- **Hermes** : le handler s'exécute dans le thread de l'agent et attend un `threading.Event` (`AgentUIAdapter.ask_blocking`) ; la discussion vient des ContextVars de session.
+- **OpenClaw** : `execute` asynchrone, discussion déduite de `sessionKey` (`…:agentui:direct:<conversationId>`) ; le bridge du compte détient la promesse (`AgentUIBridge.askBlocking`, registre `asks.ts`).
+- Non vérifié sur de vraies instances : tests avec faux AgentUI (Hermes 0.19, OpenClaw simulé). Le test `clarify` existant exige Hermes ≥ 0.21 (`attempt_text_response_for_session`).
