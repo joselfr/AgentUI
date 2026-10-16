@@ -10,6 +10,8 @@ import type { AgentEvent, GatewayMessage, Media, Usage } from './protocol.js';
 import { getAgentUIRuntime } from './runtime.js';
 import { listSubAgents } from './agents.js';
 import { jobAction, listJobs } from './cron.js';
+import { resolveQuestion } from './question.js';
+import { askReplyText, askWidget, parseAskQuestions, type AskQuestion } from './ask.js';
 
 export const CHANNEL = 'agentui';
 export const HOME_CONVERSATION = 'home';
@@ -23,6 +25,11 @@ interface Run {
   runId: string;
   conversationId: string;
   agentRunId?: string;
+  subAgentId?: string;
+  /** Questions de l'outil `ask_user` en cours (arguments de l'outil) : le prompt du cœur devient un widget. */
+  askQuestions?: AskQuestion[];
+  /** Identifiant de la question `ask_user` en attente (fourni avec son prompt) : c'est par lui qu'on la résout. */
+  askQuestionId?: string;
   abort: AbortController;
   /** Segments de texte déjà terminés (avant un outil) et segment en cours de streaming. */
   segments: string[];
@@ -74,6 +81,8 @@ export class AgentUIBridge {
         return this.onAbort(msg.runId);
       case 'approval':
         return this.onApproval(msg);
+      case 'reply':
+        return this.onReply(msg);
       case 'rpc':
         return this.onRpc(msg);
       default:
@@ -87,6 +96,7 @@ export class AgentUIBridge {
     const run: Run = {
       runId: msg.runId,
       conversationId: msg.conversationId,
+      subAgentId: msg.subAgentId,
       abort: new AbortController(),
       segments: [],
       partial: '',
@@ -219,6 +229,36 @@ export class AgentUIBridge {
     run.abort.abort();
     // Le run se termine normalement via son abortSignal ; filet de sécurité si le cœur ne rend pas la main.
     setTimeout(() => this.finish(run, { type: 'run.aborted' }), ABORT_GRACE_MS).unref?.();
+  }
+
+  /**
+   * Réponse à une question de l'agent (`ask_user`) en plein run. Le cœur enregistre la question comme cible du prochain
+   * message texte de la session : on l'injecte comme n'importe quel message, il la capte et le run reprend (pas de nouveau tour).
+   */
+  private async onReply(msg: Extract<GatewayMessage, { type: 'reply' }>): Promise<void> {
+    const run = this.runs.get(msg.runId);
+    if (!run || run.terminal) return this.p.log(`réponse sans run en cours (${msg.runId})`);
+    const text = run.askQuestions ? askReplyText(run.askQuestions, msg.text) : msg.text;
+    if (run.askQuestionId) {
+      const id = run.askQuestionId;
+      try {
+        await resolveQuestion(id, text, `${CHANNEL}:${msg.conversationId}`);
+        run.askQuestionId = undefined;
+      } catch (e) {
+        this.p.log(`réponse à la question ${id} en échec : ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
+    const capture: string[] = [];
+    const result = await this.dispatch({
+      conversationId: msg.conversationId,
+      messageId: `reply-${msg.runId}-${Date.now()}`,
+      text,
+      subAgentId: run.subAgentId,
+      media: [],
+      capture,
+    }).catch((e) => this.p.log(`réponse ${msg.runId} en échec : ${String(e)}`));
+    if (result && capture.length) this.p.log(`réponse ${msg.runId} : le cœur a répondu « ${capture.join(' ').slice(0, 200)} »`);
   }
 
   private async onApproval(msg: Extract<GatewayMessage, { type: 'approval' }>): Promise<void> {
@@ -465,6 +505,7 @@ export class AgentUIBridge {
       if (!id) return;
       if (d.phase === 'start' && !run.tools.has(id)) {
         run.tools.add(id);
+        if (d.name === 'ask_user') run.askQuestions = parseAskQuestions(d.args);
         this.emit(run, { type: 'tool.started', id, name: String(d.name ?? 'tool'), args: d.args });
       } else if (d.phase === 'result') {
         const txt = textOf(d.result?.content) || (d.result === undefined ? '' : JSON.stringify(d.result));
@@ -508,6 +549,12 @@ export class AgentUIBridge {
     if (approve?.[1]) {
       this.onApprovalEvent(run, { approvalId: approve[1], title: text.split('\n')[0] });
       text = '';
+    }
+    // Prompt d'une question de l'agent (ask_user) : un widget à la place du texte « Reply with the number… ».
+    const askUser = payload.channelData?.askUser as { questionId?: unknown } | undefined;
+    if (askUser) {
+      if (typeof askUser.questionId === 'string') run.askQuestionId = askUser.questionId;
+      if (run.askQuestions) text = askWidget(run.askQuestions) ?? text;
     }
     if (text.trim()) {
       run.delivered.push(text);

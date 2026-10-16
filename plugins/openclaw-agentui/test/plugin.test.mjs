@@ -10,6 +10,22 @@ import { WebSocketServer } from 'ws';
 // Seules surfaces du SDK chargées à l'exécution par le plugin.
 mock.module('openclaw/plugin-sdk/channel-core', { namedExports: { createChatChannelPlugin: (p) => p, defineChannelPluginEntry: (e) => e, defineSetupPluginEntry: (p) => ({ plugin: p }) } });
 mock.module('openclaw/plugin-sdk/channel-inbound', { namedExports: { toInboundMediaFacts: (m) => m } });
+// Réponses aux questions ask_user : le plugin résout la question par la passerelle (question.get puis question.resolve).
+const gatewayCalls = [];
+let questionRecord;
+mock.module('openclaw/plugin-sdk/gateway-runtime', {
+  namedExports: {
+    callGatewayFromCli: async (method, _opts, params) => {
+      gatewayCalls.push({ method, params });
+      if (method === 'question.get') return { question: questionRecord };
+      if (method === 'question.resolve') {
+        pendingAnswer?.(params.answers);
+        pendingAnswer = undefined;
+      }
+      return {};
+    },
+  },
+});
 // Suppression de session : le plugin passe par le SDK ; on enregistre les clés effacées.
 const deletedKeys = [];
 // Sessions simulées : `${agentId}|${sessionKey}` → entrée (modèle, jetons…), alimentées par le faux runtime.
@@ -40,6 +56,8 @@ writeFileSync(imgPath, Buffer.from('89504e47', 'hex'));
 const listeners = new Set();
 const turns = [];
 const routes = [];
+let pendingAnswer; // question ask_user en attente : le prochain message texte de la session la résout (comme le cœur)
+const answers = [];
 const emitAgent = (evt) => listeners.forEach((l) => l(evt));
 const runtime = {
   events: { onAgentEvent: (l) => (listeners.add(l), () => listeners.delete(l)) },
@@ -59,6 +77,21 @@ const runtime = {
         const plan = await adapter.resolveTurn(input, {}, {});
         turns.push({ input, plan });
         const ro = plan.replyOptions;
+        if (input.rawText.startsWith('ask')) {
+          const multi = input.rawText === 'ask-multi';
+          const questions = multi
+            ? [{ id: 'color', header: 'Couleur', question: 'Quelle couleur ? (rouge: vif)', options: [{ label: 'Rouge' }, { label: 'Bleu' }] }, { id: 'size', header: 'Taille', question: 'Quelle taille ?' }]
+            : [{ id: 'q', header: 'Test', question: 'Que veux-tu répondre ?', options: [{ label: 'Option A', description: 'Première' }, { label: 'Option B' }], isOther: true }];
+          questionRecord = { status: 'pending', questions: questions.map((q) => ({ questionId: q.id, options: q.options, multiSelect: q.multiSelect === true, isOther: q.isOther === true })) };
+          ro.onAgentRunStart?.('oc-run');
+          emitAgent({ runId: 'oc-run', stream: 'tool', data: { phase: 'start', toolCallId: 'ask1', name: 'ask_user', args: { questions } } });
+          await plan.delivery.deliver({ text: 'Question for you:\n\nTest\nReply with the number…', channelData: { askUser: { questionId: `ask_${'a'.repeat(32)}` } } }, { kind: 'block' });
+          answers.push(await new Promise((resolve) => (pendingAnswer = resolve)));
+          emitAgent({ runId: 'oc-run', stream: 'tool', data: { phase: 'result', toolCallId: 'ask1', name: 'ask_user', result: { content: [{ type: 'text', text: 'ok' }] } } });
+          await ro.onPartialReply({ delta: 'Merci.' });
+          ro.onAgentRunTerminalOutcome?.('completed');
+          return { dispatched: true };
+        }
         if (input.rawText.startsWith('/approve')) return { dispatched: true };
         const key = `${plan.route.agentId}|${plan.route.sessionKey}`;
         if (input.rawText.startsWith('/model')) {
@@ -214,6 +247,50 @@ test('approbation : approval.request puis /approve <id> allow-always', async () 
   for (let i = 0; i < 100 && turns.at(-1).input.rawText !== '/approve ap1 allow-always'; i++) await new Promise((r) => setTimeout(r, 20));
   assert.equal(turns.at(-1).input.rawText, '/approve ap1 allow-always');
   assert.equal(routes.at(-1).peer.id, 'c3', 'commande envoyée dans la même discussion');
+});
+
+test('ask_user : widget ask, la réponse reply débloque l\'outil dans le run en cours', async () => {
+  send({ type: 'inbound', conversationId: 'ca', runId: 'ra', text: 'ask' });
+  const fs = await until((f) => f.type === 'event' && f.runId === 'ra' && f.event.type === 'message.final');
+  const text = eventsOf(fs, 'ra').find((e) => e.type === 'message.final').text;
+  assert.doesNotMatch(text, /Reply with the number/);
+  const w = JSON.parse(/```widget\n(.*)\n```/s.exec(text)[1]);
+  assert.equal(w.type, 'ask');
+  assert.deepEqual(w.arguments.options, ['Option A', 'Option B']);
+  assert.match(w.arguments.question, /Que veux-tu répondre/);
+  assert.match(w.arguments.question, /\*\*Option A\*\* — Première/); // description de l'option
+  const turnsBefore = turns.length;
+  send({ type: 'reply', conversationId: 'ca', runId: 'ra', text: '2' });
+  const ev = eventsOf(await until(isTerminal('ra')), 'ra');
+  assert.deepEqual(answers.at(-1), { answers: { q: ['Option B'] } }); // « 2 » → la 2e option
+  assert.equal(ev.at(-1).type, 'run.completed');
+  assert.deepEqual(gatewayCalls.slice(-2).map((c) => [c.method, c.params.id]), [['question.get', `ask_${'a'.repeat(32)}`], ['question.resolve', `ask_${'a'.repeat(32)}`]]);
+  assert.equal(turns.length, turnsBefore, 'la question est résolue par la passerelle : aucun message injecté dans la session');
+});
+
+test('ask_user à plusieurs questions : formulaire, réponses renumérotées pour le cœur', async () => {
+  send({ type: 'inbound', conversationId: 'cm', runId: 'rm', text: 'ask-multi' });
+  const fs = await until((f) => f.type === 'event' && f.runId === 'rm' && f.event.type === 'message.final');
+  const text = eventsOf(fs, 'rm').find((e) => e.type === 'message.final').text;
+  const w = JSON.parse(/```widget\n(.*)\n```/s.exec(text)[1]);
+  assert.equal(w.type, 'form');
+  assert.deepEqual(w.arguments.fields.map((f) => [f.label, f.kind]), [['Quelle couleur ? (rouge: vif)', 'select'], ['Quelle taille ?', 'text']]);
+  send({ type: 'reply', conversationId: 'cm', runId: 'rm', text: 'Quelle couleur ? (rouge: vif): Bleu\nQuelle taille ?: —' });
+  await until(isTerminal('rm'));
+  assert.deepEqual(answers.at(-1), { answers: { color: ['Bleu'], size: [] } });
+});
+
+test('ask_user : conversion des réponses (numéro, libellé, texte libre, multi-sélection, invalide)', async () => {
+  const { buildQuestionAnswers } = await import('../dist/src/question.js');
+  const opts = [{ label: 'Rouge' }, { label: 'Bleu' }];
+  const one = (q, text) => buildQuestionAnswers([{ questionId: 'q', ...q }], text).answers.q;
+  assert.deepEqual(one({ options: opts }, '2'), ['Bleu']);
+  assert.deepEqual(one({ options: opts }, 'rouge'), ['Rouge']);
+  assert.deepEqual(one({ options: opts, isOther: true }, 'Vert'), ['Vert']);
+  assert.throws(() => one({ options: opts }, 'Vert'), /aucune option/);
+  assert.deepEqual(one({}, 'texte libre'), ['texte libre']);
+  assert.deepEqual(one({ options: opts, multiSelect: true }, '1, bleu, 1'), ['Rouge', 'Bleu']);
+  assert.deepEqual(buildQuestionAnswers([{ questionId: 'a', options: opts }, { questionId: 'b' }], '1: Bleu\n2: ').answers, { a: ['Bleu'], b: [] });
 });
 
 test('arrêt : abortSignal déclenché, run.aborted', async () => {

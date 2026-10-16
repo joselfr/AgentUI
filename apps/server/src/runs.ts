@@ -480,14 +480,14 @@ export class RunManager {
     await this.adapters.get(a.agentId)?.abort(a.runId, a.remoteSessionId);
   }
 
-  /** Vrai si le run en cours attend une réponse de l'utilisateur (outil `clarify` en cours) et que l'agent sait la recevoir. */
+  /** Vrai si le run en cours attend une réponse de l'utilisateur (outil `clarify` d'Hermes ou `ask_user` d'OpenClaw en cours) et que l'agent sait la recevoir. */
   awaitingReply(convId: string): boolean {
     const a = this.active.get(convId);
     if (!a || !this.adapters.get(a.agentId)?.reply) return false;
     return !!this.db
       .prepare(
         `SELECT 1 FROM tool_calls t JOIN messages m ON m.id = t.message_id
-         WHERE m.conversation_id = ? AND m.run_id = ? AND t.name = 'clarify' AND t.status = 'running' LIMIT 1`,
+         WHERE m.conversation_id = ? AND m.run_id = ? AND t.name IN ('clarify', 'ask_user') AND t.status = 'running' LIMIT 1`,
       )
       .get(convId, a.runId);
   }

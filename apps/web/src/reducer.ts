@@ -6,9 +6,12 @@ function closeRunning(m: Message, status: 'done' | 'failed', now: number) {
   m.subAgentRuns = m.subAgentRuns?.map((s) => (s.status === 'running' && !s.sessionId ? { ...s, status, endedAt: now } : s));
 }
 
-/** L'agent attend une réponse en plein run (outil `clarify` en cours) : son texte est complet, le message suivant en est la réponse. */
+/** Outils par lesquels l'agent pose une question en plein run : Hermes `clarify`, OpenClaw `ask_user`. */
+const QUESTION_TOOLS = ['clarify', 'ask_user'];
+
+/** L'agent attend une réponse en plein run (outil de question en cours) : son texte est complet, le message suivant en est la réponse. */
 export function isAwaiting(m: Message): boolean {
-  return m.status === 'streaming' && !!m.toolCalls?.some((t) => t.name === 'clarify' && t.status === 'running');
+  return m.status === 'streaming' && !!m.toolCalls?.some((t) => QUESTION_TOOLS.includes(t.name) && t.status === 'running');
 }
 
 export function awaitingReply(messages: Message[]): boolean {
