@@ -6,10 +6,14 @@ function closeRunning(m: Message, status: 'done' | 'failed', now: number) {
   m.subAgentRuns = m.subAgentRuns?.map((s) => (s.status === 'running' && !s.sessionId ? { ...s, status, endedAt: now } : s));
 }
 
-/** L'agent a posé une question en plein run (outil `clarify`) : le message suivant en est la réponse, il ne lance pas de run. */
+/** L'agent attend une réponse en plein run (outil `clarify` en cours) : son texte est complet, le message suivant en est la réponse. */
+export function isAwaiting(m: Message): boolean {
+  return m.status === 'streaming' && !!m.toolCalls?.some((t) => t.name === 'clarify' && t.status === 'running');
+}
+
 export function awaitingReply(messages: Message[]): boolean {
   const m = messages.findLast((x) => x.role === 'assistant' && x.status === 'streaming');
-  return !!m?.toolCalls?.some((t) => t.name === 'clarify' && t.status === 'running');
+  return !!m && isAwaiting(m);
 }
 
 /** Applique un événement normalisé au dernier message assistant en streaming (miroir du serveur). */

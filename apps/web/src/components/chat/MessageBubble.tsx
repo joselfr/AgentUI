@@ -11,6 +11,7 @@ import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
 import { parseWidget } from '../widget';
+import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
 import MapCard, { parseMap } from '../MapCard';
@@ -65,7 +66,7 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
       const { m, answer, onAnswer } = latest.current;
       const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
-      if (m.status !== 'streaming' && (lang === 'widget' || lang === 'ask')) {
+      if ((m.status !== 'streaming' || isAwaiting(m)) && (lang === 'widget' || lang === 'ask')) {
         const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
         if (lang === 'ask') return <AskCard ask={parseLegacyAsk(raw)} answer={answer} onAnswer={onAnswer} />;
         const w = parseWidget(raw);
