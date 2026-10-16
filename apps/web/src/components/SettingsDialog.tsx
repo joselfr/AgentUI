@@ -62,8 +62,8 @@ function PushToggle() {
   const help = st === 'unsupported' ? 'Non supporté par ce navigateur (sur iPhone : ajouter l\'app à l\'écran d\'accueil).'
     : st === 'denied' ? 'Bloquées dans le navigateur : à réactiver dans les réglages du site.' : err;
   return (
-    <Box sx={{ p: 2, py: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-      <FormControlLabel disabled={st === 'unsupported' || st === 'denied'} control={<Switch checked={st === 'on'} onChange={toggle} />} label="Notifications quand un agent répond" />
+    <Box sx={{ ...card, py: 1 }}>
+      <FormControlLabel sx={{ mx: 0 }} disabled={st === 'unsupported' || st === 'denied'} control={<Switch checked={st === 'on'} onChange={toggle} />} label="Notifications quand un agent répond" />
       {help && <Typography variant="caption" color="text.secondary" display="block">{help}</Typography>}
     </Box>
   );
