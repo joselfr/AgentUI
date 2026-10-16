@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 import mimetypes
@@ -1110,6 +1111,50 @@ def _ask_error(key: str, args: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+IMAGE_PREFIX = "agentui-img-"  # pièces jointes copiées pour un widget image : le front ne les affiche pas en plus du widget
+MAX_IMAGES = 12
+
+
+def _sniff_image(b: bytes) -> Optional[str]:
+    """Type réel d'une image d'après ses premiers octets (pas l'extension) : ce que l'endpoint des pièces jointes affiche en ligne."""
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if b[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if b[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _images_error(args: Dict[str, Any]) -> Optional[str]:
+    """Contrôle de forme des sources d'`agentui_image` (avant toute lecture de fichier)."""
+    images = args.get("images") or []
+    if not images or len(images) > MAX_IMAGES:
+        return f"Il faut entre 1 et {MAX_IMAGES} images."
+    for i, im in enumerate(images):
+        src = str(im.get("src") or "")
+        if not (re.match(r"https?://", src, re.I) or src.startswith("/")):
+            return f"Image {i + 1} : src doit être une URL https://… ou un chemin absolu (pas de data:, file: ni chemin relatif)."
+    return None
+
+
+def _read_local_image(path: str) -> dict:
+    """Lit une image locale (appel bloquant) ; ValueError lisible par l'agent si introuvable, trop grosse ou pas une image."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        raise ValueError(f"Fichier introuvable ou illisible : {path}")
+    if len(data) > MAX_MEDIA:
+        raise ValueError(f"{path} dépasse {MAX_MEDIA // 1024 // 1024} Mo.")
+    mime = _sniff_image(data)
+    if not mime:
+        raise ValueError(f"{path} n'est pas une image png, jpeg, gif ou webp.")
+    name = f"{IMAGE_PREFIX}{hashlib.sha1(data).hexdigest()[:8]}-{re.sub(r'[^A-Za-z0-9_.-]+', '_', Path(path).name)}"
+    return _media(name, data, mime)
+
+
 def _register_widget_tools(ctx) -> None:
     """Un outil par widget (`agentui_chart`, `agentui_map`, `agentui_code`, `agentui_table`) : le modèle valide ses arguments par le schéma
     de l'outil au lieu d'écrire un bloc ```widget. L'outil renvoie un jeton `[[agentui:<id>]]` que l'agent place dans son
@@ -1127,14 +1172,34 @@ def _register_widget_tools(ctx) -> None:
                     return json.dumps({"error": "Ce composant n'existe que dans AgentUI ; présente le contenu en Markdown."}, ensure_ascii=False)
             except Exception:
                 pass
-            problem = _widget_error(key, args)
+            problem = _widget_error(key, args) or (_images_error(args) if key == "image" else None)
             if problem:
                 return json.dumps({"error": problem}, ensure_ascii=False)
+            files: Dict[str, str] = {}
+            if key == "image":
+                # Images locales : copiées dans la discussion (message.media) ; le résultat dit quelle pièce jointe correspond à quel chemin.
+                try:
+                    from gateway.session_context import get_session_env
+
+                    chat = get_session_env("HERMES_SESSION_CHAT_ID")
+                except Exception:
+                    chat = None
+                for im in args.get("images") or []:
+                    src = im["src"]
+                    if not src.startswith("/") or src in files:
+                        continue
+                    try:
+                        media = _read_local_image(src)
+                    except ValueError as e:
+                        return json.dumps({"error": str(e)}, ensure_ascii=False)
+                    if not chat or _ACTIVE is None or not _ACTIVE._emit(chat, {"type": "message.media", **media}):
+                        return json.dumps({"error": "Aucun échange AgentUI en cours : impossible de copier l'image."}, ensure_ascii=False)
+                    files[src] = media["name"]
             update = args.get("update") if key == "progress" else None
             if update:  # mise à jour : même jeton, le front affiche l'état du dernier appel
                 return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
             instruction = spec["progressInstruction"] if key == "progress" else spec["tokenInstruction"]
-            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction}, ensure_ascii=False)
+            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction, **({"files": files} if key == "image" else {})}, ensure_ascii=False)
 
         return handler
 

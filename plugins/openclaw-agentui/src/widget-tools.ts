@@ -4,7 +4,8 @@
 import { randomBytes } from 'node:crypto';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
-import { askUser } from './asks.js';
+import { askUser, emitMedia } from './hosts.js';
+import { imagesError, readLocalImage } from './images.js';
 
 export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools), ...Object.keys(spec.blockingTools)].map((k) => spec.prefix + k);
 
@@ -76,14 +77,24 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
       description: tool.description,
       parameters: tool.parameters as any, // schéma JSON brut (pas de dépendance à typebox, absente de l'installation d'un plugin)
       async execute(_id: string, args: Args) {
-        const problem = widgetError(key, args);
+        const problem = widgetError(key, args) ?? (key === 'image' ? imagesError(args) : undefined);
         if (problem) throw new Error(problem);
+        // Images locales : copiées dans la discussion (message.media) ; le résultat dit quelle pièce jointe correspond à quel chemin.
+        const files: Record<string, string> = {};
+        if (key === 'image') {
+          for (const im of args.images as Array<{ src: string }>) {
+            if (!im.src.startsWith('/') || files[im.src]) continue;
+            const media = await readLocalImage(im.src);
+            if (!conversationId || !emitMedia(conversationId, media)) throw new Error("Aucun échange AgentUI en cours : impossible de copier l'image.");
+            files[im.src] = media.name;
+          }
+        }
         if (key === 'progress' && args.update) {
           // Mise à jour : même jeton, le front affiche l'état du dernier appel.
           return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: args.update, updated: true, instruction: spec.updateInstruction }) }], details: { token: args.update } };
         }
         const token = `[[agentui:${randomBytes(3).toString('hex')}]]`;
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: key === 'progress' ? spec.progressInstruction : spec.tokenInstruction }) }], details: { token } };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: key === 'progress' ? spec.progressInstruction : spec.tokenInstruction, ...(key === 'image' ? { files } : {}) }) }], details: { token } };
       },
     }));
     return [...display, ...blocking];

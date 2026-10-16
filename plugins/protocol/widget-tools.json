@@ -259,6 +259,45 @@
           "steps"
         ]
       }
+    },
+    "image": {
+      "description": "Affiche une ou plusieurs images (galerie avec visionneuse plein écran) dans la discussion AgentUI. `src` : une URL https://… OU un chemin absolu d'un fichier de ta machine (png, jpeg, gif ou webp, 20 Mo max) que le plugin copie et sert à l'utilisateur ; n'utilise ni data: ni file:. Légende par image facultative. Accompagne les images d'une phrase d'explication. Renvoie un jeton [[agentui:…]] : écris-le tel quel dans ta réponse, à l'endroit où le composant doit apparaître, sans jamais écrire le JSON toi-même.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "description": "URL https://… ou chemin absolu d'un fichier image sur ta machine."
+                },
+                "caption": {
+                  "type": "string",
+                  "description": "Légende affichée sous l'image."
+                },
+                "alt": {
+                  "type": "string",
+                  "description": "Texte alternatif (accessibilité)."
+                }
+              },
+              "required": [
+                "src"
+              ]
+            }
+          }
+        },
+        "required": [
+          "images"
+        ]
+      }
     }
   },
   "tokenInstruction": "Place ce jeton tel quel dans ta réponse, à l'endroit où le composant doit apparaître.",

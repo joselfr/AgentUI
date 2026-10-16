@@ -91,3 +91,22 @@ describe('stepTimes : durée des étapes', () => {
   });
 });
 
+describe('widget image : mapping des fichiers copiés', () => {
+  const args = { images: [{ src: '/opt/data/a.png' }, { src: 'https://x.org/b.jpg' }] };
+  const t = { id: 't1', name: 'agentui_image', args, resultPreview: '{"widget": "[[agentui:a1b2c3]]", "files": {"/opt/data/a.png": "agentui-img-1234abcd-a.png"}}' };
+
+  it('ajoute `files` aux arguments du widget', () => {
+    const out = expandWidgetTokens('Voici [[agentui:a1b2c3]]', [t]);
+    const w = JSON.parse(/```widget\n(.*)\n```/.exec(out)![1]!);
+    expect(w.type).toBe('image');
+    expect(w.arguments.files).toEqual({ '/opt/data/a.png': 'agentui-img-1234abcd-a.png' });
+    expect(w.arguments.images).toEqual(args.images);
+  });
+  it("tolère un résultat sans `files` ou illisible", () => {
+    for (const resultPreview of ['{"widget": "[[agentui:a1b2c3]]"}', '[[agentui:a1b2c3]] pas du JSON']) {
+      const w = JSON.parse(/```widget\n(.*)\n```/.exec(expandWidgetTokens('[[agentui:a1b2c3]]', [{ ...t, resultPreview }]))![1]!);
+      expect(w.arguments.files).toEqual({});
+    }
+  });
+});
+

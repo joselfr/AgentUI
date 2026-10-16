@@ -22,7 +22,7 @@ export function interactiveBlocks(text: string): string[] {
 /** Les plugins exposent chaque widget d'affichage comme un outil `agentui_<type>` (ex. `agentui_chart`) : ses arguments sont ceux du widget. */
 const WIDGET_TOOL_PREFIX = 'agentui_';
 export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string; startedAt?: number; endedAt?: number };
-const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress']);
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image']);
 
 export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
   if (!t.name.startsWith(WIDGET_TOOL_PREFIX)) return undefined;
@@ -98,6 +98,17 @@ export function stepTimes(calls: ToolCallLike[]): StepTime[] {
   return times;
 }
 
+/** Widget `image` : le plugin copie les fichiers locaux et renvoie, dans le résultat de l'outil, `files` = { chemin → nom de la pièce jointe }. */
+function filesOf(t: { resultPreview?: string }): Record<string, string> {
+  try {
+    const f = (JSON.parse(t.resultPreview ?? '') as { files?: unknown }).files;
+    return f && typeof f === 'object' && !Array.isArray(f) ? Object.fromEntries(Object.entries(f).filter(([, v]) => typeof v === 'string')) as Record<string, string> : {};
+  } catch { return {}; }
+}
+
+/** Pièces jointes copiées pour un widget image : leur nom commence par ce préfixe, elles ne s'affichent pas en plus du widget. */
+export const WIDGET_ATTACHMENT_PREFIX = 'agentui-img-';
+
 /** Jeton (`[[agentui:<id>]]`) renvoyé par l'outil, lu dans son résultat. */
 const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[agentui:([0-9a-f]+)\]\]/)?.[1];
 
@@ -113,7 +124,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
     const id = tokenOf(t);
     const w = id ? widgetOfTool(t) : undefined;
     if (id && w) {
-      widgets.set(id, w);
+      widgets.set(id, w.type === 'image' ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w);
     }
   }
   const used = new Set<string>();

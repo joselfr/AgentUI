@@ -170,6 +170,19 @@ class FakeAgent:
                 bad = json.loads(Ctx.tools["agentui_progress"]({"steps": steps, "update": "abc"}))
                 self.answers[chat] = (first, again, bad)
                 return "fait"
+            if event.text == "image-tool":  # agentui_image : copie d'un fichier local en message.media + mapping dans le résultat
+                png = Path(tempfile.mkdtemp()) / "plage.png"
+                png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+                txt = png.with_name("note.png")
+                txt.write_text("du texte")
+                call = lambda images: json.loads(Ctx.tools["agentui_image"]({"images": images}))
+                self.answers[chat] = (
+                    call([{"src": "https://exemple.org/a.jpg"}, {"src": str(png)}, {"src": str(png)}]),
+                    call([{"src": str(txt)}]),
+                    call([{"src": "/nexiste/pas.png"}]),
+                    call([{"src": "relatif/a.png"}]),
+                )
+                return "fait"
             if event.text == "long":
                 self.release.wait(10)
                 return "trop tard"
@@ -336,6 +349,15 @@ async def main():
         assert first["widget"].startswith("[[agentui:") and again["widget"] == first["widget"] and again["updated"] is True, agent.answers
         assert "error" in bad, bad
         print("✓ widget progress : jeton renvoyé puis réutilisé par update")
+
+        await server.send({"type": "inbound", "conversationId": "c3h", "runId": "r3h", "text": "image-tool"})
+        frames = await server.until(lambda f: f.get("runId") == "r3h" and f["event"]["type"] == "run.completed")
+        ok, not_image, missing, relative = agent.answers["c3h"]
+        media = [f["event"] for f in frames if f.get("event", {}).get("type") == "message.media"]
+        assert len(media) == 1 and media[0]["name"].startswith("agentui-img-") and media[0]["mimeType"] == "image/png", frames
+        assert list(ok["files"].values()) == [media[0]["name"]] and ok["widget"].startswith("[[agentui:"), ok
+        assert "pas une image" in not_image["error"] and "introuvable" in missing["error"] and "chemin absolu" in relative["error"], agent.answers
+        print("✓ widget image : copie locale en message.media, mapping, rejets")
 
         # 5. arrêt : run.aborted, et la confirmation de /stop n'est pas relayée
         await server.send({"type": "inbound", "conversationId": "c4", "runId": "r4", "text": "long"})

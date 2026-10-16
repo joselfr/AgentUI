@@ -108,6 +108,28 @@ const runtime = {
           ro.onAgentRunTerminalOutcome?.('completed');
           return { dispatched: true };
         }
+        if (input.rawText === 'img-widget') {
+          // Outil agentui_image : copie un fichier local dans la discussion (message.media) et renvoie le mapping chemin → pièce jointe.
+          const entry = (await import('../dist/index.js')).default;
+          let factory;
+          entry.registerFull({ registerService: () => {}, registerTool: (f) => (factory = f) });
+          const tool = factory({ messageChannel: 'agentui', sessionKey: plan.route.sessionKey }).find((t) => t.name === 'agentui_image');
+          ro.onAgentRunStart?.('oc-run');
+          const run = (images) => tool.execute('ti', { images }).then((r) => JSON.parse(r.content[0].text), (e) => ({ error: e.message }));
+          const text = join(imgDir, 'pas-une-image.png');
+          writeFileSync(text, 'ceci est du texte');
+          const png = join(imgDir, 'vrai.png');
+          writeFileSync(png, Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(32)]));
+          toolRuns.push(
+            await run([{ src: 'https://exemple.org/a.jpg', caption: 'Externe' }, { src: png }, { src: png }]),
+            await run([{ src: text }]),
+            await run([{ src: '/nexiste/pas.png' }]),
+            await run([{ src: 'relatif/a.png' }]),
+            await run([{ src: 'javascript:alert(1)' }]),
+          );
+          ro.onAgentRunTerminalOutcome?.('completed');
+          return { dispatched: true };
+        }
         if (input.rawText.startsWith('/approve')) return { dispatched: true };
         const key = `${plan.route.agentId}|${plan.route.sessionKey}`;
         if (input.rawText.startsWith('/model')) {
@@ -386,11 +408,27 @@ test('outils interactifs : arrêt pendant l\'attente, arguments invalides', asyn
   assert.match(toolRuns.at(-1).error, /deux fois/);
 });
 
+test('agentui_image : copie un fichier local en message.media, mapping dans le résultat, rejets lisibles', async () => {
+  send({ type: 'inbound', conversationId: 'ci', runId: 'ri', text: 'img-widget' });
+  const ev = eventsOf(await until(isTerminal('ri')), 'ri');
+  const media = ev.filter((e) => e.type === 'message.media');
+  assert.equal(media.length, 1, 'le même fichier cité deux fois n\'est copié qu\'une fois ; l\'URL externe n\'est pas copiée');
+  assert.match(media[0].name, /^agentui-img-[0-9a-f]{8}-/);
+  assert.equal(media[0].mimeType, 'image/png');
+  const [ok, notImage, missing, relative, scheme] = toolRuns.slice(-5);
+  assert.deepEqual(Object.values(ok.files), [media[0].name]);
+  assert.match(ok.widget, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
+  assert.match(notImage.error, /n'est pas une image/);
+  assert.match(missing.error, /introuvable/);
+  assert.match(relative.error, /chemin absolu/);
+  assert.match(scheme.error, /chemin absolu/);
+});
+
 test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI', async () => {
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
   const tools = factory({ messageChannel: 'agentui' });
   assert.deepEqual(tools.map((t) => t.name), opts.names);

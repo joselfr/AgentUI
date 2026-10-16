@@ -67,6 +67,13 @@ renvoyé par le premier appel, avec l'état complet. L'outil renvoie alors le m�
 affiche, à la place du jeton, les arguments du **dernier** appel, pendant le streaming comme après, sans second composant.
 Les plugins n'ont aucun état à garder.
 
+`agentui_image` accepte, par image, une URL `https://…` (chargée directement par le navigateur) ou un **chemin absolu** d'un
+fichier de la machine de l'agent. Le plugin lit ce fichier (png, jpeg, gif ou webp reconnus par leurs premiers octets, 20 Mo
+au plus), le pousse par un événement `message.media` nommé `agentui-img-<empreinte>-<fichier>` et renvoie dans le résultat de
+l'outil `files` = `{ chemin → nom de la pièce jointe }`. Le front relie le chemin à la pièce jointe du message et ne l'affiche
+pas une seconde fois comme pièce jointe. Un fichier introuvable, trop gros ou qui n'est pas une image fait échouer l'outil
+(l'erreur revient à l'agent).
+
 Les widgets interactifs `ask`, `confirm` et `form` sont des outils **bloquants** (`agentui_ask`, `agentui_confirm`,
 `agentui_form`, section `blockingTools` du même fichier). L'outil émet `question.requested`, ajoute le bloc ```` ```widget ````
 `{"type": …, "arguments": …}` au texte du run, attend la trame `reply` et renvoie `{"answer": "<texte de la réponse>"}` à

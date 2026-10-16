@@ -11,7 +11,7 @@ import { getAgentUIRuntime } from './runtime.js';
 import { listSubAgents } from './agents.js';
 import { jobAction, listJobs } from './cron.js';
 import { randomBytes } from 'node:crypto';
-import type { AskHost, AskResult } from './asks.js';
+import type { AskResult, RunHost } from './hosts.js';
 import { resolveQuestion } from './question.js';
 import { askReplyText, askWidget, parseAskQuestions, type AskQuestion } from './ask.js';
 
@@ -65,7 +65,7 @@ const APPROVE_RE = /\/approve\s+([A-Za-z0-9_-]+)\s+allow-once/;
 
 const ASK_TIMEOUT_MS = 30 * 60_000;
 
-export class AgentUIBridge implements AskHost {
+export class AgentUIBridge implements RunHost {
   private runs = new Map<string, Run>();
 
   constructor(
@@ -296,6 +296,13 @@ export class AgentUIBridge implements AskHost {
       this.emit(run, { type: 'question.requested', id });
       this.appendBlock(run, '```widget\n' + JSON.stringify({ type: key, arguments: args }) + '\n```');
     });
+  }
+
+  emitMedia(conversationId: string, media: Media): boolean {
+    const run = [...this.runs.values()].find((r) => r.conversationId === conversationId && !r.terminal);
+    if (!run) return false;
+    this.emit(run, { type: 'message.media', ...media });
+    return true;
   }
 
   /** Ajoute un bloc de texte à la réponse en cours, après ce qui a déjà été écrit. */

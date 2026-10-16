@@ -10,13 +10,14 @@ import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
-import { expandWidgetTokens, interactiveBlocks, outOfTextWidgets, parseWidget, type ToolCallLike } from '../widget';
+import { expandWidgetTokens, interactiveBlocks, outOfTextWidgets, parseWidget, WIDGET_ATTACHMENT_PREFIX, type ToolCallLike } from '../widget';
 import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
 import MapCard, { parseMap } from '../MapCard';
 import TableCard, { parseTable } from '../TableCard';
 import ProgressCard, { parseProgress } from '../ProgressCard';
+import ImageCard, { isRemote, parseImage, type Resolved } from '../ImageCard';
 import CodeCard, { parseCode } from '../CodeCard';
 import FormCard, { parseForm } from '../FormCard';
 
@@ -39,10 +40,11 @@ function Working({ m }: { m: Message }) {
 
 /** Images (aperçu cliquable) et fichiers (puces de téléchargement) joints à un message. */
 function Attachments({ m }: { m: Message }) {
-  if (!m.attachments?.length) return null;
+  const shown = (m.attachments ?? []).filter((a) => !a.name.startsWith(WIDGET_ATTACHMENT_PREFIX)); // copies d'un widget image : déjà dans le widget
+  if (!shown.length) return null;
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: m.text ? 1 : 0 }}>
-      {(m.attachments as AttachmentView[]).map((a) => {
+      {(shown as AttachmentView[]).map((a) => {
         const href = a.url ?? `/api/attachments/${a.id}`;
         return isImage(a.mimeType) ? (
           <a key={a.id} href={href} target="_blank" rel="noreferrer"><img src={href} alt={a.name} title={a.name} style={{ maxWidth: 'min(100%, 480px)', maxHeight: 320, borderRadius: 8, display: 'block' }} /></a>
@@ -56,10 +58,23 @@ function Attachments({ m }: { m: Message }) {
 }
 
 /** Widgets d'affichage (sans réponse) : bloc ```widget ou outil `agentui_<type>`. `undefined` si le type ou les arguments sont invalides. */
-function displayWidget(w?: { type: string; arguments: Record<string, unknown> }): ReactElement | undefined {
+function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
   if (w?.type === 'table') { const table = parseTable(w.arguments); if (table) return <TableCard table={table} />; }
+  if (w?.type === 'image') {
+    const gallery = parseImage(w.arguments);
+    if (gallery) {
+      const files = (w.arguments.files ?? {}) as Record<string, string>;
+      // Fichier local : copié par le plugin en pièce jointe du message ; URL externe : chargée directement par le navigateur.
+      const resolve = (src: string): Resolved => {
+        if (isRemote(src)) return { state: 'ok', url: src };
+        const a = m.attachments?.find((x) => x.name === files[src]);
+        return a ? { state: 'ok', url: `/api/attachments/${a.id}` } : m.status === 'streaming' && files[src] ? { state: 'loading' } : { state: 'error' };
+      };
+      return <ImageCard gallery={gallery} resolve={resolve} />;
+    }
+  }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }
@@ -84,8 +99,10 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
       const { m, answers, onAnswer: canAnswer } = latest.current;
       const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
-      if ((m.status !== 'streaming' || isAwaiting(m)) && (lang === 'widget' || lang === 'ask')) {
-        const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
+      const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
+      // Pendant le streaming, seule la galerie d'images s'affiche déjà (le bloc vient d'un jeton développé, donc complet) : ses fichiers locaux arrivent un à un.
+      const early = lang === 'widget' && m.status === 'streaming' && parseWidget(raw)?.type === 'image';
+      if ((m.status !== 'streaming' || isAwaiting(m) || early) && (lang === 'widget' || lang === 'ask')) {
         // Un message peut poser plusieurs questions de suite (question.requested puis réponse) : la k-ième reçoit la k-ième réponse, seule la première sans réponse est active.
         const k = interactiveBlocks(m.text).indexOf(raw);
         const answer = k >= 0 ? answers[k] : undefined;
@@ -94,7 +111,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         const w = parseWidget(raw);
         if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
         if (w?.type === 'confirm') { const confirm = parseConfirm(w.arguments); if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />; }
-        const display = displayWidget(w);
+        const display = displayWidget(w, m);
         if (display) return display;
         if (w?.type === 'form') { const form = parseForm(w.arguments); if (form) return <FormCard form={form} answer={answer} onAnswer={onAnswer} />; }
       }
