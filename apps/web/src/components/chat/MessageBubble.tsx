@@ -9,7 +9,8 @@ import type { Message } from '@agentui/shared';
 import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
-import AskCard from '../AskCard';
+import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
+import { parseWidget } from '../widget';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
 
@@ -81,14 +82,14 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
           : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={{
             pre: ({ children }) => {
               const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
-              if (el?.props?.className?.includes('language-ask') && m.status !== 'streaming') return <AskCard raw={String(el.props.children ?? '').replace(/\n$/, '')} answer={answer} onAnswer={onAnswer} />;
-              if (el?.props?.className?.includes('language-confirm') && m.status !== 'streaming') {
-                const confirm = parseConfirm(String(el.props.children ?? ''));
-                if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />;
-              }
-              if (el?.props?.className?.includes('language-chart') && m.status !== 'streaming') {
-                const chart = parseChart(String(el.props.children ?? ''));
-                if (chart) return <ChartCard chart={chart} />;
+              const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
+              if (m.status !== 'streaming' && (lang === 'widget' || lang === 'ask')) {
+                const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
+                if (lang === 'ask') return <AskCard ask={parseLegacyAsk(raw)} answer={answer} onAnswer={onAnswer} />;
+                const w = parseWidget(raw);
+                if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
+                if (w?.type === 'confirm') { const confirm = parseConfirm(w.arguments); if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />; }
+                if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
               }
               return <pre>{children}</pre>;
             },

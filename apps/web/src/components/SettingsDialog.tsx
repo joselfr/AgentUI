@@ -25,7 +25,7 @@ export default function SettingsDialog({ open, onClose, onLogout, themeMode, onT
           {(Object.keys(themeLabel) as ThemeMode[]).map((k) => <MenuItem key={k} value={k}>Thème : {themeLabel[k]}</MenuItem>)}
         </Select>
         <FormControlLabel sx={{ mx: 0, ...card }} control={<Switch checked={expandTools} onChange={(e) => onExpandTools(e.target.checked)} />} label="Déplier les outils par défaut" />
-        <FormControlLabel sx={{ mx: 0, ...card }} control={<Switch checked={askUser} onChange={(e) => onAskUser(e.target.checked)} />} label="Blocs interactifs de l'agent (ask, confirm, chart)" />
+        <FormControlLabel sx={{ mx: 0, ...card }} control={<Switch checked={askUser} onChange={(e) => onAskUser(e.target.checked)} />} label="Widgets interactifs de l'agent (ask, confirm, chart)" />
         <PushToggle />
         <UpdateButton />
         <PasswordForm />

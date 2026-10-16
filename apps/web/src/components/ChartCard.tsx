@@ -3,16 +3,14 @@ import { Box, Button, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
 interface Series { name: string; y: number[] }
-interface Chart { type: 'line' | 'bar' | 'pie'; title?: string; unit?: string; x: string[]; series: Series[] }
+interface Chart { kind: 'line' | 'bar' | 'pie'; title?: string; unit?: string; x: string[]; series: Series[] }
 
-/** Bloc ```chart : JSON `{ type: line|bar|pie, title?, unit?, x: [...], series: [{ name, y: [...] }] }`. `undefined` si invalide. */
-export function parseChart(raw: string): Chart | undefined {
-  try {
-    const c = JSON.parse(raw) as Chart;
-    if (!['line', 'bar', 'pie'].includes(c.type) || !Array.isArray(c.x) || !Array.isArray(c.series) || !c.series.length) return undefined;
-    if (!c.series.every((s) => Array.isArray(s.y) && s.y.length === c.x.length && s.y.every((v) => typeof v === 'number' && isFinite(v)))) return undefined;
-    return { ...c, x: c.x.map(String), series: c.series.slice(0, 6) };
-  } catch { return undefined; }
+/** Arguments du widget `chart` : `{ kind: line|bar|pie, title?, unit?, x: [...], series: [{ name, y: [...] }] }`. `undefined` si invalide. */
+export function parseChart(a: Record<string, unknown>): Chart | undefined {
+  const c = a as unknown as Chart;
+  if (!['line', 'bar', 'pie'].includes(c.kind) || !Array.isArray(c.x) || !Array.isArray(c.series) || !c.series.length) return undefined;
+  if (!c.series.every((s) => s && Array.isArray(s.y) && s.y.length === c.x.length && s.y.every((v) => typeof v === 'number' && isFinite(v)))) return undefined;
+  return { ...c, x: c.x.map(String), series: c.series.slice(0, 6) };
 }
 
 /** Plus petit « beau » nombre ≥ v (1, 2, 2.5, 5 × 10ⁿ). */
@@ -39,7 +37,7 @@ function Axes({ c, lo, hi, color }: { c: Chart; lo: number; hi: number; color: {
 }
 
 function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: { line: string; text: string; bg: string; fg: string } }) {
-  if (c.type === 'pie') {
+  if (c.kind === 'pie') {
     const ys = c.series[0]!.y.map((v) => Math.max(0, v));
     const total = ys.reduce((a, b) => a + b, 0) || 1;
     let a0 = -Math.PI / 2;
@@ -76,7 +74,7 @@ function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: { line:
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label={c.title}>
       <Axes c={c} lo={lo} hi={hi} color={color} />
-      {c.type === 'line' ? c.series.map((s, k) => {
+      {c.kind === 'line' ? c.series.map((s, k) => {
         const pts = s.y.map((v, i) => [M.l + cw * (i + 0.5), Y(v)] as const);
         return <g key={k}><polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke={colors[k]} strokeWidth="2.5" strokeLinejoin="round" />
           {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="3.5" fill={colors[k]}><title>{`${s.name} · ${c.x[i]} : ${fmt(s.y[i]!)}${c.unit ?? ''}`}</title></circle>)}</g>;
@@ -103,9 +101,9 @@ export default function ChartCard({ chart: c }: { chart: Chart }) {
   return (
     <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.default' }}>
       {c.title && <Typography sx={{ fontWeight: 600 }}>{c.title}</Typography>}
-      {c.unit && c.type !== 'pie' && <Typography variant="caption" color="text.secondary">en {c.unit}</Typography>}
+      {c.unit && c.kind !== 'pie' && <Typography variant="caption" color="text.secondary">en {c.unit}</Typography>}
       <Box sx={{ mt: 1 }}><Plot c={c} colors={colors} color={color} /></Box>
-      {c.type !== 'pie' && c.series.length > 1 && (
+      {c.kind !== 'pie' && c.series.length > 1 && (
         <Box sx={{ display: 'flex', gap: 2, mt: 0.5, flexWrap: 'wrap', fontSize: 12, color: 'text.secondary' }}>
           {c.series.map((s, k) => <Box key={k} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: colors[k] }} />{s.name}</Box>)}
         </Box>)}

@@ -2,17 +2,16 @@ import { useState } from 'react';
 import { Box, Button, Checkbox, FormControlLabel, Typography } from '@mui/material';
 import QuestionAnswerOutlined from '@mui/icons-material/QuestionAnswerOutlined';
 
-interface Parsed { question: string; choices: string[]; multiple: boolean }
+export interface Parsed { question: string; choices: string[]; multiple: boolean }
 
-/** Bloc ```ask : JSON `{ question, choices?: [...], multiple?: bool }`. Sans `choices` : réponse libre. */
-export function parseAsk(raw: string): Parsed {
-  try {
-    const j = JSON.parse(raw) as { question?: unknown; choices?: unknown; multiple?: unknown };
-    if (j && typeof j === 'object') {
-      const choices = Array.isArray(j.choices) ? j.choices.map(String) : [];
-      return { question: String(j.question ?? '').trim(), choices, multiple: j.multiple === true };
-    }
-  } catch { /* ancien format Markdown, conservé pour les discussions déjà enregistrées */ }
+/** Arguments du widget `ask` : `{ question, options?: [...], multiple?: bool }`. Sans `options` : réponse libre. */
+export function parseAsk(args: Record<string, unknown>): Parsed | undefined {
+  if (typeof args.question !== 'string') return undefined;
+  return { question: args.question.trim(), choices: Array.isArray(args.options) ? args.options.map(String) : [], multiple: args.multiple === true };
+}
+
+/** Ancien bloc ```ask en Markdown (`- choix`, `- [ ] choix`), conservé pour les discussions déjà enregistrées. */
+export function parseLegacyAsk(raw: string): Parsed {
   const question: string[] = [];
   const choices: string[] = [];
   let multiple = false;
@@ -24,8 +23,7 @@ export function parseAsk(raw: string): Parsed {
 }
 
 /** `answer` : réponse déjà envoyée (message utilisateur suivant), `onAnswer` absent : question plus répondable. */
-export default function AskCard({ raw, answer, onAnswer }: { raw: string; answer?: string; onAnswer?: (text: string) => void }) {
-  const { question, choices, multiple } = parseAsk(raw);
+export default function AskCard({ ask: { question, choices, multiple }, answer, onAnswer }: { ask: Parsed; answer?: string; onAnswer?: (text: string) => void }) {
   const [picked, setPicked] = useState<string[]>([]);
   const live = !!onAnswer;
   const answered = (c: string) => (answer ? answer.split(/,\s*/).includes(c) || answer === c : false);

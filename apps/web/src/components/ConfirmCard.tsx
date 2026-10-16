@@ -5,14 +5,11 @@ import HelpOutline from '@mui/icons-material/HelpOutline';
 
 export interface Parsed { title: string; text: string; danger: boolean; yes: string; no: string }
 
-/** Bloc ```confirm : JSON `{ title, text?, danger?, yes?, no? }`. Un JSON invalide s'affiche comme un bloc de code. */
-export function parseConfirm(raw: string): Parsed | undefined {
-  try {
-    const j = JSON.parse(raw) as Record<string, unknown>;
-    if (!j || typeof j.title !== 'string') return undefined;
-    const s = (v: unknown, d: string) => (typeof v === 'string' && v.trim() ? v : d);
-    return { title: j.title, text: s(j.text, ''), danger: j.danger === true, yes: s(j.yes, 'Confirmer'), no: s(j.no, 'Annuler') };
-  } catch { return undefined; }
+/** Arguments du widget `confirm` : `{ title, text?, danger?, yes?, no? }`. */
+export function parseConfirm(j: Record<string, unknown>): Parsed | undefined {
+  if (typeof j.title !== 'string') return undefined;
+  const s = (v: unknown, d: string) => (typeof v === 'string' && v.trim() ? v : d);
+  return { title: j.title, text: s(j.text, ''), danger: j.danger === true, yes: s(j.yes, 'Confirmer'), no: s(j.no, 'Annuler') };
 }
 
 /** `answer` : réponse déjà envoyée (libellé du bouton choisi), `onAnswer` absent : demande plus répondable. */
