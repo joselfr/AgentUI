@@ -50,7 +50,7 @@ await chat('OpenClaw');
 const lastAssistant = () => page.locator('[data-role=assistant]').last().innerText().catch(() => '');
 const ocText = await lastAssistant();
 check('OpenClaw : réponse de l\'agent', /PONG/i.test(ocText), JSON.stringify(ocText.slice(-80)));
-check('OpenClaw : carte « outils utilisés »', await page.getByText(/outils? utilisés?/).first().waitFor({ timeout: 5000 }).then(() => true, () => false));
+check('OpenClaw : ligne d’activité « N outils »', await page.getByText(/\d+ outils?/).first().waitFor({ timeout: 5000 }).then(() => true, () => false));
 await page.getByText(/outils? utilisés?/).first().click();
 await page.getByText('exec').first().waitFor({ timeout: 5000 }).catch(() => {});
 await page.getByText('exec').first().click().catch(() => {});

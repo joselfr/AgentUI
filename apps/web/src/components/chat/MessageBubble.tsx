@@ -1,15 +1,14 @@
-import { useState, type ReactElement, type ReactNode } from 'react';
-import { Avatar, Box, Chip, Collapse, Paper, Typography } from '@mui/material';
+import type { ReactElement, ReactNode } from 'react';
+import { Avatar, Box, Chip, Paper, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
-import Psychology from '@mui/icons-material/Psychology';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // un retour à la ligne = une ligne (sorties de cron, messages courts)
 import type { Message } from '@agentui/shared';
 import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
-import { ToolsBlock } from '../ToolCard';
+import ActivityBlock from './ActivityBlock';
 import AskCard from '../AskCard';
 
 const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
@@ -52,7 +51,6 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
   m: Message; expandTools: boolean; agentName: string; answer?: string; onAnswer?: (t: string) => void; working?: boolean;
 }) {
   const mine = m.role === 'user';
-  const [showReasoning, setShowReasoning] = useState(false);
   return (
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
       {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
@@ -75,14 +73,7 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
         },
         overflowWrap: 'anywhere', minWidth: 0,
       }}>
-        {!mine && m.reasoning && (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0.5 }} color="text.secondary"
-              onClick={() => setShowReasoning(!showReasoning)}><Psychology fontSize="inherit" /> Raisonnement</Typography>
-            <Collapse in={showReasoning}><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>{m.reasoning}</Typography></Collapse>
-          </Box>
-        )}
-        {!mine && <ToolsBlock tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
+        {!mine && <ActivityBlock reasoning={m.reasoning} tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
         {mine && <Attachments m={m} />}
         {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
           : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={{
