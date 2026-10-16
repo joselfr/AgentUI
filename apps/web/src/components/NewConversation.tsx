@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, ListItemButton, ListItemText, Typography } from '@mui/material';
 import type { AgentInfo, SubAgent } from '@agentui/shared';
 import { api } from '../api';
-import { StatusDot } from './Sidebar';
+import StatusDot from './StatusDot';
 
 export default function NewConversation(props: {
   open: boolean; agents: AgentInfo[]; agentId?: string; sub?: string;

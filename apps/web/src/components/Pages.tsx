@@ -10,7 +10,7 @@ import type { AgentInfo, Job, Skill, SubAgent } from '@agentui/shared';
 import { api } from '../api';
 import { MONO } from '../theme';
 import { useConfirm } from './Confirm';
-import { StatusDot } from './Sidebar';
+import StatusDot from './StatusDot';
 
 const card = { display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '12px', bgcolor: 'background.paper' } as const;
 

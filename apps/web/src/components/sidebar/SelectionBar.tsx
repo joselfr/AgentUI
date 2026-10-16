@@ -1,0 +1,23 @@
+import { Box, Checkbox, IconButton, Tooltip, Typography } from '@mui/material';
+import Archive from '@mui/icons-material/Archive';
+import Close from '@mui/icons-material/Close';
+import Delete from '@mui/icons-material/Delete';
+import Unarchive from '@mui/icons-material/Unarchive';
+
+/** Barre d'actions du mode sélection : tout sélectionner, archiver / désarchiver, supprimer, quitter. */
+export default function SelectionBar({ count, allChosen, allArchived, onToggleAll, onArchive, onDelete, onCancel }: {
+  count: number; allChosen: boolean; allArchived: boolean;
+  onToggleAll: () => void; onArchive: () => void; onDelete: () => void; onCancel: () => void;
+}) {
+  const archiveLabel = allArchived ? 'Désarchiver' : 'Archiver';
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.5, pr: 1, height: 64, flexShrink: 0 }}>
+      <Checkbox size="small" checked={allChosen} indeterminate={!allChosen && count > 0} sx={{ p: 0.5 }} inputProps={{ 'aria-label': 'Tout sélectionner' }} onChange={onToggleAll} />
+      <Typography variant="subtitle2" sx={{ flex: 1 }} noWrap>{count ? `${count} sélectionnée${count > 1 ? 's' : ''}` : 'Sélectionner'}</Typography>
+      <Tooltip title={archiveLabel}><span><IconButton size="small" disabled={!count} aria-label={archiveLabel} onClick={onArchive}>
+        {allArchived ? <Unarchive fontSize="small" /> : <Archive fontSize="small" />}</IconButton></span></Tooltip>
+      <Tooltip title="Supprimer"><span><IconButton size="small" color="error" disabled={!count} aria-label="Supprimer la sélection" onClick={onDelete}><Delete fontSize="small" /></IconButton></span></Tooltip>
+      <Tooltip title="Annuler"><IconButton size="small" aria-label="Quitter la sélection" onClick={onCancel}><Close fontSize="small" /></IconButton></Tooltip>
+    </Box>
+  );
+}
