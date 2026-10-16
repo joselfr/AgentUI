@@ -12,6 +12,7 @@ export const CapabilitiesSchema = z.object({
   jobs: z.boolean(),
   jobControl: z.boolean(), // pause/reprise/exécution/suppression
   sessionDelete: z.boolean().optional(), // suppression de la session de plateforme avec la discussion
+  models: z.boolean().optional(), // choix du modèle par discussion + modèle et coût d'une session
   attachments: z.object({
     images: z.boolean(), // PNG/JPEG/GIF/WebP envoyés nativement
     files: z.boolean(), // fichiers binaires (PDF, zip…) ; les fichiers texte sont toujours insérés dans le message
@@ -85,6 +86,27 @@ export interface SearchHit {
   snippet?: string;
   /** Plages [début, longueur] à surligner dans `snippet`. */
   marks?: [number, number][];
+}
+
+/** Consommation d'une session de l'agent : modèle utilisé, tokens et coût cumulés depuis son début. */
+export interface Usage {
+  model?: string;
+  provider?: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  reasoningTokens?: number;
+  /** Coût cumulé en dollars US. */
+  costUsd?: number;
+  /** Le coût est une estimation (tarifs publics) et non un montant facturé. */
+  costEstimated?: boolean;
+}
+
+/** Un modèle que l'agent peut utiliser, avec son fournisseur. */
+export interface ModelOption {
+  provider: string;
+  providerName: string;
+  id: string;
 }
 
 export interface Session {
@@ -172,6 +194,8 @@ export type AgentEvent =
   | { type: 'subagent.end'; id: string; failed?: boolean }
   | { type: 'message.media'; url: string; name: string; mimeType?: string }
   | { type: 'attachment.added'; attachment: AttachmentMeta }
+  /** Consommation cumulée de la session, émise à la fin d'un run. */
+  | { type: 'usage'; usage: Usage }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
   | { type: 'run.completed' }
   | { type: 'run.failed'; error: string }

@@ -4,10 +4,12 @@ import type {
   ConnStatus,
   Job,
   Message,
+  ModelOption,
   SendInput,
   Session,
   Skill,
   SubAgent,
+  Usage,
 } from '@agentui/shared';
 
 export interface RunHandle {
@@ -34,6 +36,12 @@ export interface AgentAdapter {
   jobAction?(jobId: string, action: 'pause' | 'resume' | 'run' | 'delete', subAgentId?: string): Promise<void>;
   /** Supprime la session de la plateforme (adaptateurs canal) ; absent = l'agent ne sait pas le faire. */
   deleteSession?(sessionId: string): Promise<void>;
+  /** Modèles disponibles (adaptateurs qui savent en changer par session). */
+  listModels?(): Promise<ModelOption[]>;
+  /** Fixe le modèle d'une session ; renvoie le modèle effectivement retenu. */
+  setModel?(sessionId: string, model: string, provider?: string): Promise<{ model: string; provider?: string; message?: string }>;
+  /** Modèle courant et consommation d'une session existante (sans attendre un nouveau run). */
+  sessionUsage?(sessionId: string): Promise<Usage | undefined>;
 
   listSessions(): Promise<Session[]>;
   getMessages(sessionId: string): Promise<Message[]>;

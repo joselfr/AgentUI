@@ -7,8 +7,10 @@ import type {
   Job,
   Message,
   SendInput,
+  ModelOption,
   Session,
   Skill,
+  Usage,
   SubAgent,
 } from '@agentui/shared';
 import type { AgentAdapter, RunHandle } from './types.js';
@@ -368,6 +370,22 @@ export class GatewayAdapter implements AgentAdapter {
   }
 
   /** Supprime la session de plateforme d'une discussion ; le plugin annonce `sessionDelete`. */
+  async listModels(): Promise<ModelOption[]> {
+    if (!this.capabilities().models) return [];
+    return this.rpc<ModelOption[]>('listModels', {});
+  }
+  async setModel(sessionId: string, model: string, provider?: string) {
+    if (!this.capabilities().models) throw Object.assign(new Error(`${this.name} : ce plugin ne sait pas changer de modèle`), { statusCode: 501 });
+    try {
+      return await this.rpc<{ model: string; provider?: string; message?: string }>('setModel', { conversationId: sessionId, model, ...(provider ? { provider } : {}) });
+    } catch (e) {
+      throw Object.assign(new Error((e as Error).message), { statusCode: 502 });
+    }
+  }
+  async sessionUsage(sessionId: string): Promise<Usage | undefined> {
+    if (!this.capabilities().models) return undefined;
+    return (await this.rpc<Usage | null>('sessionUsage', { conversationId: sessionId })) ?? undefined;
+  }
   async deleteSession(sessionId: string): Promise<void> {
     if (!this.capabilities().sessionDelete) {
       throw Object.assign(new Error(`${this.name} : ce plugin ne sait pas supprimer ses sessions`), { statusCode: 501 });

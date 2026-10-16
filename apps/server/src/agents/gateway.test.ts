@@ -204,6 +204,38 @@ test('suppression de session : RPC deleteSession, erreur du plugin relayée, 501
   expect(p2.last('rpc')).toBeUndefined();
 });
 
+test('modèle et coût : RPC listModels, setModel et sessionUsage ; sans la capacité, rien n’est appelé', async () => {
+  const { adapter } = setup();
+  const p = new FakePlugin();
+  adapter.attach(p, hello({ capabilities: { ...CAPS, models: true } }));
+  const list = adapter.listModels();
+  expect(p.last('rpc').method).toBe('listModels');
+  p.frame({ type: 'rpc.result', id: p.last('rpc').id, result: [{ provider: 'deepseek', providerName: 'DeepSeek', id: 'deepseek-flash' }] });
+  expect(await list).toEqual([{ provider: 'deepseek', providerName: 'DeepSeek', id: 'deepseek-flash' }]);
+
+  const set = adapter.setModel!('c1', 'deepseek-v4-pro', 'deepseek');
+  expect(p.last('rpc').params).toEqual({ conversationId: 'c1', model: 'deepseek-v4-pro', provider: 'deepseek' });
+  p.frame({ type: 'rpc.result', id: p.last('rpc').id, result: { model: 'deepseek-v4-pro', provider: 'deepseek', message: '✓ ok' } });
+  expect(await set).toMatchObject({ model: 'deepseek-v4-pro' });
+
+  const refused = adapter.setModel!('c1', 'inconnu');
+  p.frame({ type: 'rpc.result', id: p.last('rpc').id, error: 'Modèle inconnu' });
+  await expect(refused).rejects.toMatchObject({ message: 'Modèle inconnu', statusCode: 502 });
+
+  const usage = adapter.sessionUsage!('c1');
+  expect(p.last('rpc').method).toBe('sessionUsage');
+  p.frame({ type: 'rpc.result', id: p.last('rpc').id, result: null });
+  expect(await usage).toBeUndefined(); // session inconnue du plugin
+
+  const { adapter: plain } = setup();
+  const p2 = new FakePlugin();
+  plain.attach(p2, hello());
+  expect(await plain.listModels()).toEqual([]);
+  await expect(plain.setModel!('c1', 'x')).rejects.toMatchObject({ statusCode: 501 });
+  expect(await plain.sessionUsage!('c1')).toBeUndefined();
+  expect(p2.last('rpc')).toBeUndefined();
+});
+
 test('connexion send-only : livre sans remplacer la connexion principale', async () => {
   const { adapter, runs } = setup();
   const main = new FakePlugin();

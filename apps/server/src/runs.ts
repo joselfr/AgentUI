@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentEvent, Message, OutgoingAttachment, SearchHit, ServerPush, ToolCall, SubAgentRun } from '@agentui/shared';
+import type { AgentEvent, Message, OutgoingAttachment, SearchHit, ServerPush, ToolCall, SubAgentRun, Usage } from '@agentui/shared';
 import type { DB } from './db.js';
 import type { AgentAdapter } from './agents/types.js';
 import { ASK_INSTRUCTIONS } from './interactive.js';
@@ -19,6 +19,8 @@ export interface ConversationRow {
   favorite?: number;
   /** 1 si la discussion est archivée (rangée hors de la liste principale). */
   archived?: number;
+  /** Dernière consommation connue de la session (JSON `Usage`). */
+  usage?: string | null;
   /** 1 si un message d'agent terminé est plus récent que la dernière lecture. */
   unread?: number;
 }
@@ -164,6 +166,21 @@ export class RunManager {
       .prepare(`UPDATE conversations SET last_read_at = MAX(?, COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id = conversations.id AND role = 'assistant'), 0)) WHERE id = ?`)
       .run(Date.now(), id);
     if (Number(r.changes)) this.broadcast({ type: 'conversation.read', conversationId: id });
+  }
+  /** Mémorise la consommation de la session (cumulée côté agent) et prévient les appareils connectés. */
+  setUsage(id: string, usage: Usage) {
+    this.db.prepare('UPDATE conversations SET usage = ? WHERE id = ?').run(JSON.stringify(usage), id);
+  }
+  /**
+   * Identifiant de session distante d'une discussion, créé au besoin : permet d'agir sur la session de l'agent
+   * (choix du modèle) avant le premier message. Les plugins canal créent la session à la première utilisation.
+   */
+  ensureRemoteSession(id: string): string {
+    const c = this.getConversation(id);
+    if (c?.remote_session_id) return c.remote_session_id;
+    const sid = randomUUID();
+    this.db.prepare('UPDATE conversations SET remote_session_id = ? WHERE id = ?').run(sid, id);
+    return sid;
   }
   setArchived(id: string, archived: boolean) {
     this.db.prepare('UPDATE conversations SET archived = ? WHERE id = ?').run(archived ? 1 : 0, id);
@@ -489,6 +506,7 @@ export class RunManager {
           if (added) emit({ type: 'attachment.added', attachment: added });
           continue;
         }
+        if (ev.type === 'usage') { this.setUsage(conv.id, ev.usage); emit(ev); continue; }
         text = this.apply(messageId, ev, text);
         if (ev.type === 'run.failed') outcome = 'failed';
         if (ev.type === 'run.aborted') outcome = 'aborted';

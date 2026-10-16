@@ -295,3 +295,34 @@ test('archivage : le drapeau est enregistré, conservé et restitué avec les di
   runs.setArchived(c.id, false);
   expect(!!runs.getConversation(c.id)!.archived).toBe(false);
 });
+
+test('consommation : l’événement usage est mémorisé, rediffusé et ne perturbe pas le message', async () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const usage = { model: 'deepseek-flash', provider: 'deepseek', inputTokens: 1200, outputTokens: 340, costUsd: 0.0123, costEstimated: true };
+  const adapter = {
+    id: 'a', name: 'A', capabilities: () => ({}),
+    send: async () => ({
+      runId: 'r1', sessionId: 's1',
+      events: (async function* () {
+        yield { type: 'message.final', text: 'Bonjour' } as const;
+        yield { type: 'usage', usage } as const;
+        yield { type: 'run.completed' } as const;
+      })(),
+    }),
+  } as unknown as AgentAdapter;
+  const runs = new RunManager(db, new Map([['a', adapter]]));
+  const pushes: any[] = [];
+  runs.subscribe((p) => pushes.push(p));
+  const conv = runs.createConversation('a');
+  const finished = new Promise<string>((r) => (runs.onRunFinished = (_c, o) => r(o)));
+  await runs.start(conv.id, 'salut');
+  expect(await finished).toBe('completed');
+  expect(JSON.parse(runs.getConversation(conv.id)!.usage!)).toEqual(usage);
+  expect(runs.getMessages(conv.id).at(-1)).toMatchObject({ role: 'assistant', text: 'Bonjour', status: 'done' });
+  expect(pushes.filter((p) => p.type === 'event').map((p) => p.event.type)).toEqual(['message.final', 'usage', 'run.completed']);
+  // identifiant de session distante créé à la demande (choix du modèle avant le premier message), puis conservé
+  const fresh = runs.createConversation('a');
+  const sid = runs.ensureRemoteSession(fresh.id);
+  expect(sid).toBeTruthy();
+  expect(runs.ensureRemoteSession(fresh.id)).toBe(sid);
+});

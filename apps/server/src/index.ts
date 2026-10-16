@@ -6,7 +6,7 @@ import fastifyCookie from '@fastify/cookie';
 import fastifyWebsocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import { z } from 'zod';
-import type { AgentInfo, ServerPush } from '@agentui/shared';
+import type { AgentInfo, ServerPush, Usage } from '@agentui/shared';
 import { env, loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { changePassword, ensureAdmin, login, logout, RateLimiter, userFromToken, type AuthUser } from './auth.js';
@@ -174,6 +174,7 @@ async function main() {
     unread: !!c.unread,
     favorite: !!c.favorite,
     archived: !!c.archived,
+    usage: c.usage ? (JSON.parse(c.usage) as Usage) : undefined,
     cron: !!c.remote_session_id?.startsWith('cron-'), // discussion dédiée d'une tâche planifiée
     lastReadAt: c.last_read_at ?? 0, // lecture précédente : sert à repérer les messages non lus à l'ouverture
   });
@@ -183,6 +184,35 @@ async function main() {
   app.get<{ Querystring: { q?: string } }>('/api/search', async (req) =>
     runs.search(z.string().max(100).catch('').parse(req.query.q)),
   );
+  // ---------- Modèle et coût ----------
+  app.get<{ Params: { id: string } }>('/api/agents/:id/models', async (req) => {
+    const a = adapterOf(req.params.id);
+    return a.listModels ? a.listModels() : [];
+  });
+  /** Rafraîchit la consommation d'une discussion depuis l'agent (modèle courant, tokens, coût), p. ex. à l'ouverture. */
+  app.get<{ Params: { id: string } }>('/api/conversations/:id/usage', async (req, reply) => {
+    const c = runs.getConversation(req.params.id);
+    if (!c) return reply.code(404).send({ error: 'not found' });
+    const a = adapterOf(c.agent_id);
+    if (!a.sessionUsage || !c.remote_session_id) return c.usage ? JSON.parse(c.usage) : null;
+    const usage = await a.sessionUsage(c.remote_session_id).catch(() => undefined);
+    if (usage) runs.setUsage(c.id, usage);
+    return usage ?? (c.usage ? JSON.parse(c.usage) : null);
+  });
+  /** Change le modèle d'une discussion. Une discussion jamais utilisée reçoit d'abord son identifiant de session. */
+  app.put<{ Params: { id: string } }>('/api/conversations/:id/model', async (req, reply) => {
+    const b = z.object({ model: z.string().min(1).max(200), provider: z.string().max(100).optional() }).parse(req.body);
+    const c = runs.getConversation(req.params.id);
+    if (!c) return reply.code(404).send({ error: 'not found' });
+    const a = adapterOf(c.agent_id);
+    if (!a.setModel) return reply.code(501).send({ error: 'Cet agent ne sait pas changer de modèle' });
+    if (runs.isRunning(c.id)) return reply.code(409).send({ error: 'Une réponse est en cours : attendez sa fin pour changer de modèle' });
+    const sessionId = runs.ensureRemoteSession(c.id);
+    const r = await a.setModel(sessionId, b.model, b.provider);
+    const usage = (await a.sessionUsage?.(sessionId).catch(() => undefined)) ?? { ...(c.usage ? JSON.parse(c.usage) : { inputTokens: 0, outputTokens: 0 }), model: r.model, provider: r.provider };
+    runs.setUsage(c.id, { ...usage, model: r.model, provider: r.provider ?? usage.provider });
+    return { ...r, usage: runs.getConversation(c.id)?.usage ? JSON.parse(runs.getConversation(c.id)!.usage!) : undefined };
+  });
   app.post('/api/conversations', async (req) => {
     const b = z.object({ agentId: z.string(), subAgentId: z.string().optional() }).parse(req.body);
     adapterOf(b.agentId);
