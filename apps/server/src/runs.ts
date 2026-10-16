@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentEvent, Message, OutgoingAttachment, ServerPush, ToolCall, SubAgentRun } from '@agentui/shared';
+import type { AgentEvent, Message, OutgoingAttachment, SearchHit, ServerPush, ToolCall, SubAgentRun } from '@agentui/shared';
 import type { DB } from './db.js';
 import type { AgentAdapter } from './agents/types.js';
 import { ASK_INSTRUCTIONS } from './interactive.js';
@@ -30,6 +30,49 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Un message en cours de streaming n'est pas « non lu » : il le devient en se terminant.
 const UNREAD = `EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.role = 'assistant'
   AND COALESCE(m.status, 'done') != 'streaming' AND m.created_at > COALESCE(c.last_read_at, 0)) AS unread`;
+
+/** Minuscules sans accents : base de la recherche (« ete » trouve « Été »). */
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+/** Idem, avec la correspondance de chaque caractère du texte replié vers sa position dans le texte d'origine. */
+function foldMap(s: string): { f: string; map: number[] } {
+  let f = '';
+  const map: number[] = [];
+  let i = 0;
+  for (const ch of s) {
+    const n = fold(ch);
+    for (let k = 0; k < n.length; k++) map.push(i);
+    f += n;
+    i += ch.length;
+  }
+  return { f, map };
+}
+
+/** Extrait d'une soixantaine de caractères autour du premier mot trouvé, et plages à surligner. */
+function makeSnippet(text: string, words: string[]): { snippet: string; marks: [number, number][] } {
+  const { f, map } = foldMap(text);
+  const first = Math.min(...words.map((w) => { const i = f.indexOf(w); return i < 0 ? Infinity : i; }));
+  const at = Number.isFinite(first) ? map[first] ?? 0 : 0;
+  const from = Math.max(0, at - 40);
+  const to = Math.min(text.length, at + 110);
+  const snippet = (from > 0 ? '…' : '') + text.slice(from, to).replace(/\s+/g, ' ').trim() + (to < text.length ? '…' : '');
+  const sf = foldMap(snippet);
+  const marks: [number, number][] = [];
+  for (const w of words) {
+    for (let i = sf.f.indexOf(w); i >= 0 && marks.length < 12; i = sf.f.indexOf(w, i + w.length)) {
+      const start = sf.map[i]!;
+      marks.push([start, (sf.map[i + w.length - 1] ?? start) + 1 - start]);
+    }
+  }
+  marks.sort((x, y) => x[0] - y[0]);
+  const merged: [number, number][] = [];
+  for (const m of marks) {
+    const last = merged[merged.length - 1];
+    if (last && m[0] <= last[0] + last[1]) last[1] = Math.max(last[1], m[0] + m[1] - last[0]);
+    else merged.push([...m]);
+  }
+  return { snippet, marks: merged };
+}
 
 type Listener = (push: ServerPush) => void;
 
@@ -122,6 +165,37 @@ export class RunManager {
   }
   setFavorite(id: string, favorite: boolean) {
     this.db.prepare('UPDATE conversations SET favorite = ? WHERE id = ?').run(favorite ? 1 : 0, id);
+  }
+  /**
+   * Recherche plein texte dans les titres et les messages (sans tenir compte de la casse ni des accents).
+   * Tous les mots de la requête doivent figurer dans le titre, ou dans un même message. Les titres d'abord, puis
+   * les discussions les plus récentes ; l'extrait vient du message correspondant le plus récent.
+   */
+  search(query: string, limit = 30): SearchHit[] {
+    const words = [...new Set(fold(query).split(/\s+/).filter(Boolean))];
+    if (!words.length || fold(query).length < 2) return [];
+    const matches = (text: string) => { const f = fold(text); return words.every((w) => f.includes(w)); };
+    const convs = this.db.prepare('SELECT id, agent_id, title, updated_at, favorite FROM conversations').all() as any[];
+    const hits = new Map<string, SearchHit>();
+    for (const c of convs) {
+      if (matches(c.title)) hits.set(c.id, { id: c.id, agentId: c.agent_id, title: c.title, updatedAt: c.updated_at, favorite: !!c.favorite, inTitle: true });
+    }
+    const info = new Map(convs.map((c) => [c.id as string, c]));
+    // Messages du plus récent au plus ancien : le premier qui correspond fournit l'extrait.
+    const rows = this.db.prepare("SELECT conversation_id, text FROM messages WHERE role IN ('user','assistant') AND text != '' ORDER BY created_at DESC").all() as any[];
+    const withSnippet = new Set<string>();
+    for (const r of rows) {
+      if (withSnippet.has(r.conversation_id) || !matches(r.text)) continue;
+      withSnippet.add(r.conversation_id);
+      const { snippet, marks } = makeSnippet(r.text, words);
+      const c = info.get(r.conversation_id);
+      if (!c) continue;
+      const hit = hits.get(c.id) ?? { id: c.id, agentId: c.agent_id, title: c.title, updatedAt: c.updated_at, favorite: !!c.favorite, inTitle: false };
+      hits.set(c.id, { ...hit, snippet, marks });
+    }
+    return [...hits.values()]
+      .sort((a, b) => Number(b.inTitle) - Number(a.inTitle) || b.updatedAt - a.updatedAt)
+      .slice(0, limit);
   }
   renameConversation(id: string, title: string) {
     this.db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);

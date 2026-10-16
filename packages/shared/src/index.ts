@@ -71,6 +71,21 @@ export interface Job {
   conversationId?: string;
 }
 
+/** Résultat de recherche : une discussion dont le titre ou un message correspond à tous les mots de la requête. */
+export interface SearchHit {
+  id: string;
+  agentId: string;
+  title: string;
+  updatedAt: number;
+  favorite: boolean;
+  /** Le titre correspond (sinon seul un message correspond). */
+  inTitle: boolean;
+  /** Extrait du message le plus récent qui correspond. */
+  snippet?: string;
+  /** Plages [début, longueur] à surligner dans `snippet`. */
+  marks?: [number, number][];
+}
+
 export interface Session {
   id: string; // id côté agent
   title: string;

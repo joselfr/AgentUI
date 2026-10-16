@@ -1,4 +1,4 @@
-import type { AgentInfo, Job, Message, OutgoingAttachment, Skill, SubAgent } from '@agentui/shared';
+import type { AgentInfo, Job, Message, OutgoingAttachment, SearchHit, Skill, SubAgent } from '@agentui/shared';
 
 export interface Conversation {
   id: string;
@@ -50,6 +50,7 @@ export const api = {
   jobs: (id: string, sub?: string) => call<Job[]>('GET', `/agents/${id}/jobs${q(sub)}`),
   jobAction: (id: string, jobId: string, action: string, sub?: string) =>
     call<{ ok: true }>('POST', `/agents/${id}/jobs/${encodeURIComponent(jobId)}/${action}${q(sub)}`),
+  search: (query: string) => call<SearchHit[]>('GET', `/search?q=${encodeURIComponent(query)}`),
   conversations: () => call<Conversation[]>('GET', '/conversations'),
   createConversation: (agentId: string, subAgentId?: string) => call<Conversation>('POST', '/conversations', { agentId, subAgentId }),
   markRead: (id: string) => call<{ ok: true }>('POST', `/conversations/${id}/read`),

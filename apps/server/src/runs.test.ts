@@ -259,3 +259,26 @@ test('non lu : message proactif dans une discussion existante ou créée par l�
   expect(!!runs.getConversation(first.id)!.unread).toBe(true); // nouveau message après la lecture
   expect(runs.listConversations('a')).toHaveLength(1);
 });
+
+test('recherche : titres et messages, sans casse ni accents, tous les mots requis, extrait surligné', () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const runs = new RunManager(db, new Map());
+  const a = runs.deliver('a', 's1', 'On se voit cet été à Lisbonne pour le déjeuner', [], 'A', 'Vacances');
+  const b = runs.deliver('a', 's2', 'Rien à voir avec le sujet', [], 'A', 'Été au Portugal');
+  runs.deliver('a', 's3', 'Un sujet sans rapport', [], 'A', 'Autre');
+  // accents et casse ignorés ; le titre passe avant les messages
+  expect(runs.search('ETE').map((h) => h.id)).toEqual([b.id, a.id]);
+  const inTitle = runs.search('ete')[0]!;
+  expect(inTitle.inTitle).toBe(true);
+  // tous les mots doivent figurer (dans le titre, ou dans un même message)
+  expect(runs.search('ete lisbonne').map((h) => h.id)).toEqual([a.id]);
+  expect(runs.search('lisbonne portugal')).toEqual([]);
+  // extrait autour du mot trouvé, plages à surligner dans l'extrait
+  const hit = runs.search('lisbonne')[0]!;
+  expect(hit.inTitle).toBe(false);
+  expect(hit.snippet).toContain('Lisbonne');
+  expect(hit.marks!.map(([i, n]) => hit.snippet!.slice(i, i + n))).toEqual(['Lisbonne']);
+  // requête trop courte ou vide
+  expect(runs.search('e')).toEqual([]);
+  expect(runs.search('   ')).toEqual([]);
+});

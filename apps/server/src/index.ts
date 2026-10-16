@@ -179,6 +179,9 @@ async function main() {
   app.get<{ Querystring: { agentId?: string } }>('/api/conversations', async (req) =>
     runs.listConversations(req.query.agentId).map(convDto),
   );
+  app.get<{ Querystring: { q?: string } }>('/api/search', async (req) =>
+    runs.search(z.string().max(100).catch('').parse(req.query.q)),
+  );
   app.post('/api/conversations', async (req) => {
     const b = z.object({ agentId: z.string(), subAgentId: z.string().optional() }).parse(req.body);
     adapterOf(b.agentId);
