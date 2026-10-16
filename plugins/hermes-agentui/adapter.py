@@ -238,6 +238,9 @@ def _strip_cursor(text: str) -> str:
     return text
 
 
+_FAILURE_MARKERS = ("❌", "✗", "🟡", "⚠")
+
+
 def _session_usage(conversation_id: str) -> Optional[dict]:
     """Modèle et consommation cumulée de la session Hermes d'une discussion, lus dans sa base (None si inconnue)."""
     import sqlite3
@@ -599,10 +602,13 @@ class AgentUIAdapter(BasePlatformAdapter):
             if conv in self._runs:
                 raise RuntimeError("un run est en cours dans cette discussion")
         reply = await self._control(conv, f"/model {model}" + (f" --provider {provider}" if provider else "") + " --session")
-        if not reply.lstrip().startswith("✓"):
-            raise RuntimeError(reply.lstrip("❌✗🟡 \n").strip() or "changement de modèle refusé")
+        text = reply.strip()
+        # La gateway répond « Model switched to `x` … » en cas de succès ; un refus commence par une pastille d'erreur
+        # (❌ modèle inconnu, 🟡 changement annulé…). Un avertissement en cours de texte n'est pas un échec.
+        if text.startswith(_FAILURE_MARKERS):
+            raise RuntimeError(text.lstrip("".join(_FAILURE_MARKERS) + "\ufe0f \n").strip() or "changement de modèle refusé")
         usage = await asyncio.to_thread(_session_usage, conv)
-        return {"model": (usage or {}).get("model") or model, **({"provider": provider} if provider else {}), "message": reply.strip()}
+        return {"model": (usage or {}).get("model") or model, **({"provider": provider} if provider else {}), "message": text}
 
     async def _on_rpc(self, msg: dict) -> None:
         method, params = msg.get("method"), msg.get("params") or {}

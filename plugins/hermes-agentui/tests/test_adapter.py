@@ -112,7 +112,10 @@ class FakeAgent:
         if event.text.startswith("/model"):
             if "refusé" in event.text:
                 return "❌ Modèle inconnu"
-            return "✓ Modèle changé : " + event.text.split()[1]
+            if "annulé" in event.text:
+                return "🟡 Model switch cancelled. Current model unchanged (deepseek-flash)."
+            # format réel de la gateway : pas de ✓, un avertissement peut figurer dans le texte
+            return f"Model switched to `{event.text.split()[1]}`\nProvider: DeepSeek\nWarning: Auto-corrected `x` → `y`\n_(session only)_"
         chat = event.source.chat_id
         self.chats.append(chat)
         ctx = contextvars.copy_context()
@@ -342,9 +345,11 @@ async def main():
             assert set(m) == {"provider", "providerName", "id"}, m
         # setModel : la commande /model est exécutée par la gateway, sa réponse n'apparaît pas dans la discussion
         res = await rpc("setModel", {"conversationId": "c-use", "model": "deepseek-v4-pro", "provider": "deepseek"})
-        assert res["result"]["model"] == "deepseek-flash" and "Modèle changé" in res["result"]["message"], res  # modèle relu en base
+        assert res["result"]["model"] == "deepseek-flash" and "Model switched to `deepseek-v4-pro`" in res["result"]["message"], res  # modèle relu en base
         res = await rpc("setModel", {"conversationId": "c-use", "model": "refusé"})
         assert "Modèle inconnu" in res["error"], res
+        res = await rpc("setModel", {"conversationId": "c-use", "model": "annulé"})
+        assert res["error"].startswith("Model switch cancelled"), res
         assert "error" in await rpc("setModel", {"conversationId": "c-use"}), "paramètres manquants"
         # fin de run : la consommation de la session suit run.completed
         await server.send({"type": "inbound", "conversationId": "c-use", "runId": "r-use", "text": "bonjour"})
