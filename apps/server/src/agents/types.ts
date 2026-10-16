@@ -57,7 +57,7 @@ export interface AgentAdapter {
   resume?(runId: string, sessionId: string, subAgentId?: string): Promise<RunHandle | null>;
   abort(runId: string, sessionId: string): Promise<void>;
   resolveApproval?(runId: string, approvalId: string, approve: boolean): Promise<void>;
-  /** Répond à une question que l'agent pose en plein run (outil `clarify`) : le run reprend, il n'en démarre pas un autre. */
+  /** Répond à une question que l'agent pose en plein run (`question.requested`) : le run reprend, il n'en démarre pas un autre. */
   reply?(runId: string, sessionId: string, text: string): Promise<void>;
 }
 

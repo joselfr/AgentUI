@@ -30,6 +30,8 @@ interface Run {
   askQuestions?: AskQuestion[];
   /** Identifiant de la question `ask_user` en attente (fourni avec son prompt) : c'est par lui qu'on la résout. */
   askQuestionId?: string;
+  /** Appel d'outil `ask_user` en cours : sa fin (réponse, annulation, délai) ferme la question. */
+  askToolId?: string;
   abort: AbortController;
   /** Segments de texte déjà terminés (avant un outil) et segment en cours de streaming. */
   segments: string[];
@@ -243,7 +245,7 @@ export class AgentUIBridge {
       const id = run.askQuestionId;
       try {
         await resolveQuestion(id, text, `${CHANNEL}:${msg.conversationId}`);
-        run.askQuestionId = undefined;
+        this.closeQuestion(run, id);
       } catch (e) {
         this.p.log(`réponse à la question ${id} en échec : ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -259,6 +261,13 @@ export class AgentUIBridge {
       capture,
     }).catch((e) => this.p.log(`réponse ${msg.runId} en échec : ${String(e)}`));
     if (result && capture.length) this.p.log(`réponse ${msg.runId} : le cœur a répondu « ${capture.join(' ').slice(0, 200)} »`);
+  }
+
+  /** La question n'attend plus de réponse : AgentUI rend la main au composer. */
+  private closeQuestion(run: Run, id: string): void {
+    if (run.askQuestionId !== id) return;
+    run.askQuestionId = undefined;
+    this.emit(run, { type: 'question.resolved', id });
   }
 
   private async onApproval(msg: Extract<GatewayMessage, { type: 'approval' }>): Promise<void> {
@@ -505,9 +514,13 @@ export class AgentUIBridge {
       if (!id) return;
       if (d.phase === 'start' && !run.tools.has(id)) {
         run.tools.add(id);
-        if (d.name === 'ask_user') run.askQuestions = parseAskQuestions(d.args);
+        if (d.name === 'ask_user') {
+          run.askQuestions = parseAskQuestions(d.args);
+          run.askToolId = id;
+        }
         this.emit(run, { type: 'tool.started', id, name: String(d.name ?? 'tool'), args: d.args });
       } else if (d.phase === 'result') {
+        if (id === run.askToolId && run.askQuestionId) this.closeQuestion(run, run.askQuestionId); // répondue, annulée ou expirée
         const txt = textOf(d.result?.content) || (d.result === undefined ? '' : JSON.stringify(d.result));
         this.emit(run, {
           type: 'tool.completed',
@@ -553,7 +566,11 @@ export class AgentUIBridge {
     // Prompt d'une question de l'agent (ask_user) : un widget à la place du texte « Reply with the number… ».
     const askUser = payload.channelData?.askUser as { questionId?: unknown } | undefined;
     if (askUser) {
-      if (typeof askUser.questionId === 'string') run.askQuestionId = askUser.questionId;
+      if (typeof askUser.questionId === 'string' && askUser.questionId !== run.askQuestionId) {
+        run.askQuestionId = askUser.questionId;
+        // Avant le prompt : au moment où le widget arrive, AgentUI sait déjà que la réponse est attendue.
+        this.emit(run, { type: 'question.requested', id: askUser.questionId });
+      }
       if (run.askQuestions) text = askWidget(run.askQuestions) ?? text;
     }
     if (text.trim()) {

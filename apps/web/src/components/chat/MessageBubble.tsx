@@ -68,7 +68,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
       if ((m.status !== 'streaming' || isAwaiting(m)) && (lang === 'widget' || lang === 'ask')) {
         const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
-        // Un message peut poser plusieurs questions de suite (clarify) : la k-ième reçoit la k-ième réponse, seule la première sans réponse est active.
+        // Un message peut poser plusieurs questions de suite (question.requested puis réponse) : la k-ième reçoit la k-ième réponse, seule la première sans réponse est active.
         const k = interactiveBlocks(m.text).indexOf(raw);
         const answer = k >= 0 ? answers[k] : undefined;
         const onAnswer = k >= 0 && k !== answers.length ? undefined : canAnswer;

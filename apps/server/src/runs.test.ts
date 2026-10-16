@@ -328,7 +328,7 @@ test('consommation : l’événement usage est mémorisé, rediffusé et ne pert
   expect(runs.ensureRemoteSession(fresh.id)).toBe(sid);
 });
 
-test('question de l\'agent (clarify) : la réponse reprend le run en cours, sans en ouvrir un autre', async () => {
+test('question de l\'agent : la réponse reprend le run en cours, sans en ouvrir un autre', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const replies: string[] = [];
   let push!: (e: AgentEvent) => void;
@@ -358,13 +358,15 @@ test('question de l\'agent (clarify) : la réponse reprend le run en cours, sans
   await runs.start(conv.id, 'refais un form');
   expect(runs.awaitingReply(conv.id)).toBe(false);
   await expect(runs.reply(conv.id, 'x')).rejects.toThrow(); // pas de question en attente → pas de réponse
-  push({ type: 'tool.started', id: 't1', name: 'clarify' });
+  push({ type: 'question.requested', id: 'q1' });
   await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(true));
+  expect(runs.getMessages(conv.id).at(-1)!.pendingQuestion).toBe('q1'); // persistée : un rechargement de la page la retrouve
 
   await runs.reply(conv.id, 'Un autre thème');
   expect(replies).toEqual(['Un autre thème']);
-  push({ type: 'tool.completed', id: 't1', name: 'clarify' });
+  push({ type: 'question.resolved', id: 'q1' });
   await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(false));
+  expect(runs.getMessages(conv.id).at(-1)!.pendingQuestion).toBeUndefined();
   push({ type: 'message.delta', text: 'Voici' });
   end();
   expect(await finished).toBe('completed');

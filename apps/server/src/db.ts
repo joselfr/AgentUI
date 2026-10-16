@@ -99,6 +99,7 @@ export function openDb(dataDir: string): DB {
   try { db.exec('ALTER TABLE conversations ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0'); } catch { /* colonne déjà présente */ }
   try { db.exec('ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch { /* colonne déjà présente */ }
   try { db.exec('ALTER TABLE conversations ADD COLUMN usage TEXT'); } catch { /* colonne déjà présente */ }
+  try { db.exec('ALTER TABLE messages ADD COLUMN pending_question TEXT'); } catch { /* colonne déjà présente */ }
   for (const col of ['reasoning TEXT', 'summary TEXT', 'session_id TEXT']) {
     try { db.exec(`ALTER TABLE subagent_runs ADD COLUMN ${col}`); } catch { /* colonne déjà présente */ }
   }

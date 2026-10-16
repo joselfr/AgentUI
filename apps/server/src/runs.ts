@@ -245,6 +245,7 @@ export class RunManager {
       createdAt: r.created_at,
       runId: r.run_id ?? undefined,
       status: r.status ?? undefined,
+      pendingQuestion: r.pending_question ?? undefined,
       toolCalls: tools
         .filter((t) => t.message_id === r.id)
         .map<ToolCall>((t) => ({
@@ -295,6 +296,7 @@ export class RunManager {
 
   /** Un run terminé ne laisse ni outil ni sous-agent « en cours » (leur événement de fin peut ne jamais arriver). */
   private closeRunning(messageId: string, status: 'done' | 'failed', now: number) {
+    this.db.prepare('UPDATE messages SET pending_question = NULL WHERE id = ?').run(messageId);
     this.db.prepare("UPDATE tool_calls SET status = ?, ended_at = ? WHERE message_id = ? AND status = 'running'").run(status, now, messageId);
     this.db.prepare("UPDATE subagent_runs SET status = ?, ended_at = ? WHERE message_id = ? AND status = 'running' AND session_id IS NULL").run(status, now, messageId);
   }
@@ -480,15 +482,12 @@ export class RunManager {
     await this.adapters.get(a.agentId)?.abort(a.runId, a.remoteSessionId);
   }
 
-  /** Vrai si le run en cours attend une réponse de l'utilisateur (outil `clarify` d'Hermes ou `ask_user` d'OpenClaw en cours) et que l'agent sait la recevoir. */
+  /** Vrai si le run en cours attend une réponse de l'utilisateur (question.requested sans question.resolved) et que l'agent sait la recevoir. */
   awaitingReply(convId: string): boolean {
     const a = this.active.get(convId);
     if (!a || !this.adapters.get(a.agentId)?.reply) return false;
     return !!this.db
-      .prepare(
-        `SELECT 1 FROM tool_calls t JOIN messages m ON m.id = t.message_id
-         WHERE m.conversation_id = ? AND m.run_id = ? AND t.name IN ('clarify', 'ask_user') AND t.status = 'running' LIMIT 1`,
-      )
+      .prepare('SELECT 1 FROM messages WHERE conversation_id = ? AND run_id = ? AND pending_question IS NOT NULL LIMIT 1')
       .get(convId, a.runId);
   }
 
@@ -577,6 +576,12 @@ export class RunManager {
         this.db
           .prepare('UPDATE tool_calls SET status = ?, result_preview = ?, result_truncated = ?, ended_at = ? WHERE message_id = ? AND id = ?')
           .run(ev.failed ? 'failed' : 'done', ev.result ?? null, ev.truncated ? 1 : 0, now, messageId, ev.id);
+        return text;
+      case 'question.requested':
+        this.db.prepare('UPDATE messages SET pending_question = ? WHERE id = ?').run(ev.id, messageId);
+        return text;
+      case 'question.resolved':
+        this.db.prepare('UPDATE messages SET pending_question = NULL WHERE id = ? AND pending_question = ?').run(messageId, ev.id);
         return text;
       case 'subagent.start':
         this.db

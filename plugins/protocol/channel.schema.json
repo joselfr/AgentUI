@@ -285,6 +285,32 @@
         {
           "properties": {
             "type": {
+              "const": "question.requested"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "question.resolved"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
               "const": "usage"
             },
             "usage": {

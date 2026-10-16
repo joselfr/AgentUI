@@ -29,7 +29,7 @@ d'agents (Hermes, OpenClaw…). Schéma JSON : [`channel.schema.json`](channel.s
 | `welcome` | `protocol: 1` | Accepte le `hello`. |
 | `inbound` | `conversationId`, `runId`, `text`, `subAgentId?`, `attachments?: Media[]` | Message de l'utilisateur. **Chaque `conversationId` est un chat distinct** pour la plateforme, et donc une session distincte (fils multiples). Le `runId` est choisi par AgentUI. |
 | `abort` | `conversationId`, `runId` | Arrêter le run. |
-| `reply` | `conversationId`, `runId`, `text` | Réponse de l'utilisateur à une question que l'agent pose **en plein run** (outil `clarify` d'Hermes : l'outil est en cours, le run ne s'arrête pas). Le plugin la remet à l'outil en attente, le run se poursuit et se termine normalement ; ce n'est pas un nouvel `inbound`. Facultatif : AgentUI n'en envoie que si un outil `clarify` est `running`. |
+| `reply` | `conversationId`, `runId`, `text` | Réponse de l'utilisateur à une question que l'agent pose **en plein run** (annoncée par `question.requested`). Le plugin la remet à l'agent en attente : le run se poursuit et se termine normalement, ce n'est pas un nouvel `inbound`. Facultatif : AgentUI n'en envoie que tant qu'une question est ouverte. |
 | `approval` | `conversationId`, `runId`, `id`, `approve: boolean`, `scope?: "once" \| "session" \| "always"` | Réponse à un `approval.request`. |
 | `rpc` | `id`, `method`, `params?` | Appel optionnel. Méthode inconnue : `rpc.result` avec `error`. Méthodes : `listSubAgents` → `[{ id, name, description?, isDefault? }]` ; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (si `capabilities.jobs`) ; `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (si `capabilities.jobControl`) ; `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (si `capabilities.skills`) ; `deleteSession {conversationId}` → `{ ok: true }` (si `capabilities.sessionDelete`) ; `listModels` → `[{ provider, providerName, id }]`, `setModel {conversationId, model, provider?, subAgentId?}` → `{ model, provider?, message? }` et `sessionUsage {conversationId, subAgentId?}` → `Usage` ou `null` (si `capabilities.models`). Dates en millisecondes. |
 | `ping` | — | Maintien de la connexion. |
@@ -49,6 +49,8 @@ Identiques au type `AgentEvent` de `packages/shared` (une seule exception : `mes
 | `message.media` | `name`, `mimeType`, `data` (base64) — **au lieu de `url`** : le plugin pousse le contenu |
 | `usage` | `usage` : `{ model?, provider?, inputTokens, outputTokens, cacheReadTokens?, reasoningTokens?, costUsd?, costEstimated? }` — consommation **cumulée de la session**, émise avant `run.completed` (si `capabilities.models`) |
 | `approval.request` | `id`, `description`, `payload?` |
+| `question.requested` | `id` | L'agent attend une réponse de l'utilisateur **sans terminer le run** (outil `clarify` d'Hermes, `ask_user` d'OpenClaw…). À émettre **avant** le message qui porte la question, que le plugin rend dans le texte (widget `ask`, ou `form` pour plusieurs questions à la fois). Tant qu'elle est ouverte, AgentUI accepte un message de l'utilisateur comme réponse (trame `reply`) au lieu de refuser « run déjà en cours ». |
+| `question.resolved` | `id` | La question `id` n'attend plus de réponse : répondue, annulée ou expirée. Un `run.*` terminal la ferme aussi. |
 | `run.completed` / `run.failed` (`error`) / `run.aborted` | — |
 
 ## Règles

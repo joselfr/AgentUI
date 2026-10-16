@@ -249,7 +249,7 @@ async function main() {
       .refine((v) => v.text.trim() || v.attachments.length, { message: 'Message vide' })
       .parse(req.body);
     try {
-      // Pendant une question de l'agent (clarify), le message est la réponse : il reprend le run en cours.
+      // Pendant une question de l'agent (question.requested), le message est la réponse : il reprend le run en cours.
       if (runs.awaitingReply(req.params.id)) {
         if (b.attachments.length) return reply.code(400).send({ error: 'Pas de pièce jointe dans une réponse' });
         return await runs.reply(req.params.id, b.text);

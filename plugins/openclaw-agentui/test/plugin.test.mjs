@@ -253,6 +253,8 @@ test('ask_user : widget ask, la réponse reply débloque l\'outil dans le run en
   send({ type: 'inbound', conversationId: 'ca', runId: 'ra', text: 'ask' });
   const fs = await until((f) => f.type === 'event' && f.runId === 'ra' && f.event.type === 'message.final');
   const text = eventsOf(fs, 'ra').find((e) => e.type === 'message.final').text;
+  const asked = eventsOf(fs, 'ra').filter((e) => e.type === 'question.requested');
+  assert.deepEqual(asked, [{ type: 'question.requested', id: `ask_${'a'.repeat(32)}` }], 'annoncée avant le prompt');
   assert.doesNotMatch(text, /Reply with the number/);
   const w = JSON.parse(/```widget\n(.*)\n```/s.exec(text)[1]);
   assert.equal(w.type, 'ask');
@@ -262,6 +264,7 @@ test('ask_user : widget ask, la réponse reply débloque l\'outil dans le run en
   const turnsBefore = turns.length;
   send({ type: 'reply', conversationId: 'ca', runId: 'ra', text: '2' });
   const ev = eventsOf(await until(isTerminal('ra')), 'ra');
+  assert.deepEqual(ev.filter((e) => e.type === 'question.resolved'), [{ type: 'question.resolved', id: `ask_${'a'.repeat(32)}` }], 'une seule fois (réponse puis fin de l\'outil)');
   assert.deepEqual(answers.at(-1), { answers: { q: ['Option B'] } }); // « 2 » → la 2e option
   assert.equal(ev.at(-1).type, 'run.completed');
   assert.deepEqual(gatewayCalls.slice(-2).map((c) => [c.method, c.params.id]), [['question.get', `ask_${'a'.repeat(32)}`], ['question.resolve', `ask_${'a'.repeat(32)}`]]);

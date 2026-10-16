@@ -50,6 +50,8 @@ export type AgentEvent =
   | ({ type: 'message.media' } & Media)
   | { type: 'usage'; usage: Usage }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
+  | { type: 'question.requested'; id: string }
+  | { type: 'question.resolved'; id: string }
   | { type: 'run.completed' }
   | { type: 'run.failed'; error: string }
   | { type: 'run.aborted' };

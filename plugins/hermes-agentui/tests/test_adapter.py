@@ -271,7 +271,10 @@ async def main():
         frames = await server.until(lambda f: "```widget" in json.dumps(f, ensure_ascii=False))
         blob = json.dumps(frames[-1], ensure_ascii=False)
         assert '\\"type\\": \\"ask\\"' in blob and "Lequel ?" in blob and "Deux" in blob, blob
+        asked = [f["event"] for f in frames if f.get("event", {}).get("type") == "question.requested"]
+        assert asked == [{"type": "question.requested", "id": "cl-c3b"}], frames  # émise avant le prompt
         await server.send({"type": "reply", "conversationId": "c3b", "runId": "r3b", "text": "2"})
+        await server.until(lambda f: f.get("runId") == "r3b" and f["event"]["type"] == "question.resolved")
         await server.until(lambda f: f.get("runId") == "r3b" and f["event"]["type"] == "run.completed")
         assert agent.answers["c3b"] == "Deux", agent.answers  # « 2 » → la 2e option, comme sur Telegram
         await server.send({"type": "inbound", "conversationId": "c3c", "runId": "r3c", "text": "clarify-libre"})

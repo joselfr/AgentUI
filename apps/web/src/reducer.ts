@@ -2,16 +2,14 @@ import type { AgentEvent, Message, ToolCall } from '@agentui/shared';
 
 /** Un run terminé ne laisse ni outil ni sous-agent « en cours » (miroir du serveur). */
 function closeRunning(m: Message, status: 'done' | 'failed', now: number) {
+  m.pendingQuestion = undefined;
   m.toolCalls = m.toolCalls?.map((t) => (t.status === 'running' ? { ...t, status, endedAt: now } : t));
   m.subAgentRuns = m.subAgentRuns?.map((s) => (s.status === 'running' && !s.sessionId ? { ...s, status, endedAt: now } : s));
 }
 
-/** Outils par lesquels l'agent pose une question en plein run : Hermes `clarify`, OpenClaw `ask_user`. */
-const QUESTION_TOOLS = ['clarify', 'ask_user'];
-
-/** L'agent attend une réponse en plein run (outil de question en cours) : son texte est complet, le message suivant en est la réponse. */
+/** L'agent attend une réponse en plein run (question en cours) : son texte est complet, le message suivant en est la réponse. */
 export function isAwaiting(m: Message): boolean {
-  return m.status === 'streaming' && !!m.toolCalls?.some((t) => QUESTION_TOOLS.includes(t.name) && t.status === 'running');
+  return m.status === 'streaming' && !!m.pendingQuestion;
 }
 
 export function awaitingReply(messages: Message[]): boolean {
@@ -37,6 +35,8 @@ export function applyEvent(messages: Message[], ev: AgentEvent): Message[] | nul
       m.toolCalls = (m.toolCalls ?? []).map<ToolCall>((t) =>
         t.id === ev.id ? { ...t, status: ev.failed ? 'failed' : 'done', resultPreview: ev.result, resultTruncated: ev.truncated, endedAt: now } : t);
       break;
+    case 'question.requested': m.pendingQuestion = ev.id; break;
+    case 'question.resolved': if (m.pendingQuestion === ev.id) m.pendingQuestion = undefined; break;
     case 'attachment.added': m.attachments = [...(m.attachments ?? []), ev.attachment]; break;
     case 'subagent.start':
       m.subAgentRuns = [...(m.subAgentRuns ?? []), { id: ev.id, name: ev.name, status: 'running', startedAt: now, sessionId: ev.sessionId }];

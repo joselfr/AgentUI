@@ -167,6 +167,8 @@ export interface Message {
   createdAt: number;
   runId?: string;
   status?: 'streaming' | 'done' | 'failed' | 'aborted';
+  /** Question posée par l'agent en plein run, en attente de réponse (le prompt est dans le texte, en widget). */
+  pendingQuestion?: string;
 }
 
 // ---------- Événements normalisés ----------
@@ -197,6 +199,10 @@ export type AgentEvent =
   /** Consommation cumulée de la session, émise à la fin d'un run. */
   | { type: 'usage'; usage: Usage }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
+  /** L'agent attend une réponse en plein run : le prochain message de l'utilisateur la lui remet, sans nouveau run. */
+  | { type: 'question.requested'; id: string }
+  /** La question `id` n'attend plus de réponse (répondue, annulée ou expirée). */
+  | { type: 'question.resolved'; id: string }
   | { type: 'run.completed' }
   | { type: 'run.failed'; error: string }
   | { type: 'run.aborted' }

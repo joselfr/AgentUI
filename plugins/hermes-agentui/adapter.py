@@ -571,6 +571,10 @@ class AgentUIAdapter(BasePlatformAdapter):
                 cg.resolve_gateway_clarify(clarify_id, text)
         except Exception:
             logger.exception("AgentUI: échec de résolution de la question")
+            with self._lock:
+                self._clarifies.setdefault(conv, pending)  # toujours en attente : l'utilisateur peut réessayer
+            return
+        self._emit(conv, {"type": "question.resolved", "id": clarify_id})
 
     def _delete_session(self, conversation_id: str) -> dict:
         """Supprime la session Hermes d'une discussion AgentUI (une discussion = un chat_id = une session).
@@ -806,6 +810,8 @@ class AgentUIAdapter(BasePlatformAdapter):
 
         with self._lock:
             self._clarifies[chat_id] = (session_key, clarify_id)
+        # Avant le prompt : au moment où le widget arrive, AgentUI sait déjà que la réponse est attendue.
+        self._emit(chat_id, {"type": "question.requested", "id": clarify_id})
         if choices:
             multi = bool(getattr(cg._entries.get(clarify_id), "multi_select", False))  # même lecture que l'adaptateur de base
             cg.mark_awaiting_text(clarify_id)  # les réponses par texte (« 2 », libellé, texte libre) sont aussi acceptées
@@ -878,6 +884,11 @@ class AgentUIAdapter(BasePlatformAdapter):
         chat = self._chat_for(kw.get("session_id"))
         if not chat or not kw.get("tool_call_id"):
             return
+        if kw.get("tool_name") == "clarify":  # répondue, annulée ou expirée : plus rien n'est attendu
+            with self._lock:
+                pending = self._clarifies.pop(chat, None)
+            if pending:
+                self._emit(chat, {"type": "question.resolved", "id": pending[1]})
         result = kw.get("result")
         text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
         self._emit(chat, {
