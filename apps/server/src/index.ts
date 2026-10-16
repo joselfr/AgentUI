@@ -37,7 +37,7 @@ async function main() {
       .notify({
         title: outcome === 'failed' ? `${agent} : échec` : `${agent} a répondu`,
         body: preview ? `${fresh.title} — ${preview}` : fresh.title,
-        url: `/?c=${conv.id}`,
+        url: `/c/${conv.id}`,
         tag: conv.id,
       })
       .catch((e) => app.log.warn({ err: e }, 'envoi push échoué'));

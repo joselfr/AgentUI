@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, CssBaseline, Drawer, ThemeProvider, Typography, useMediaQuery } from '@mui/material';
 import type { AgentInfo, Message, ModelOption, Usage } from '@agentui/shared';
 import { api, UnauthorizedError, type Conversation } from './api';
@@ -33,7 +34,15 @@ export default function App() {
   const [auth, setAuth] = useState<'loading' | 'out' | 'in'>('loading');
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [convs, setConvs] = useState<Conversation[]>([]);
-  const [currentId, setCurrentId] = useState<string | undefined>(() => load<string | null>('currentId', null) ?? undefined);
+  // La route est la source de vérité : `/` nouvelle conversation, `/c/:id` une discussion, `/agents` `/skills` `/jobs` les autres pages.
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const currentId = matchPath('/c/:id', pathname)?.params.id;
+  const view: View = (['agents', 'skills', 'jobs'] as const).find((v) => pathname === `/${v}`) ?? 'chats';
+  const setCurrentId = useCallback((id: string | undefined, replace = false) => navigate(id ? `/c/${id}` : '/', { replace }), [navigate]);
+  const chatPath = useRef('/'); // dernière route Discussions, rouverte en revenant d'une autre page
+  if (view === 'chats') chatPath.current = pathname;
+  const [savedId] = useState(() => load<string | null>('currentId', null)); // discussion ouverte à la dernière visite, rouverte si l'app démarre sur `/`
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const msgCache = useRef(new Map<string, Message[]>()); // dernier état connu de chaque conversation (affiché hors ligne)
@@ -44,7 +53,6 @@ export default function App() {
   const [drawer, setDrawer] = useState(false);
   useBackClose(!wide && drawer, () => setDrawer(false));
   const [listOpen, setListOpen] = useState(() => load<boolean>('listOpen', true));
-  const [view, setView] = useState<View>(() => load<View>('view', 'chats'));
   const [settings, setSettings] = useState(false);
   const [newDlg, setNewDlg] = useState(false);
   const [sub, setSub] = useState<string | undefined>(() => load<string | null>('newSub', null) ?? undefined);
@@ -106,24 +114,39 @@ export default function App() {
 
   useEffect(() => { api.me().then((r) => setAuth(r.user ? 'in' : 'out')).catch(() => setAuth('out')); }, []);
   useEffect(() => { if (auth === 'in') refreshLists(); }, [auth, refreshLists]);
-  // Ouverture d'une conversation depuis une notification (?c=<id> ou message du service worker)
+  // Lien de notification : l'ancien `/?c=<id>` devient `/c/<id>`, et le service worker demande d'ouvrir une route d'une fenêtre déjà ouverte
+  const restored = useRef(false);
   useEffect(() => {
     if (auth !== 'in') return;
-    const open = (url: string) => { const id = new URL(url, location.origin).searchParams.get('c'); if (id) { setCurrentId(id); setView('chats'); history.replaceState(null, '', '/'); } };
-    open(location.href);
-    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'open-conversation') { open(e.data.url); refreshLists(); } };
+    const legacy = new URLSearchParams(search).get('c');
+    if (legacy) navigate(`/c/${legacy}`, { replace: true });
+    else if (!restored.current && pathname === '/' && savedId) navigate(`/c/${savedId}`, { replace: true });
+    restored.current = true;
+  }, [auth, pathname, search, savedId, navigate]);
+  // Route inconnue : retour à l'accueil
+  useEffect(() => {
+    if (auth === 'in' && !currentId && !['/', '/agents', '/skills', '/jobs'].includes(pathname)) navigate('/', { replace: true });
+  }, [auth, currentId, pathname, navigate]);
+  useEffect(() => {
+    if (auth !== 'in') return;
+    const onMsg = (e: MessageEvent) => {
+      if (e.data?.type !== 'open-conversation') return;
+      const u = new URL(e.data.url, location.origin);
+      const id = u.searchParams.get('c');
+      navigate(id ? `/c/${id}` : u.pathname + u.search);
+      refreshLists();
+    };
     navigator.serviceWorker?.addEventListener('message', onMsg);
     return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
-  }, [auth, refreshLists]);
+  }, [auth, refreshLists, navigate]);
   useEffect(() => {
     if (agents.length && !agents.some((a) => a.id === newAgent)) setNewAgent(agents[0]!.id);
   }, [agents, newAgent]);
   // Reprise de l'état au rechargement : page, conversation ouverte, agent de la prochaine conversation
-  useEffect(() => { save('view', view); }, [view]);
   useEffect(() => { save('listOpen', listOpen); }, [listOpen]);
   useEffect(() => { save('currentId', currentId ?? null); }, [currentId]);
   useEffect(() => { save('newAgent', newAgent ?? null); save('newSub', sub ?? null); }, [newAgent, sub]);
-  useEffect(() => { if (convsLoaded && currentId && !convs.some((c) => c.id === currentId)) setCurrentId(undefined); }, [convsLoaded, convs, currentId]);
+  useEffect(() => { if (convsLoaded && currentId && !convs.some((c) => c.id === currentId)) setCurrentId(undefined, true); }, [convsLoaded, convs, currentId, setCurrentId]);
   useEffect(() => {
     setApproval(undefined); setError(undefined);
     openedRef.current = undefined; setUnreadMark(undefined);
@@ -185,7 +208,7 @@ export default function App() {
         const c = await api.createConversation(newAgent, sub);
         setConvs((cs) => [c, ...cs]);
         currentRef.current = createdRef.current = id = c.id;
-        setCurrentId(id);
+        setCurrentId(id, true);
       }
       const answering = running && awaitingReply(messages); // réponse à une question de l'agent : le run en cours se poursuit
       const attachments = await toOutgoing(files);
@@ -215,7 +238,7 @@ export default function App() {
       const c = await api.createConversation(newAgent, sub);
       setConvs((cs) => [c, ...cs]);
       currentRef.current = createdRef.current = id = c.id;
-      setCurrentId(id);
+      setCurrentId(id, true);
     }
     const r = await api.setModel(id, o.id, o.provider);
     setConvUsage(id, r.usage ?? { inputTokens: 0, outputTokens: 0, model: r.model, provider: r.provider });
@@ -226,7 +249,7 @@ export default function App() {
   // La discussion qu'on est en train de lire n'est jamais « non lue » à l'écran (le marquage côté serveur suit)
   const shownConvs = useMemo(() => convs.map((c) => (c.unread && viewing && c.id === currentId ? { ...c, unread: false } : c)), [convs, viewing, currentId]);
   const unreadCount = shownConvs.filter((c) => c.unread && !c.archived).length;
-  const nav = <NavRail unread={unreadCount} view={view} onView={(v) => { setView(v); if (v === 'chats') setDrawer(true); else closeDrawer(); }} onSettings={() => { setSettings(true); closeDrawer(); }} settingsOpen={settings} />;
+  const nav = <NavRail unread={unreadCount} view={view} onView={(v) => { navigate(v === 'chats' ? chatPath.current : `/${v}`); if (v === 'chats') setDrawer(true); else closeDrawer(); }} onSettings={() => { setSettings(true); closeDrawer(); }} settingsOpen={settings} />;
   const sidebar = (
     <Sidebar agents={agents} convs={shownConvs} currentId={currentId}
       onSelectConv={(id) => { setCurrentId(id); closeDrawer(); }}
@@ -262,9 +285,9 @@ export default function App() {
         </Box>
         ) : (
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setView('chats'); }} />}
+            {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); navigate('/'); }} />}
             {view === 'skills' && <SkillsPage agents={agents} />}
-            {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => { setCurrentId(id); setView('chats'); }} />}
+            {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => navigate(`/c/${id}`)} />}
           </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}
           onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />

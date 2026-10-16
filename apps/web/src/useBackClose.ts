@@ -22,7 +22,7 @@ export function useBackClose(open: boolean, onClose: () => void) {
     if (!listening) { window.addEventListener('popstate', onPop); listening = true; }
     const entry: Entry = { close: () => cb.current() };
     stack.push(entry);
-    history.pushState({ modal: true }, '');
+    history.pushState({ ...history.state, modal: true }, ''); // garde l'état du routeur (idx)
     return () => {
       const i = stack.indexOf(entry);
       if (i < 0) return; // déjà dépilée par le bouton retour

@@ -60,7 +60,7 @@ const cdp = await ctx.newCDPSession(page);
 const regs = new Promise((res) => cdp.on('ServiceWorker.workerRegistrationUpdated', (e) => e.registrations.length && res(e.registrations[0])));
 await cdp.send('ServiceWorker.enable');
 const reg = await regs;
-const payload = { title: 'Hermes a répondu', body: 'test — NOTIFIE', url: `/?c=${conv.id}`, tag: conv.id };
+const payload = { title: 'Hermes a répondu', body: 'test — NOTIFIE', url: `/c/${conv.id}`, tag: conv.id };
 const deliver = () => cdp.send('ServiceWorker.deliverPushMessage', { origin: new URL(base).origin, registrationId: reg.registrationId, data: JSON.stringify(payload) });
 const count = () => page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).length);
 
@@ -72,12 +72,15 @@ await deliver(); await page.waitForTimeout(1500);
 const p2 = await ctx.newPage(); await p2.goto('/');
 const notifs = await p2.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => ({ title: n.title, body: n.body, tag: n.tag, url: n.data?.url })));
 check('app fermée → notification affichée', notifs.length === 1 && notifs[0].title === 'Hermes a répondu', JSON.stringify(notifs[0]));
-check('lien de la notification = conversation', notifs[0]?.url === `/?c=${conv.id}`);
+check('lien de la notification = conversation', notifs[0]?.url === `/c/${conv.id}`);
 
-// clic : le lien ouvre la conversation et nettoie l'URL
+// clic : le lien ouvre la conversation (route /c/<id>) ; l'ancien lien /?c=<id> est redirigé vers elle
 await p2.goto(notifs[0].url);
 await p2.getByText('NOTIFIE').first().waitFor({ timeout: 15000 }).then(() => check('lien notification → conversation ouverte', true), () => check('lien notification → conversation ouverte', false));
-check('?c= retiré de l\'URL', new URL(p2.url()).search === '');
+check('URL = /c/<id>', new URL(p2.url()).pathname === `/c/${conv.id}`);
+await p2.goto(`/?c=${conv.id}`);
+await p2.getByText('NOTIFIE').first().waitFor({ timeout: 15000 }).then(() => check('ancien lien ?c= → conversation ouverte', true), () => check('ancien lien ?c= → conversation ouverte', false));
+check('ancien lien ?c= redirigé vers /c/<id>', new URL(p2.url()).pathname === `/c/${conv.id}` && new URL(p2.url()).search === '');
 await api.delete(`/api/conversations/${conv.id}`, { headers: H });
 
 // désactivation : (ré)activer sur cette page puis désactiver, plus aucun envoi ensuite
