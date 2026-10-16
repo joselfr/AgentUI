@@ -1,163 +1,35 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { Alert, Avatar, Button, Box, Chip, CircularProgress, Collapse, Fab, IconButton, Paper, TextField, Tooltip, Typography } from '@mui/material';
-import { alpha, keyframes } from '@mui/material/styles';
-import AttachFile from '@mui/icons-material/AttachFile';
-import Close from '@mui/icons-material/Close';
-import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
-import SendIcon from '@mui/icons-material/Send';
-import StopIcon from '@mui/icons-material/Stop';
-import Psychology from '@mui/icons-material/Psychology';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks'; // un retour à la ligne = une ligne (sorties de cron, messages courts)
+import { Fragment, useState } from 'react';
+import { Alert, Avatar, Box, Button, CircularProgress, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { Capabilities, Message } from '@agentui/shared';
-import { checkFile, formatSize, isImage, type AttachmentView } from '../attachments';
-import { ToolsBlock } from './ToolCard';
-import AskCard from './AskCard';
+import Composer from './chat/Composer';
+import MessageBubble from './chat/MessageBubble';
+import UnreadDivider from './chat/UnreadDivider';
+import { useAttachments } from './chat/useAttachments';
+import { useStickToBottom } from './chat/useStickToBottom';
 
-const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
-const halo = keyframes`0% { box-shadow: 0 0 0 0 var(--halo) } 70%, 100% { box-shadow: 0 0 0 7px transparent }`;
+const alertSx = { mx: 'auto', mb: 1, width: 'min(836px, calc(100% - 24px))' } as const;
 
-/** Indicateur « l'agent travaille » : points animés + activité en cours. */
-function Working({ m }: { m: Message }) {
-  const tool = [...(m.toolCalls ?? [])].reverse().find((t) => t.status === 'running');
-  const label = tool ? `Utilise ${tool.name}` : m.text ? 'Rédige' : 'Réfléchit';
-  return (
-    <Box role="status" aria-label={`${label}…`} sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: m.text || m.toolCalls?.length ? 1 : 0, color: 'text.secondary' }}>
-      <Box sx={{ display: 'flex', gap: '4px' }}>
-        {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main', animation: `${bounce} 1.2s ${i * 0.15}s infinite ease-in-out` }} />)}
-      </Box>
-      <Typography variant="caption" noWrap sx={{ minWidth: 0 }}>{label}…</Typography>
-    </Box>
-  );
-}
-
-function Bubble({ m, expandTools, agentName, answer, onAnswer, working }: { m: Message; expandTools: boolean; agentName: string; answer?: string; onAnswer?: (t: string) => void; working?: boolean }) {
-  const mine = m.role === 'user';
-  const [showReasoning, setShowReasoning] = useState(false);
-  const attachmentsView = (
-        !!m.attachments?.length && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: m.text ? 1 : 0 }}>
-            {(m.attachments as AttachmentView[]).map((a) => {
-              const href = a.url ?? `/api/attachments/${a.id}`;
-              return isImage(a.mimeType) ? (
-                <a key={a.id} href={href} target="_blank" rel="noreferrer"><img src={href} alt={a.name} title={a.name} style={{ maxWidth: 'min(100%, 480px)', maxHeight: 320, borderRadius: 8, display: 'block' }} /></a>
-              ) : (
-                <Chip key={a.id} component="a" href={href} download={a.name} clickable icon={<InsertDriveFileOutlined />} label={`${a.name} · ${formatSize(a.size)}`}
-                  sx={{ bgcolor: 'action.selected', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } }} />
-              );
-            })}
-          </Box>)
-  );
-  return (
-    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
-      {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
-        '--halo': (t) => alpha(t.palette.primary.main, 0.5), animation: working ? `${halo} 1.6s infinite` : 'none' }}>{agentName[0]}</Avatar>}
-      <Paper data-role={m.role} sx={{
-        maxWidth: mine ? 'min(640px, 88%)' : 'min(760px, calc(100% - 44px))', px: 2, py: 1.25, borderRadius: mine ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
-        bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
-        '& pre': { overflow: 'auto', p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: 1, borderColor: 'divider', fontSize: 13 },
-        '& code': { fontSize: '0.88em' }, '& :not(pre) > code': { px: 0.6, py: 0.15, borderRadius: 1, bgcolor: 'action.selected' },
-        '& p': { my: 0.5 }, '& a': { color: 'primary.main' }, '& table': { borderCollapse: 'collapse' }, '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5 },
-        overflowWrap: 'anywhere', minWidth: 0,
-      }}>
-        {!mine && m.reasoning && (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0.5 }} color="text.secondary"
-              onClick={() => setShowReasoning(!showReasoning)}><Psychology fontSize="inherit" /> Raisonnement</Typography>
-            <Collapse in={showReasoning}><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>{m.reasoning}</Typography></Collapse>
-          </Box>
-        )}
-        {!mine && <ToolsBlock tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
-        {mine && attachmentsView}
-        {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
-          : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={{
-            pre: ({ children }) => {
-              const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
-              if (el?.props?.className?.includes('language-ask') && m.status !== 'streaming') return <AskCard raw={String(el.props.children ?? '').replace(/\n$/, '')} answer={answer} onAnswer={onAnswer} />;
-              return <pre>{children}</pre>;
-            },
-          }}>{m.text}</ReactMarkdown>}
-        {!mine && attachmentsView}
-        {working && <Working m={m} />}
-        {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">⏹ interrompu</Typography>}
-      </Paper>
-    </Box>
-  );
-}
-
-/** Repère « non lus » : sépare ce qui a été lu de ce qui est arrivé depuis la dernière visite. */
-function UnreadDivider({ count }: { count: number }) {
-  return (
-    <Box role="separator" aria-label={`${count} message${count > 1 ? 's' : ''} non lu${count > 1 ? 's' : ''}`}
-      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, color: 'primary.main' }}>
-      <Box sx={{ flex: 1, height: '1px', bgcolor: (t) => alpha(t.palette.primary.main, 0.4) }} />
-      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>{count > 1 ? `${count} nouveaux messages` : 'Nouveau message'}</Typography>
-      <Box sx={{ flex: 1, height: '1px', bgcolor: (t) => alpha(t.palette.primary.main, 0.4) }} />
-    </Box>
-  );
-}
-
+/** Conversation : messages, demande d'autorisation, erreurs et zone de saisie ; dépôt de fichiers par glisser-déposer. */
 export default function Chat(props: {
   unreadMark?: { id: string; count: number };
   title: string; agentName: string; messages: Message[]; loading: boolean; isNew: boolean; running: boolean; expandTools: boolean;
   canAbort: boolean; attach: Capabilities['attachments']; approval?: { id: string; description: string }; onApprove: (ok: boolean) => void; onSend: (t: string, files: File[]) => Promise<boolean>; onAbort: () => void; error?: string;
 }) {
-  const [text, setText] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [fileError, setFileError] = useState('');
   const [drag, setDrag] = useState(false);
-  const picker = useRef<HTMLInputElement>(null);
-  const previews = useMemo(() => files.map((f) => (isImage(f.type) ? URL.createObjectURL(f) : '')), [files]);
-  useEffect(() => () => previews.forEach((u) => u && URL.revokeObjectURL(u)), [previews]);
-  const bottom = useRef<HTMLDivElement>(null);
-  const stick = useRef(true);
-  const scroller = useRef<HTMLDivElement>(null);
-  const lastTop = useRef(0);
-  const toBottom = () => { const el = scroller.current; if (el && stick.current) el.scrollTop = el.scrollHeight; };
-  const firstId = props.messages[0]?.id;
-  useEffect(() => { stick.current = true; }, [firstId]); // autre conversation : on repart du bas
-  useEffect(toBottom, [props.messages]);
-  // Le contenu peut grandir sans que les messages changent (bloc ask rendu en carte, images chargées…)
-  const content = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = content.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(toBottom);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const add = (list: FileList | File[]) => {
-    let next = files; const errs: string[] = [];
-    for (const f of Array.from(list)) { const e = checkFile(f, next, props.attach); if (e) errs.push(e); else next = [...next, f]; }
-    setFiles(next); setFileError(errs.join(' '));
-  };
-  const canSend = (text.trim() || files.length) && !props.running;
-  const send = async () => {
-    if (!canSend) return;
-    const t = text, f = files;
-    setText(''); setFiles([]); setFileError(''); stick.current = true;
-    if (!(await props.onSend(t.trim(), f))) { setText(t); setFiles(f); } // échec : on garde le brouillon
-  };
+  const attachments = useAttachments(props.attach);
+  const scroll = useStickToBottom(props.messages);
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDrag(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDrag(false); }}
-      onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) add(e.dataTransfer.files); }}>
+      onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) attachments.add(e.dataTransfer.files); }}>
       {drag && (
         <Box sx={{ position: 'absolute', inset: 8, zIndex: 10, border: 2, borderStyle: 'dashed', borderColor: 'primary.main', borderRadius: 4, bgcolor: (t) => alpha(t.palette.primary.main, 0.08), display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
           <Typography variant="h6" color="primary">Déposez vos fichiers ici</Typography>
         </Box>)}
-      <Box ref={scroller} sx={{ flex: 1, overflow: 'auto', p: { xs: 1.5, sm: 3 } }}
-        onScroll={(e) => {
-          // Seul un défilement vers le haut désactive le suivi : la croissance du contenu ne fait jamais reculer scrollTop.
-          const el = e.currentTarget;
-          const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-          if (atBottom) stick.current = true;
-          else if (el.scrollTop < lastTop.current - 2) stick.current = false;
-          lastTop.current = el.scrollTop;
-        }}>
-        <Box ref={content} sx={{ maxWidth: 860, mx: 'auto' }}>
+      <Box ref={scroll.scroller} onScroll={scroll.onScroll} sx={{ flex: 1, overflow: 'auto', p: { xs: 1.5, sm: 3 } }}>
+        <Box ref={scroll.content} sx={{ maxWidth: 860, mx: 'auto' }}>
           {props.messages.length === 0 && props.loading && <Box sx={{ display: 'grid', placeItems: 'center', mt: 8 }}><CircularProgress size={28} /></Box>}
           {props.messages.length === 0 && props.isNew && (
             <Box sx={{ textAlign: 'center', mt: { xs: 6, md: 12 }, color: 'text.secondary' }}>
@@ -171,47 +43,24 @@ export default function Chat(props: {
             return (
               <Fragment key={m.id}>
                 {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
-                <Bubble m={m} expandTools={props.expandTools} agentName={props.agentName}
+                <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName}
                   answer={next?.role === 'user' ? next.text : undefined}
                   onAnswer={last && !props.running && m.role === 'assistant' ? (t) => void props.onSend(t, []) : undefined}
                   working={last && props.running && m.role === 'assistant'} />
               </Fragment>);
           })}
-          <div ref={bottom} />
         </Box>
       </Box>
       {props.approval && (
-        <Alert severity="warning" variant="outlined" sx={{ mx: 'auto', mb: 1, width: 'min(836px, calc(100% - 24px))' }} action={<>
+        <Alert severity="warning" variant="outlined" sx={alertSx} action={<>
           <Button color="inherit" size="small" onClick={() => props.onApprove(true)}>Autoriser</Button>
           <Button color="inherit" size="small" onClick={() => props.onApprove(false)}>Refuser</Button></>}>
           {props.approval.description}
         </Alert>)}
-      {props.error && <Alert severity="error" variant="outlined" sx={{ mx: 'auto', mb: 1, width: 'min(836px, calc(100% - 24px))' }}>{props.error}</Alert>}
-      {fileError && <Alert severity="warning" variant="outlined" onClose={() => setFileError('')} sx={{ mx: 'auto', mb: 1, width: 'min(836px, calc(100% - 24px))' }}>{fileError}</Alert>}
-      <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 'max(12px, env(safe-area-inset-bottom))', pt: 0.5 }}>
-        <Paper sx={{ maxWidth: 860, mx: 'auto', borderRadius: 4, bgcolor: 'background.paper', '&:focus-within': { borderColor: 'primary.main' }, transition: 'border-color .15s' }}>
-          {files.length > 0 && (
-            <Box sx={{ px: 1.5, pt: 1.25, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {files.map((f, i) => (
-                <Chip key={`${f.name}-${i}`} label={`${f.name} · ${formatSize(f.size)}`} onDelete={() => setFiles(files.filter((_, j) => j !== i))}
-                  avatar={previews[i] ? <Avatar src={previews[i]} variant="rounded" alt="" /> : undefined} icon={previews[i] ? undefined : <InsertDriveFileOutlined />} deleteIcon={<Close />} />
-              ))}
-            </Box>)}
-          <Box sx={{ p: 1, display: 'flex', gap: 0.5, alignItems: 'flex-end' }}>
-            <input ref={picker} type="file" multiple hidden data-testid="file-input" onChange={(e) => { if (e.target.files) add(e.target.files); e.target.value = ''; }} />
-            <Tooltip title="Joindre des fichiers"><span><IconButton onClick={() => picker.current?.click()} aria-label="Joindre un fichier" disabled={props.running} sx={{ borderRadius: '50%' }}><AttachFile /></IconButton></span></Tooltip>
-            <TextField fullWidth multiline size="small" maxRows={8}placeholder={`Message à ${props.agentName}`} value={text}
-              sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'transparent' }, '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 0 } }}
-              onChange={(e) => setText(e.target.value)}
-              onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); add(e.clipboardData.files); } }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-            {props.running && props.canAbort
-              ? <Fab color="error" size="small" onClick={props.onAbort} aria-label="Arrêter" sx={{ flexShrink: 0, boxShadow: 'none' }}><StopIcon /></Fab>
-              : <IconButton onClick={() => void send()} disabled={!canSend} aria-label="Envoyer"
-                  sx={{ flexShrink: 0, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}><SendIcon /></IconButton>}
-          </Box>
-        </Paper>
-      </Box>
+      {props.error && <Alert severity="error" variant="outlined" sx={alertSx}>{props.error}</Alert>}
+      {attachments.error && <Alert severity="warning" variant="outlined" onClose={attachments.dismissError} sx={alertSx}>{attachments.error}</Alert>}
+      <Composer agentName={props.agentName} running={props.running} canAbort={props.canAbort} attachments={attachments} onAbort={props.onAbort}
+        onSubmit={(t, f) => { scroll.pin(); return props.onSend(t, f); }} />
     </Box>
   );
 }
