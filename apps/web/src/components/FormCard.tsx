@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, Checkbox, FormControlLabel, TextField, Typography } from '@mui/material';
 import ArticleOutlined from '@mui/icons-material/ArticleOutlined';
+import Markdown from './Markdown';
 
 type Kind = 'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox';
 interface Field { name: string; label: string; kind: Kind; required: boolean; def?: string | number | boolean; placeholder?: string; hint?: string; options: string[]; min?: number; max?: number; unit?: string }
@@ -91,7 +92,7 @@ export default function FormCard({ form, answer, onAnswer }: { form: Parsed; ans
         <ArticleOutlined fontSize="small" color={live ? 'primary' : 'action'} sx={{ mt: 0.25 }} />
         <Box>
           <Typography sx={{ fontWeight: 600 }}>{form.title ?? (form.text ? '' : 'Formulaire')}</Typography>
-          {form.text && <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>{form.text}</Typography>}
+          {form.text && <Box sx={{ color: 'text.secondary', fontSize: '0.875rem' }}><Markdown>{form.text}</Markdown></Box>}
         </Box>
       </Box>
       {form.fields.map((f) => {

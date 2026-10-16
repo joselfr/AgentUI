@@ -2,6 +2,7 @@ import { Box, Button, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import HelpOutline from '@mui/icons-material/HelpOutline';
+import Markdown from './Markdown';
 
 export interface Parsed { title: string; text: string; danger: boolean; yes: string; no: string }
 
@@ -26,7 +27,7 @@ export default function ConfirmCard({ confirm: { title, text, danger, yes, no },
         </Box>
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ fontWeight: 600, whiteSpace: 'pre-wrap' }}>{title}</Typography>
-          {text && <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>{text}</Typography>}
+          {text && <Box sx={{ color: 'text.secondary', fontSize: '0.875rem' }}><Markdown>{text}</Markdown></Box>}
         </Box>
       </Box>
       <Box sx={{ display: 'flex', gap: 1, mt: 1.25, ml: 5.25, flexWrap: 'wrap' }}>

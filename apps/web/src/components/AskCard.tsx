@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, Checkbox, FormControlLabel, Typography } from '@mui/material';
 import QuestionAnswerOutlined from '@mui/icons-material/QuestionAnswerOutlined';
+import Markdown from './Markdown';
 
 export interface Parsed { question: string; choices: string[]; multiple: boolean }
 
@@ -31,7 +32,7 @@ export default function AskCard({ ask: { question, choices, multiple }, answer, 
     <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: live ? 'primary.main' : 'divider', borderRadius: '10px', bgcolor: 'background.default', opacity: live || answer ? 1 : 0.7 }}>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
         <QuestionAnswerOutlined fontSize="small" color={live ? 'primary' : 'action'} sx={{ mt: 0.25 }} />
-        <Typography sx={{ whiteSpace: 'pre-wrap', fontWeight: 600 }}>{question || 'Question de l\'agent'}</Typography>
+        <Box sx={{ fontWeight: 600, minWidth: 0 }}><Markdown>{question || 'Question de l\'agent'}</Markdown></Box>
       </Box>
       {choices.length > 0 && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.25, ml: 3.5 }}>
