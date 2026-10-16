@@ -10,6 +10,8 @@ import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard from '../AskCard';
+import ConfirmCard, { parseConfirm } from '../ConfirmCard';
+import ChartCard, { parseChart } from '../ChartCard';
 
 const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
 const halo = keyframes`0% { box-shadow: 0 0 0 0 var(--halo) } 70%, 100% { box-shadow: 0 0 0 7px transparent }`;
@@ -80,6 +82,14 @@ export default function MessageBubble({ m, expandTools, agentName, answer, onAns
             pre: ({ children }) => {
               const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
               if (el?.props?.className?.includes('language-ask') && m.status !== 'streaming') return <AskCard raw={String(el.props.children ?? '').replace(/\n$/, '')} answer={answer} onAnswer={onAnswer} />;
+              if (el?.props?.className?.includes('language-confirm') && m.status !== 'streaming') {
+                const confirm = parseConfirm(String(el.props.children ?? ''));
+                if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />;
+              }
+              if (el?.props?.className?.includes('language-chart') && m.status !== 'streaming') {
+                const chart = parseChart(String(el.props.children ?? ''));
+                if (chart) return <ChartCard chart={chart} />;
+              }
               return <pre>{children}</pre>;
             },
           }}>{m.text}</ReactMarkdown>}

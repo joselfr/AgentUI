@@ -4,8 +4,15 @@ import QuestionAnswerOutlined from '@mui/icons-material/QuestionAnswerOutlined';
 
 interface Parsed { question: string; choices: string[]; multiple: boolean }
 
-/** Bloc ```ask : question en tête, puis `- choix` (un seul) ou `- [ ] choix` (plusieurs). Sans liste : réponse libre. */
+/** Bloc ```ask : JSON `{ question, choices?: [...], multiple?: bool }`. Sans `choices` : réponse libre. */
 export function parseAsk(raw: string): Parsed {
+  try {
+    const j = JSON.parse(raw) as { question?: unknown; choices?: unknown; multiple?: unknown };
+    if (j && typeof j === 'object') {
+      const choices = Array.isArray(j.choices) ? j.choices.map(String) : [];
+      return { question: String(j.question ?? '').trim(), choices, multiple: j.multiple === true };
+    }
+  } catch { /* ancien format Markdown, conservé pour les discussions déjà enregistrées */ }
   const question: string[] = [];
   const choices: string[] = [];
   let multiple = false;
