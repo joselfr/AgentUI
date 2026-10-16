@@ -1,35 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AppBar, Box, Button, Chip, CircularProgress, CssBaseline, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, FormControlLabel,
-  IconButton, MenuItem, Select, Switch, TextField, ThemeProvider, Toolbar, Typography, useMediaQuery,
-} from '@mui/material';
-import { alpha } from '@mui/material/styles';
-import MenuIcon from '@mui/icons-material/Menu';
-import SystemUpdateAlt from '@mui/icons-material/SystemUpdateAlt';
+import { Box, CircularProgress, CssBaseline, Drawer, ThemeProvider, Typography, useMediaQuery } from '@mui/material';
 import type { AgentInfo, Message } from '@agentui/shared';
 import { api, UnauthorizedError, type Conversation } from './api';
 import { makeTheme } from './theme';
 import { applyEvent } from './reducer';
 import { useLive, type LiveEvent } from './useLive';
+import { useConversationActions } from './useConversationActions';
 import Login from './components/Login';
 import { useConfirm } from './components/Confirm';
-import { load, save } from './storage';
+import { load, save, usePersisted } from './storage';
 import Sidebar, { DRAWER } from './components/Sidebar';
-import StatusDot from './components/StatusDot';
 import NavRail, { NAV, type View } from './components/NavRail';
 import Chat from './components/Chat';
+import ChatHeader from './components/ChatHeader';
 import NewConversation from './components/NewConversation';
+import SettingsDialog, { type ThemeMode } from './components/SettingsDialog';
 import { AgentsPage, JobsPage, SkillsPage } from './components/Pages';
 import { toOutgoing, type AttachmentView } from './attachments';
-import { forceUpdate } from './pwa';
-import { disablePush, enablePush, pushState, type PushState } from './push';
-
 
 export default function App() {
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
-  const [themeMode, setThemeMode] = useState<'auto' | 'light' | 'dark'>(() => load('themeMode', 'dark'));
-  const [askUser, setAskUser] = useState<boolean>(() => load('askUser', true));
-  const [expandTools, setExpandTools] = useState<boolean>(() => load('expandTools', false));
+  const [themeMode, setThemeMode] = usePersisted<ThemeMode>('themeMode', 'dark');
+  const [askUser, setAskUser] = usePersisted<boolean>('askUser', true);
+  const [expandTools, setExpandTools] = usePersisted<boolean>('expandTools', false);
   const theme = useMemo(() => makeTheme(themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode), [themeMode, prefersDark]);
   const wide = useMediaQuery(theme.breakpoints.up('md'));
 
@@ -200,42 +193,8 @@ export default function App() {
     }
   };
 
-  const themeLabel = { auto: 'Système', light: 'Clair', dark: 'Sombre' };
-
   const closeDrawer = () => { if (!wide) setDrawer(false); };
-  const toggleFavorite = (c: Conversation) => {
-    const favorite = !c.favorite;
-    setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, favorite } : x)));
-    api.setFavorite(c.id, favorite).catch((e) => { setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, favorite: !favorite } : x))); guard(e); });
-  };
-  const renameConv = (c: Conversation, title: string) => {
-    setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title } : x)));
-    api.rename(c.id, title).catch((e) => { setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title: c.title } : x))); guard(e); });
-  };
-  const archiveConv = (c: Conversation, archived: boolean) => archiveMany([c], archived);
-  const archiveMany = async (cs: Conversation[], archived: boolean) => {
-    const ids = new Set(cs.map((c) => c.id));
-    const set = (v: boolean) => setConvs((all) => all.map((x) => (ids.has(x.id) ? { ...x, archived: v } : x)));
-    set(archived);
-    try { await Promise.all(cs.map((c) => api.setArchived(c.id, archived))); } catch (e) { set(!archived); guard(e); }
-  };
-  /** Suppression groupée : une confirmation, puis une suppression par discussion (la session de l'agent est supprimée aussi). */
-  const deleteMany = async (cs: Conversation[]): Promise<boolean> => {
-    if (!(await askConfirm({ title: `Supprimer ${cs.length} conversations ?`, text: 'Elles seront supprimées, ainsi que leurs sessions chez l’agent. Cette action est définitive.', confirmLabel: 'Supprimer', danger: true }))) return false;
-    for (const c of cs) {
-      try {
-        await api.remove(c.id);
-        setConvs((all) => all.filter((x) => x.id !== c.id));
-        if (c.id === currentRef.current) setCurrentId(undefined);
-      } catch (e) { guard(e); break; } // on s'arrête à la première erreur : le reste est conservé
-    }
-    return true;
-  };
-  const deleteConv = async (c: Conversation) => {
-    if (await askConfirm({ title: 'Supprimer cette conversation ?', text: <>« {c.title.length > 60 ? `${c.title.slice(0, 60)}…` : c.title} » sera supprimée, ainsi que sa session chez l’agent. Cette action est définitive.</>, confirmLabel: 'Supprimer', danger: true })) {
-      api.remove(c.id).then(() => { setConvs((cs) => cs.filter((x) => x.id !== c.id)); if (c.id === currentId) setCurrentId(undefined); }).catch(guard);
-    }
-  };
+  const { toggleFavorite, renameConv, archiveConv, archiveMany, deleteConv, deleteMany } = useConversationActions({ setConvs, setCurrentId, currentRef, guard, ask: askConfirm });
   // Sur mobile, la barre de navigation vit dans le tiroir des discussions : fermer la liste libère toute la largeur.
   // La discussion qu'on est en train de lire n'est jamais « non lue » à l'écran (le marquage côté serveur suit)
   const shownConvs = useMemo(() => convs.map((c) => (c.unread && viewing && c.id === currentId ? { ...c, unread: false } : c)), [convs, viewing, currentId]);
@@ -263,18 +222,7 @@ export default function App() {
             sx={{ width: wide ? DRAWER : 0, flexShrink: 0, '& .MuiDrawer-paper': { width: wide ? DRAWER : `min(${NAV + DRAWER}px, 90vw)`, overflowX: 'hidden', position: wide ? 'relative' : 'fixed', borderWidth: '0 1px 0 0', borderStyle: 'solid' } }}>{drawerContent}</Drawer>)}
         {view === 'chats' ? (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <AppBar position="static" color="transparent" elevation={0}
-            sx={{ border: 0, borderBottom: 1, borderColor: 'divider', backdropFilter: 'blur(12px)', bgcolor: (t) => alpha(t.palette.background.default, 0.8) }}>
-            <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, md: 64 } }}>
-              {(!wide || !listOpen) && <IconButton edge="start" onClick={() => (wide ? setListOpen(true) : setDrawer(true))} aria-label="Afficher les discussions" title="Afficher les discussions"><MenuIcon /></IconButton>}
-              <Typography variant="subtitle1" noWrap sx={{ flex: 1 }}>{current?.title ?? 'Nouvelle conversation'}</Typography>
-              {agent && (
-                <Chip size="small" variant="outlined"
-                  label={<Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><StatusDot status={agent.status} /><Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{agent.name}</Box></Box>}
-                  title={agent.status === 'connected' ? agent.type : agent.statusDetail ?? agent.status}
-                  sx={{ height: 32, fontWeight: 600, maxWidth: { xs: 140, sm: 260 }, '& .MuiChip-label': { px: 1.5 } }} />)}
-            </Toolbar>
-          </AppBar>
+          <ChatHeader title={current?.title ?? 'Nouvelle conversation'} agent={agent} showListButton={!wide || !listOpen} onShowList={() => (wide ? setListOpen(true) : setDrawer(true))} />
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {agent ? (
               <Chat title={current?.title ?? ''} agentName={agent.name} messages={messages} loading={loadingMsgs} isNew={!currentId} running={running} expandTools={expandTools}
@@ -293,70 +241,9 @@ export default function App() {
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}
           onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />
         {confirmDialog}
-        <Dialog open={settings} onClose={() => setSettings(false)} fullWidth maxWidth="xs">
-          <DialogTitle sx={{ fontWeight: 650 }}>Réglages</DialogTitle>
-          <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
-            <Select size="small" value={themeMode} onChange={(e) => { const v = e.target.value as 'auto' | 'light' | 'dark'; setThemeMode(v); save('themeMode', v); }}>
-              {(Object.keys(themeLabel) as Array<keyof typeof themeLabel>).map((k) => <MenuItem key={k} value={k}>Thème : {themeLabel[k]}</MenuItem>)}
-            </Select>
-            <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 1 }} control={<Switch checked={expandTools} onChange={(e) => { setExpandTools(e.target.checked); save('expandTools', e.target.checked); }} />} label="Déplier les outils par défaut" />
-            <FormControlLabel sx={{ mx: 0, p: 2, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 1 }} control={<Switch checked={askUser} onChange={(e) => { setAskUser(e.target.checked); save('askUser', e.target.checked); }} />} label="Questions interactives de l'agent (bloc ask)" />
-            <PushToggle />
-            <UpdateButton />
-            <PasswordForm />
-          </DialogContent>
-          <DialogActions>
-            <Button color="error" onClick={() => api.logout().finally(() => { setAuth('out'); setCurrentId(undefined); })}>Se déconnecter</Button>
-            <Button onClick={() => setSettings(false)}>Fermer</Button>
-          </DialogActions>
-        </Dialog>
+        <SettingsDialog open={settings} onClose={() => setSettings(false)} onLogout={() => api.logout().finally(() => { setAuth('out'); setCurrentId(undefined); })}
+          themeMode={themeMode} onThemeMode={setThemeMode} expandTools={expandTools} onExpandTools={setExpandTools} askUser={askUser} onAskUser={setAskUser} />
       </Box>
     </ThemeProvider>
-  );
-}
-
-function UpdateButton() {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const run = async () => {
-    setBusy(true); setErr('');
-    try { await forceUpdate(); } catch (e) { setErr((e as Error).message); setBusy(false); }
-  };
-  return (
-    <Box sx={{ p: 2, py: 1, border: 1, borderColor: 'divider', borderRadius: 1, display: 'grid', gap: 0.5, justifyItems: 'start' }}>
-      <Button size="small" startIcon={busy ? <CircularProgress size={14} color="inherit" /> : <SystemUpdateAlt />} disabled={busy} onClick={run}>Forcer la mise à jour de l'app</Button>
-      <Typography variant="caption" color={err ? 'error' : 'text.secondary'}>{err || 'Récupère la dernière version puis recharge la page.'}</Typography>
-    </Box>
-  );
-}
-
-function PushToggle() {
-  const [st, setSt] = useState<PushState>('off');
-  const [err, setErr] = useState('');
-  useEffect(() => { void pushState().then(setSt); }, []);
-  const toggle = async () => {
-    setErr('');
-    try { setSt(st === 'on' ? await disablePush() : await enablePush()); } catch (e) { setErr((e as Error).message); }
-  };
-  const help = st === 'unsupported' ? 'Non supporté par ce navigateur (sur iPhone : ajouter l\'app à l\'écran d\'accueil).'
-    : st === 'denied' ? 'Bloquées dans le navigateur : à réactiver dans les réglages du site.' : err;
-  return (
-    <Box sx={{ p: 2, py: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-      <FormControlLabel disabled={st === 'unsupported' || st === 'denied'} control={<Switch checked={st === 'on'} onChange={toggle} />} label="Notifications quand un agent répond" />
-      {help && <Typography variant="caption" color="text.secondary" display="block">{help}</Typography>}
-    </Box>
-  );
-}
-
-function PasswordForm() {
-  const [o, setO] = useState(''); const [n, setN] = useState(''); const [msg, setMsg] = useState('');
-  return (
-    <Box sx={{ display: 'grid', gap: 1, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-      <Typography variant="subtitle2">Changer le mot de passe</Typography>
-      <TextField size="small" type="password" label="Actuel" value={o} onChange={(e) => setO(e.target.value)} autoComplete="current-password" />
-      <TextField size="small" type="password" label="Nouveau (8+ caractères)" value={n} onChange={(e) => setN(e.target.value)} autoComplete="new-password" />
-      <Button disabled={!o || n.length < 8} onClick={() => api.changePassword(o, n).then(() => { setMsg('Mot de passe modifié'); setO(''); setN(''); }).catch((e) => setMsg((e as Error).message))}>Modifier</Button>
-      {msg && <Typography variant="caption">{msg}</Typography>}
-    </Box>
   );
 }
