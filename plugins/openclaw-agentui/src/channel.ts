@@ -24,6 +24,7 @@ const CAPABILITIES: Capabilities = {
   jobs: true,
   jobControl: true,
   sessionDelete: true,
+  models: true,
   attachments: { images: true, files: true, maxBytes: MAX_MEDIA },
 };
 

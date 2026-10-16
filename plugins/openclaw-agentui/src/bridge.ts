@@ -4,9 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { OpenClawConfig } from 'openclaw/plugin-sdk/channel-core';
 import { toInboundMediaFacts } from 'openclaw/plugin-sdk/channel-inbound';
-import { deleteSessionEntry } from 'openclaw/plugin-sdk/session-store-runtime';
+import { deleteSessionEntry, getSessionEntry } from 'openclaw/plugin-sdk/session-store-runtime';
 import type { AgentUIClient } from './client.js';
-import type { AgentEvent, GatewayMessage, Media } from './protocol.js';
+import type { AgentEvent, GatewayMessage, Media, Usage } from './protocol.js';
 import { getAgentUIRuntime } from './runtime.js';
 import { listSubAgents } from './agents.js';
 import { jobAction, listJobs } from './cron.js';
@@ -41,6 +41,12 @@ const textOf = (content: unknown): string =>
     : Array.isArray(content)
       ? content.filter((p: Json) => p?.type === 'text' && typeof p.text === 'string').map((p: Json) => p.text).join('')
       : '';
+
+/** « fournisseur/modèle » → { provider, id } (un identifiant sans « / » n'a pas de fournisseur). */
+function splitRef(ref: string): { provider?: string; id: string } {
+  const i = ref.indexOf('/');
+  return i > 0 ? { provider: ref.slice(0, i), id: ref.slice(i + 1) } : { id: ref };
+}
 
 const APPROVE_RE = /\/approve\s+([A-Za-z0-9_-]+)\s+allow-once/;
 
@@ -105,12 +111,12 @@ export class AgentUIBridge {
         run,
       });
       if (!result.dispatched) throw new Error('message non admis par OpenClaw');
-      if (run.abort.signal.aborted) this.finish(run, { type: 'run.aborted' });
-      else if (run.outcome === 'failed') this.finish(run, { type: 'run.failed', error: 'échec du run OpenClaw' });
-      else this.finish(run, { type: 'run.completed' });
+      if (run.abort.signal.aborted) this.finishWithUsage(run, msg, { type: 'run.aborted' });
+      else if (run.outcome === 'failed') this.finishWithUsage(run, msg, { type: 'run.failed', error: 'échec du run OpenClaw' });
+      else this.finishWithUsage(run, msg, { type: 'run.completed' });
     } catch (e) {
-      if (run.abort.signal.aborted) this.finish(run, { type: 'run.aborted' });
-      else this.finish(run, { type: 'run.failed', error: e instanceof Error ? e.message : String(e) });
+      if (run.abort.signal.aborted) this.finishWithUsage(run, msg, { type: 'run.aborted' });
+      else this.finishWithUsage(run, msg, { type: 'run.failed', error: e instanceof Error ? e.message : String(e) });
     } finally {
       unsubscribe();
       this.runs.delete(run.runId);
@@ -125,10 +131,12 @@ export class AgentUIBridge {
     subAgentId?: string;
     media: Array<{ path: string; contentType?: string }>;
     run?: Run;
+    /** Commande de contrôle (/model…) : les réponses livrées sont recueillies ici au lieu d'être affichées. */
+    capture?: string[];
   }) {
     const rt = getAgentUIRuntime();
     const { cfg, accountId } = this.p;
-    const { conversationId, messageId, text, run } = params;
+    const { conversationId, messageId, text, run, capture } = params;
     // Une discussion AgentUI = un pair direct = une session (dmScope forcé : sinon tous les DM partagent « main »).
     const route = rt.channel.routing.resolveAgentRoute({
       cfg,
@@ -174,6 +182,10 @@ export class AgentUIBridge {
           ctxPayload,
           delivery: {
             deliver: async (payload) => {
+              if (capture) {
+                if (typeof payload.text === 'string' && payload.text.trim()) capture.push(payload.text);
+                return;
+              }
               if (run) await this.deliver(run, payload);
             },
             onError: (err, info) => this.p.log(`livraison ${info.kind} en échec : ${String(err)}`),
@@ -248,6 +260,122 @@ export class AgentUIBridge {
     for (const sessionKey of keys) await deleteSessionEntry({ sessionKey });
   }
 
+  // ── Modèle d'une discussion ──────────────────────────────────────────────
+
+  /** Route d'une discussion pour un agent : même résolution que `dispatch`, elle fixe la clé de session. */
+  private routeOf(conversationId: string, agentId?: string) {
+    const rt = getAgentUIRuntime();
+    const { cfg, accountId } = this.p;
+    return rt.channel.routing.resolveAgentRoute({
+      cfg,
+      channel: CHANNEL,
+      accountId,
+      peer: { kind: 'direct', id: conversationId },
+      dmScope: 'per-channel-peer',
+      ...(agentId ? { defaultAgentId: agentId } : {}),
+    });
+  }
+
+  /** Session d'une discussion : celle du sous-agent demandé, sinon la plus récemment utilisée parmi les agents. */
+  private sessionOf(conversationId: string, subAgentId?: string): { agentId: string; entry?: Json } {
+    const agents = subAgentId ? [subAgentId] : listSubAgents(this.p.cfg).map((a) => a.id);
+    let best: { agentId: string; entry?: Json; at: number } | undefined;
+    for (const id of agents) {
+      const route = this.routeOf(conversationId, id);
+      const entry = route?.sessionKey ? (getSessionEntry({ agentId: route.agentId ?? id, sessionKey: route.sessionKey }) as Json | undefined) : undefined;
+      const at = Number(entry?.updatedAt ?? 0);
+      if (entry && (!best || at > best.at)) best = { agentId: route.agentId ?? id, entry, at };
+    }
+    return best ?? { agentId: agents[0] ?? 'main' };
+  }
+
+  /** Modèle par défaut d'un agent : sa configuration, sinon celle de `agents.defaults`. */
+  private defaultModelOf(agentId: string): { provider?: string; id?: string } {
+    const cfg = this.p.cfg as Json;
+    const primary = (m: unknown) => (typeof m === 'string' ? m : typeof (m as Json)?.primary === 'string' ? (m as Json).primary : undefined);
+    const ref = primary(cfg.agents?.list?.find((a: Json) => a.id === agentId)?.model) ?? primary(cfg.agents?.defaults?.model);
+    return ref ? splitRef(ref) : {};
+  }
+
+  /** Modèle courant (choix de la session, sinon dernier utilisé, sinon défaut de l'agent) et tokens d'une discussion. */
+  usageOf(conversationId: string, subAgentId?: string): Usage | undefined {
+    if (!conversationId) throw new Error('conversationId manquant');
+    const { agentId, entry } = this.sessionOf(conversationId, subAgentId);
+    if (!entry) return undefined;
+    const fallback = this.defaultModelOf(agentId);
+    const model = (entry.modelOverride as string | undefined) ?? (entry.model as string | undefined) ?? fallback.id;
+    const provider = (entry.providerOverride as string | undefined) ?? (entry.modelProvider as string | undefined) ?? fallback.provider;
+    return {
+      inputTokens: Number(entry.inputTokens ?? 0),
+      outputTokens: Number(entry.outputTokens ?? 0),
+      ...(model ? { model } : {}),
+      ...(provider ? { provider } : {}),
+    };
+  }
+
+  /** Modèles proposés : ceux déclarés par les fournisseurs, la liste d'autorisation des agents et les modèles par défaut. */
+  listModels(): Array<{ provider: string; providerName: string; id: string }> {
+    const cfg = this.p.cfg as Json;
+    const out = new Map<string, { provider: string; providerName: string; id: string }>();
+    const add = (provider: string | undefined, id: string | undefined) => {
+      if (!provider || !id) return;
+      const key = `${provider}/${id}`;
+      if (!out.has(key)) out.set(key, { provider, providerName: provider.charAt(0).toUpperCase() + provider.slice(1), id });
+    };
+    for (const [provider, def] of Object.entries((cfg.models?.providers ?? {}) as Record<string, Json>)) {
+      for (const m of (def?.models ?? []) as Array<Json | string>) add(provider, typeof m === 'string' ? m : (m.id as string | undefined));
+    }
+    for (const ref of Object.keys((cfg.agents?.defaults?.models ?? {}) as Record<string, unknown>)) {
+      const r = splitRef(ref);
+      add(r.provider, r.id);
+    }
+    for (const a of listSubAgents(this.p.cfg)) {
+      const r = this.defaultModelOf(a.id);
+      add(r.provider, r.id);
+    }
+    return [...out.values()];
+  }
+
+  /**
+   * Fixe le modèle de la session d'une discussion avec la commande /model … -s d'OpenClaw (limitée à la session),
+   * dont la réponse est recueillie. Le succès est vérifié sur l'état réel de la session, pas sur le texte.
+   */
+  async setModel(conversationId: string, model: string, provider: string | undefined, subAgentId?: string) {
+    if (!conversationId || !model.trim()) throw new Error('conversationId et model sont requis');
+    if ([...this.runs.values()].some((r) => !r.terminal && r.conversationId === conversationId)) {
+      throw new Error('un run est en cours dans cette discussion');
+    }
+    const { agentId } = this.sessionOf(conversationId, subAgentId);
+    const ref = provider ? `${provider}/${model}` : model;
+    const capture: string[] = [];
+    const result = await this.dispatch({
+      conversationId,
+      messageId: `model-${Date.now()}`,
+      text: `/model ${ref} -s`,
+      subAgentId: subAgentId ?? agentId,
+      media: [],
+      capture,
+    });
+    const reply = capture.join('\n\n').trim();
+    if (!result.dispatched) throw new Error(reply || 'commande /model non admise par OpenClaw');
+    const now = this.usageOf(conversationId, subAgentId ?? agentId);
+    if (!now || now.model !== model || (provider && now.provider && now.provider !== provider)) {
+      throw new Error(reply || `le modèle ${ref} n'a pas été retenu`);
+    }
+    return { model: now.model, ...(now.provider ? { provider: now.provider } : {}), message: reply };
+  }
+
+  /** Termine le run en joignant la consommation de la session (même interrompu, des tokens ont pu être utilisés). */
+  private finishWithUsage(run: Run, msg: Extract<GatewayMessage, { type: 'inbound' }>, event: AgentEvent): void {
+    try {
+      const usage = this.usageOf(msg.conversationId, msg.subAgentId);
+      if (usage) this.emit(run, { type: 'usage', usage });
+    } catch (e) {
+      this.p.log(`consommation illisible : ${String(e)}`);
+    }
+    this.finish(run, event);
+  }
+
   private async onRpc(msg: Extract<GatewayMessage, { type: 'rpc' }>): Promise<void> {
     const client = this.p.client();
     const params = (msg.params ?? {}) as Json;
@@ -257,6 +385,20 @@ export class AgentUIBridge {
           msg.method === 'listJobs'
             ? await listJobs(typeof params.subAgentId === 'string' ? params.subAgentId : undefined)
             : await jobAction(String(params.jobId ?? ''), String(params.action ?? ''));
+        client?.send({ type: 'rpc.result', id: msg.id, result });
+      } catch (e) {
+        client?.send({ type: 'rpc.result', id: msg.id, error: e instanceof Error ? e.message : String(e) });
+      }
+    } else if (msg.method === 'listModels' || msg.method === 'sessionUsage' || msg.method === 'setModel') {
+      try {
+        const conv = String(params.conversationId ?? '');
+        const sub = typeof params.subAgentId === 'string' && params.subAgentId ? params.subAgentId : undefined;
+        const result =
+          msg.method === 'listModels'
+            ? this.listModels()
+            : msg.method === 'sessionUsage'
+              ? this.usageOf(conv, sub) ?? null
+              : await this.setModel(conv, String(params.model ?? ''), typeof params.provider === 'string' ? params.provider : undefined, sub);
         client?.send({ type: 'rpc.result', id: msg.id, result });
       } catch (e) {
         client?.send({ type: 'rpc.result', id: msg.id, error: e instanceof Error ? e.message : String(e) });

@@ -21,7 +21,21 @@ export interface Capabilities {
   jobControl: boolean;
   /** Suppression de la session de plateforme quand l'utilisateur supprime la discussion (rpc deleteSession). */
   sessionDelete?: boolean;
+  /** Modèle d'une discussion : rpc listModels / setModel / sessionUsage et événement `usage`. */
+  models?: boolean;
   attachments: { images: boolean; files: boolean; maxBytes: number };
+}
+
+/** Modèle et consommation cumulée d'une session. */
+export interface Usage {
+  model?: string;
+  provider?: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  reasoningTokens?: number;
+  costUsd?: number;
+  costEstimated?: boolean;
 }
 
 export type AgentEvent =
@@ -34,6 +48,7 @@ export type AgentEvent =
   | { type: 'subagent.sync'; id: string }
   | { type: 'subagent.end'; id: string; failed?: boolean }
   | ({ type: 'message.media' } & Media)
+  | { type: 'usage'; usage: Usage }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
   | { type: 'run.completed' }
   | { type: 'run.failed'; error: string }

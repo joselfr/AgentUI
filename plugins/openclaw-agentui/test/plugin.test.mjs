@@ -12,8 +12,13 @@ mock.module('openclaw/plugin-sdk/channel-core', { namedExports: { createChatChan
 mock.module('openclaw/plugin-sdk/channel-inbound', { namedExports: { toInboundMediaFacts: (m) => m } });
 // Suppression de session : le plugin passe par le SDK ; on enregistre les clés effacées.
 const deletedKeys = [];
+// Sessions simulées : `${agentId}|${sessionKey}` → entrée (modèle, jetons…), alimentées par le faux runtime.
+const sessionStore = new Map();
 mock.module('openclaw/plugin-sdk/session-store-runtime', {
-  namedExports: { deleteSessionEntry: async (params) => (deletedKeys.push(params.sessionKey), true) },
+  namedExports: {
+    deleteSessionEntry: async (params) => (deletedKeys.push(params.sessionKey), true),
+    getSessionEntry: ({ agentId, sessionKey }) => sessionStore.get(`${agentId}|${sessionKey}`),
+  },
 });
 mock.module('openclaw/plugin-sdk/agent-scope-runtime', {
   namedExports: {
@@ -55,6 +60,19 @@ const runtime = {
         turns.push({ input, plan });
         const ro = plan.replyOptions;
         if (input.rawText.startsWith('/approve')) return { dispatched: true };
+        const key = `${plan.route.agentId}|${plan.route.sessionKey}`;
+        if (input.rawText.startsWith('/model')) {
+          // Commande de contrôle : la gateway répond par un texte, et pose le choix de modèle sur la session
+          const ref = input.rawText.split(' ')[1];
+          if (ref.includes('refuse')) {
+            await plan.delivery.deliver({ text: '⚠️ Model not allowed' }, { kind: 'final' });
+            return { dispatched: true };
+          }
+          const [provider, id] = ref.includes('/') ? ref.split('/') : [undefined, ref];
+          sessionStore.set(key, { ...(sessionStore.get(key) ?? { updatedAt: Date.now() }), modelOverride: id, providerOverride: provider });
+          await plan.delivery.deliver({ text: `Model set to ${ref} (session only)` }, { kind: 'final' });
+          return { dispatched: true };
+        }
         if (input.rawText === 'long') {
           await new Promise((_, reject) => ro.abortSignal.addEventListener('abort', () => reject(new Error('aborted'))));
         }
@@ -69,6 +87,7 @@ const runtime = {
         if (input.rawText === 'approve') await ro.onApprovalEvent({ approvalId: 'ap1', command: 'rm -rf build', status: 'pending', title: 'Exec approval' });
         await ro.onPartialReply({ delta: 'Fini.' });
         await plan.delivery.deliver({ text: 'Fini : a.txt', mediaUrls: [imgPath] }, { kind: 'final' });
+        sessionStore.set(key, { ...(sessionStore.get(key) ?? {}), model: 'deepseek-flash', modelProvider: 'deepseek', inputTokens: 1200, outputTokens: 340, updatedAt: Date.now() });
         ro.onAgentRunTerminalOutcome?.('completed');
         return { dispatched: true };
       },
@@ -121,7 +140,8 @@ const rpc = async (method, params) => {
 // ── Démarrage du compte (vrai gateway.startAccount) ──────────────────────────
 const cfg = {
   channels: { agentui: { url, token: TOKEN, name: 'OpenClaw test' } },
-  agents: { defaults: { model: { primary: 'deepseek/deepseek-flash' } }, list: [{ id: 'coder', name: 'Codeur', model: 'anthropic/claude' }] },
+  models: { providers: { deepseek: { models: [{ id: 'deepseek-flash' }, { id: 'deepseek-v4-pro' }] } } },
+  agents: { defaults: { model: { primary: 'deepseek/deepseek-flash' }, models: { 'anthropic/claude': {} } }, list: [{ id: 'coder', name: 'Codeur', model: 'anthropic/claude' }] },
 };
 const abort = new AbortController();
 const statuses = [];
@@ -170,7 +190,8 @@ test('run complet : streaming, outils (événements d’agent), raisonnement, fi
 test('fils multiples : un conversationId = un pair direct = une session', async () => {
   send({ type: 'inbound', conversationId: 'c2', runId: 'r2', text: 'liste' });
   await until(isTerminal('r2'));
-  const [a, b] = routes.slice(-2);
+  // routes des tours (sans agent imposé) : la lecture de la consommation en fin de run en résout d'autres, par agent
+  const [a, b] = routes.filter((r) => !r.defaultAgentId).slice(-2);
   assert.deepEqual([a.peer, b.peer], [{ kind: 'direct', id: 'c1' }, { kind: 'direct', id: 'c2' }]);
   assert.equal(a.dmScope, 'per-channel-peer');
   assert.notEqual(turns.at(-2).plan.route.sessionKey, turns.at(-1).plan.route.sessionKey);
@@ -257,6 +278,38 @@ test('suppression : refusée tant qu’un run est en cours dans la discussion', 
   assert.deepEqual(deletedKeys, []);
   send({ type: 'abort', conversationId: 'c8', runId: 'r8' });
   await until(isTerminal('r8'));
+});
+
+test('modèle : liste, consommation, changement par /model -s, refus, run en cours', async () => {
+  assert.equal(hello.capabilities.models, true);
+  // modèles des fournisseurs + liste d'autorisation + modèles par défaut des agents, sans doublon
+  const models = (await rpc('listModels', {})).result;
+  assert.deepEqual(models.map((m) => `${m.provider}/${m.id}`).sort(), ['anthropic/claude', 'deepseek/deepseek-flash', 'deepseek/deepseek-v4-pro']);
+  assert.deepEqual(models.find((m) => m.id === 'deepseek-flash'), { provider: 'deepseek', providerName: 'Deepseek', id: 'deepseek-flash' });
+
+  // fin de run : la consommation de la session précède run.completed
+  send({ type: 'inbound', conversationId: 'cm', runId: 'rm', text: 'liste' });
+  const kinds = eventsOf(await until(isTerminal('rm')), 'rm').map((e) => e.type);
+  assert.ok(kinds.includes('usage') && kinds.indexOf('usage') < kinds.indexOf('run.completed'), kinds.join());
+  assert.deepEqual((await rpc('sessionUsage', { conversationId: 'cm' })).result, { inputTokens: 1200, outputTokens: 340, model: 'deepseek-flash', provider: 'deepseek' });
+  assert.equal((await rpc('sessionUsage', { conversationId: 'inconnue' })).result, null);
+  assert.equal((await rpc('sessionUsage', { conversationId: 'cm', subAgentId: 'coder' })).result, null, 'session d’un autre agent');
+
+  // changement de modèle : commande /model <fournisseur/modèle> -s, réponse recueillie (pas affichée), état relu
+  const set = (await rpc('setModel', { conversationId: 'cm', model: 'deepseek-v4-pro', provider: 'deepseek' })).result;
+  assert.deepEqual(set, { model: 'deepseek-v4-pro', provider: 'deepseek', message: 'Model set to deepseek/deepseek-v4-pro (session only)' });
+  assert.equal(turns.at(-1).input.rawText, '/model deepseek/deepseek-v4-pro -s');
+  assert.equal((await rpc('sessionUsage', { conversationId: 'cm' })).result.model, 'deepseek-v4-pro');
+  // refus : le texte d'OpenClaw est remonté, la session garde son modèle
+  assert.match((await rpc('setModel', { conversationId: 'cm', model: 'refuse-me' })).error, /Model not allowed/);
+  assert.equal((await rpc('sessionUsage', { conversationId: 'cm' })).result.model, 'deepseek-v4-pro');
+  assert.ok((await rpc('setModel', { conversationId: 'cm' })).error, 'paramètres manquants');
+  // pas de changement pendant une réponse
+  send({ type: 'inbound', conversationId: 'cl', runId: 'rl', text: 'long' });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.match((await rpc('setModel', { conversationId: 'cl', model: 'deepseek-flash' })).error, /run est en cours/);
+  send({ type: 'abort', conversationId: 'cl', runId: 'rl' });
+  await until(isTerminal('rl'));
 });
 
 test('arrêt du compte', async () => {
