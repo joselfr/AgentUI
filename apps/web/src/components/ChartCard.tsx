@@ -53,6 +53,7 @@ function Pie({ c, colors, color }: { c: Chart; colors: string[]; color: Colors }
   const ref = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS<'doughnut'>>();
   const [hover, setHover] = useState<number | null>(null);
+  const key = JSON.stringify(c);
   const ys = c.series[0]!.y.map((v) => Math.max(0, v));
   const total = ys.reduce((a, b) => a + b, 0) || 1;
   const unit = c.unit ?? '';
@@ -68,8 +69,9 @@ function Pie({ c, colors, color }: { c: Chart; colors: string[]; color: Colors }
     });
     chartRef.current = ch;
     return () => ch.destroy();
+    // `c` est recréé à chaque rendu du message (parseChart) : on ne reconstruit que si son contenu change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [c, colors, color.bg]);
+  }, [key, colors, color.bg]);
   const highlight = (i: number | null) => {
     const ch = chartRef.current; if (!ch) return;
     ch.setActiveElements(i === null ? [] : [{ datasetIndex: 0, index: i }]); ch.update(); setHover(i);
@@ -98,6 +100,7 @@ function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: Colors 
   const ref = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS>();
   const [hidden, setHidden] = useState<number[]>([]);
+  const key = JSON.stringify(c);
   const line = c.kind === 'line';
   const unit = c.unit ?? '';
   useEffect(() => {
@@ -139,7 +142,8 @@ function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: Colors 
     });
     chartRef.current = ch;
     return () => ch.destroy();
-  }, [c, colors, color, line, unit]);
+    // idem : clé de contenu, pas l'identité de `c`
+  }, [key, colors, color, line, unit]);
   const toggle = (k: number) => {
     const ch = chartRef.current; if (!ch) return;
     ch.setDatasetVisibility(k, !ch.isDatasetVisible(k)); ch.update();
