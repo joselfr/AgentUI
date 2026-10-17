@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import { ArcElement, BarController, BarElement, CategoryScale, Chart as ChartJS, DoughnutController, LinearScale, LineController, LineElement, PointElement, Tooltip, type Plugin } from 'chart.js';
+
+ChartJS.register(ArcElement, BarController, BarElement, CategoryScale, DoughnutController, LinearScale, LineController, LineElement, PointElement, Tooltip);
 
 interface Series { name: string; y: number[] }
 interface Chart { kind: 'line' | 'bar' | 'pie'; title?: string; unit?: string; x: string[]; series: Series[] }
@@ -21,78 +24,143 @@ function niceCeil(v: number) {
 }
 const fmt = (v: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(v);
 
-const W = 520, H = 220, M = { l: 40, r: 10, t: 14, b: 28 };
+type Colors = { line: string; text: string; bg: string; fg: string; paper: string };
 
-function Axes({ c, lo, hi, color }: { c: Chart; lo: number; hi: number; color: { line: string; text: string } }) {
-  const step = Math.ceil(c.x.length / 8);
-  const cw = (W - M.l - M.r) / c.x.length;
-  return (<>
-    {[0, 1, 2, 3, 4].map((i) => {
-      const y = M.t + ((H - M.t - M.b) * i) / 4;
-      return <g key={i}><line x1={M.l} x2={W - M.r} y1={y} y2={y} stroke={color.line} />
-        <text x={M.l - 8} y={y + 4} textAnchor="end" fontSize="11" fill={color.text}>{fmt(hi - ((hi - lo) * i) / 4)}</text></g>;
-    })}
-    {c.x.map((l, i) => i % step === 0 && <text key={i} x={M.l + cw * (i + 0.5)} y={H - 8} textAnchor="middle" fontSize="11" fill={color.text}>{l}</text>)}
-  </>);
+/** Repère vertical pointillé sous le point survolé (courbes). */
+const crosshair: Plugin = {
+  id: 'crosshair',
+  afterDatasetsDraw(chart) {
+    const a = chart.tooltip?.getActiveElements();
+    if ((chart.config as { type?: string }).type !== 'line' || !a?.length) return;
+    const x = a[0]!.element.x, { top, bottom } = chart.chartArea, g = chart.ctx;
+    g.save(); g.strokeStyle = (chart.options.color as string) ?? '#888'; g.globalAlpha = 0.5; g.setLineDash([3, 3]);
+    g.beginPath(); g.moveTo(x, top); g.lineTo(x, bottom); g.stroke(); g.restore();
+  },
+};
+
+/** Valeur au-dessus de chaque barre (graphique à une seule série). */
+const barLabels: Plugin = {
+  id: 'barLabels',
+  afterDatasetsDraw(chart, _a, opts: { on?: boolean; color?: string }) {
+    if (!opts.on) return;
+    const g = chart.ctx; g.save(); g.fillStyle = opts.color ?? '#888'; g.font = '11px Inter Variable, Inter, sans-serif'; g.textAlign = 'center';
+    chart.getDatasetMeta(0).data.forEach((b, i) => { const v = chart.data.datasets[0]!.data[i] as number; g.fillText(fmt(v), b.x, v < 0 ? b.y + 14 : b.y - 5); });
+    g.restore();
+  },
+};
+
+function Pie({ c, colors, color }: { c: Chart; colors: string[]; color: Colors }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<ChartJS<'doughnut'>>();
+  const [hover, setHover] = useState<number | null>(null);
+  const ys = c.series[0]!.y.map((v) => Math.max(0, v));
+  const total = ys.reduce((a, b) => a + b, 0) || 1;
+  const unit = c.unit ?? '';
+  useEffect(() => {
+    const ch = new ChartJS(ref.current!, {
+      type: 'doughnut',
+      data: { labels: c.x, datasets: [{ data: ys, backgroundColor: colors, borderColor: color.bg, borderWidth: 2, hoverOffset: 6, hoverBorderColor: color.bg }] },
+      options: {
+        cutout: '60%', responsive: true, aspectRatio: 1, animation: { duration: 400 }, layout: { padding: 6 },
+        plugins: { tooltip: { enabled: false } },
+        onHover: (_e, a) => setHover(a.length ? a[0]!.index : null),
+      },
+    });
+    chartRef.current = ch;
+    return () => ch.destroy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [c, colors, color.bg]);
+  const highlight = (i: number | null) => {
+    const ch = chartRef.current; if (!ch) return;
+    ch.setActiveElements(i === null ? [] : [{ datasetIndex: 0, index: i }]); ch.update(); setHover(i);
+  };
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap' }}>
+      <Box sx={{ position: 'relative', width: 180, flex: 'none' }} onMouseLeave={() => setHover(null)}>
+        <canvas ref={ref} role="img" aria-label={c.title} />
+        <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center', pointerEvents: 'none' }}>
+          <Box sx={{ fontSize: 20, fontWeight: 600, lineHeight: 1.2, color: color.fg }}>{fmt(hover === null ? total : ys[hover]!)}{unit}</Box>
+          <Box sx={{ fontSize: 11, color: color.text }}>{hover === null ? 'total' : `${c.x[hover]} · ${Math.round((100 * ys[hover]!) / total)} %`}</Box>
+        </Box>
+      </Box>
+      <Box sx={{ display: 'grid', gap: 0.75, fontSize: 13 }}>
+        {ys.map((v, i) => (
+          <Box key={i} onMouseEnter={() => highlight(i)} onMouseLeave={() => highlight(null)}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 0.5, mx: -0.5, borderRadius: '6px', bgcolor: hover === i ? 'action.hover' : 'transparent' }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: colors[i % colors.length] }} />
+            <span>{c.x[i]} <b>{fmt(v)}{unit}</b> <Box component="span" sx={{ color: 'text.secondary' }}>({Math.round((100 * v) / total)} %)</Box></span>
+          </Box>))}
+      </Box>
+    </Box>);
 }
 
-function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: { line: string; text: string; bg: string; fg: string } }) {
-  if (c.kind === 'pie') {
-    const ys = c.series[0]!.y.map((v) => Math.max(0, v));
-    const total = ys.reduce((a, b) => a + b, 0) || 1;
-    let a0 = -Math.PI / 2;
-    const P = (r: number, a: number) => `${100 + r * Math.cos(a)} ${100 + r * Math.sin(a)}`;
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap' }}>
-        <svg viewBox="0 0 200 200" style={{ width: 180, flex: 'none' }} role="img" aria-label={c.title}>
-          {ys.map((v, i) => {
-            const a1 = a0 + (2 * Math.PI * v) / total;
-            const full = v >= total; // une seule part : un arc de 360° se dessine en deux moitiés
-            const d = full
-              ? `M${P(90, 0)}A90 90 0 1 1 ${P(90, Math.PI)}A90 90 0 1 1 ${P(90, 0)}Z M${P(54, 0)}A54 54 0 1 0 ${P(54, Math.PI)}A54 54 0 1 0 ${P(54, 0)}Z`
-              : `M${P(90, a0)}A90 90 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${P(90, a1)}L${P(54, a1)}A54 54 0 ${a1 - a0 > Math.PI ? 1 : 0} 0 ${P(54, a0)}Z`;
-            a0 = a1;
-            return <path key={i} d={d} fill={colors[i % colors.length]} fillRule="evenodd" stroke={color.bg} strokeWidth="2" />;
-          })}
-          <text x="100" y="99" textAnchor="middle" fontSize="20" fontWeight="600" fill={color.fg}>{fmt(total)}{c.unit ?? ''}</text>
-          <text x="100" y="116" textAnchor="middle" fontSize="11" fill={color.text}>total</text>
-        </svg>
-        <Box sx={{ display: 'grid', gap: 0.75, fontSize: 13 }}>
-          {ys.map((v, i) => (
-            <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: colors[i % colors.length] }} />
-              <span>{c.x[i]} <b>{fmt(v)}{c.unit ?? ''}</b> <Box component="span" sx={{ color: 'text.secondary' }}>({Math.round((100 * v) / total)} %)</Box></span>
-            </Box>))}
-        </Box>
-      </Box>);
-  }
-  const all = c.series.flatMap((s) => s.y);
-  const lo = Math.min(0, ...all);
-  const hi = Math.max(lo + 1, niceCeil(Math.max(...all)));
-  const Y = (v: number) => M.t + (H - M.t - M.b) * (1 - (v - lo) / (hi - lo));
-  const cw = (W - M.l - M.r) / c.x.length;
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label={c.title}>
-      <Axes c={c} lo={lo} hi={hi} color={color} />
-      {c.kind === 'line' ? c.series.map((s, k) => {
-        const pts = s.y.map((v, i) => [M.l + cw * (i + 0.5), Y(v)] as const);
-        return <g key={k}><polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke={colors[k]} strokeWidth="2.5" strokeLinejoin="round" />
-          {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="3.5" fill={colors[k]}><title>{`${s.name} · ${c.x[i]} : ${fmt(s.y[i]!)}${c.unit ?? ''}`}</title></circle>)}</g>;
-      }) : c.series.map((s, k) => {
-        const bw = (cw * 0.7) / c.series.length;
-        return <g key={k}>{s.y.map((v, i) => {
-          const x = M.l + cw * i + cw * 0.15 + bw * k;
-          return <g key={i}><rect x={x} y={Math.min(Y(v), Y(0))} width={bw - 2} height={Math.abs(Y(v) - Y(0))} rx="4" fill={colors[k]}><title>{`${s.name} · ${c.x[i]} : ${fmt(v)}${c.unit ?? ''}`}</title></rect>
-            {c.series.length === 1 && <text x={x + (bw - 2) / 2} y={Y(v) - 5} textAnchor="middle" fontSize="11" fill={color.text}>{fmt(v)}</text>}</g>;
-        })}</g>;
-      })}
-    </svg>);
+function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: Colors }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<ChartJS>();
+  const [hidden, setHidden] = useState<number[]>([]);
+  const line = c.kind === 'line';
+  const unit = c.unit ?? '';
+  useEffect(() => {
+    const all = c.series.flatMap((s) => s.y);
+    const mn = Math.min(0, ...all), mx = Math.max(0, ...all);
+    // ~4 intervalles ronds, bornes alignées sur le pas (pas de graduations du type 37,5)
+    const step = niceCeil(Math.max(mx - mn, 1e-9) / 4);
+    const lo = Math.floor(mn / step) * step, hi = Math.max(lo + step, Math.ceil(mx / step) * step);
+    const ch = new ChartJS(ref.current!, {
+      type: c.kind === 'line' ? 'line' : 'bar',
+      data: {
+        labels: c.x,
+        datasets: c.series.map((s, k) => ({
+          label: s.name, data: s.y, borderColor: colors[k], backgroundColor: colors[k],
+          ...(line
+            ? { borderWidth: 2.5, tension: 0, pointRadius: 3.5, pointHoverRadius: 6, pointBorderColor: color.bg, pointBorderWidth: 0, pointHoverBorderWidth: 2 }
+            : { borderRadius: 4, borderSkipped: false, borderWidth: 0, categoryPercentage: 0.7, barPercentage: 1 }),
+        })) as never,
+      },
+      options: {
+        responsive: true, aspectRatio: 520 / 220, animation: { duration: 400 }, color: color.text,
+        layout: { padding: { top: 8, right: 4 } },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: color.text, font: { size: 11 }, maxRotation: 0, autoSkipPadding: 12 } },
+          y: { min: lo, max: hi, border: { display: false }, grid: { color: color.line }, ticks: { color: color.text, font: { size: 11 }, stepSize: step, callback: (v) => fmt(Number(v)) } },
+        },
+        plugins: {
+          tooltip: {
+            backgroundColor: color.paper, borderColor: color.line, borderWidth: 1, cornerRadius: 8, padding: 10, boxPadding: 4,
+            titleColor: color.text, bodyColor: color.fg, titleFont: { weight: 'normal', size: 12 }, bodyFont: { size: 12 },
+            displayColors: true, boxWidth: 9, boxHeight: 9, usePointStyle: false,
+            callbacks: { label: (i: { dataset: { label?: string }; parsed: { y: number | null } }) => ` ${i.dataset.label} : ${fmt(i.parsed.y ?? 0)}${unit}` },
+          },
+          barLabels: { on: !line && c.series.length === 1, color: color.text },
+        } as never,
+      },
+      plugins: [crosshair, barLabels],
+    });
+    chartRef.current = ch;
+    return () => ch.destroy();
+  }, [c, colors, color, line, unit]);
+  const toggle = (k: number) => {
+    const ch = chartRef.current; if (!ch) return;
+    ch.setDatasetVisibility(k, !ch.isDatasetVisible(k)); ch.update();
+    setHidden(c.series.map((_, i) => i).filter((i) => !ch.isDatasetVisible(i)));
+  };
+  return (<>
+    <canvas ref={ref} role="img" aria-label={c.title} />
+    {c.series.length > 1 && (
+      <Box sx={{ display: 'flex', gap: 2, mt: 0.5, flexWrap: 'wrap', fontSize: 12, color: 'text.secondary' }}>
+        {c.series.map((s, k) => (
+          <Box key={k} onClick={() => toggle(k)} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', userSelect: 'none', opacity: hidden.includes(k) ? 0.4 : 1, textDecoration: hidden.includes(k) ? 'line-through' : 'none' }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: colors[k] }} />{s.name}
+          </Box>))}
+      </Box>)}
+  </>);
 }
 
 export default function ChartCard({ chart: c }: { chart: Chart }) {
   const t = useTheme();
-  const colors = [t.palette.primary.main, t.palette.secondary.main, t.palette.warning.main, t.palette.success.main, '#38bdf8', '#ec4899'];
-  const color = { line: t.palette.divider, text: t.palette.text.secondary, bg: t.palette.background.default, fg: t.palette.text.primary };
+  const colors = useMemo(() => [t.palette.primary.main, t.palette.secondary.main, t.palette.warning.main, t.palette.success.main, '#38bdf8', '#ec4899'], [t]);
+  const color = useMemo<Colors>(() => ({ line: t.palette.divider, text: t.palette.text.secondary, bg: t.palette.background.default, fg: t.palette.text.primary, paper: t.palette.background.paper }), [t]);
   const [copied, setCopied] = useState(false);
   const copy = () => {
     const rows = [['', ...c.series.map((s) => s.name)], ...c.x.map((x, i) => [x, ...c.series.map((s) => String(s.y[i]))])];
@@ -102,11 +170,7 @@ export default function ChartCard({ chart: c }: { chart: Chart }) {
     <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.default' }}>
       {c.title && <Typography sx={{ fontWeight: 600 }}>{c.title}</Typography>}
       {c.unit && c.kind !== 'pie' && <Typography variant="caption" color="text.secondary">en {c.unit}</Typography>}
-      <Box sx={{ mt: 1 }}><Plot c={c} colors={colors} color={color} /></Box>
-      {c.kind !== 'pie' && c.series.length > 1 && (
-        <Box sx={{ display: 'flex', gap: 2, mt: 0.5, flexWrap: 'wrap', fontSize: 12, color: 'text.secondary' }}>
-          {c.series.map((s, k) => <Box key={k} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: colors[k] }} />{s.name}</Box>)}
-        </Box>)}
+      <Box sx={{ mt: 1 }}>{c.kind === 'pie' ? <Pie c={c} colors={colors} color={color} /> : <Plot c={c} colors={colors} color={color} />}</Box>
       <Button size="small" variant="outlined" onClick={copy} sx={{ mt: 1, py: 0, fontSize: 12 }}>{copied ? 'Copié ✓' : 'Copier les données'}</Button>
     </Box>
   );
