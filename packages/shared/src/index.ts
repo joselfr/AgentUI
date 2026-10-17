@@ -225,21 +225,6 @@ export interface AdapterAttachment {
 
 // ---------- Configuration des agents ----------
 export const AgentConfigSchema = z.discriminatedUnion('type', [
-  z.object({
-    id: z.string().regex(/^[a-z0-9_-]+$/i),
-    type: z.literal('hermes'),
-    name: z.string(),
-    url: z.string().url(),
-    apiKey: z.string(),
-    profiles: z.array(z.string()).default(['default']),
-  }),
-  z.object({
-    id: z.string().regex(/^[a-z0-9_-]+$/i),
-    type: z.literal('openclaw'),
-    name: z.string(),
-    url: z.string(), // ws:// ou wss://
-    auth: z.object({ token: z.string().optional(), password: z.string().optional() }),
-  }),
   // Agent relié par un plugin canal qui se connecte à AgentUI sur /gateway (plugins/protocol/PROTOCOL.md)
   z.object({
     id: z.string().regex(/^[a-z0-9_-]+$/i),

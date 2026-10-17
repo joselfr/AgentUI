@@ -1,20 +1,12 @@
 # Copier en agents.config.yaml. Les ${VARIABLES} sont lues dans l'environnement (.env).
+# Chaque agent est relié par un plugin canal (plugins/) : c'est la plateforme qui se connecte à AgentUI sur /gateway.
+# Le même token est déclaré côté plateforme (Hermes : AGENTUI_TOKEN ; OpenClaw : channels.agentui.token).
 agents:
   - id: hermes
-    type: hermes
+    type: gateway
     name: Hermes
-    url: http://127.0.0.1:8642
-    apiKey: ${HERMES_API_KEY}
-    profiles: [default]
-  # OpenClaw : adapter à implémenter après le spike protocole (étape 3)
+    token: ${AGENTUI_HERMES_TOKEN}
   # - id: openclaw
-  #   type: openclaw
-  #   name: OpenClaw
-  #   url: ws://127.0.0.1:18789
-  #   auth: { token: ${OPENCLAW_TOKEN} }
-  # Agent relié par plugin canal (plugins/) : c'est la plateforme qui se connecte à AgentUI sur /gateway.
-  # Le même token est déclaré côté plateforme (Hermes : AGENTUI_TOKEN ; OpenClaw : channels.agentui.token).
-  # - id: hermes-canal
   #   type: gateway
-  #   name: Hermes (canal)
-  #   token: ${AGENTUI_HERMES_TOKEN}
+  #   name: OpenClaw
+  #   token: ${AGENTUI_OPENCLAW_TOKEN}

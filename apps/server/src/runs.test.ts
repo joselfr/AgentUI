@@ -1,54 +1,32 @@
-import { createServer, type Server } from 'node:http';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AgentEvent } from '@agentui/shared';
-import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { openDb } from './db.js';
-import { HermesAdapter } from './agents/hermes.js';
 import type { AgentAdapter } from './agents/types.js';
 import { RunManager } from './runs.js';
 import { hashPassword, verifyPassword } from './auth.js';
 
-let server: Server;
-let url = '';
-
-// Format réel de Hermes v0.21 : pas de ligne `event:`, le nom est dans le JSON.
-const sse = (res: import('node:http').ServerResponse, name: string, data: object) =>
-  res.write(`data: ${JSON.stringify({ event: name, run_id: 'r1', ...data })}\n\n`);
-
-beforeAll(async () => {
-  server = createServer((req, res) => {
-    if (req.headers.authorization !== 'Bearer k') return void res.writeHead(401).end();
-    if (req.url === '/health') return void res.end('{"status":"ok"}');
-    // Messages texte : flux « session chat » (événements nommés via `event:`), seul à intégrer les images MEDIA.
-    if (req.url === '/api/sessions' && req.method === 'POST') {
-      res.setHeader('content-type', 'application/json');
-      return void res.end('{"object":"hermes.session"}');
-    }
-    if (req.url?.endsWith('/chat/stream') && req.method === 'POST') {
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const ev = (name: string, data: object) => res.write(`event: ${name}\ndata: ${JSON.stringify({ run_id: 'r1', ...data })}\n\n`);
-      ev('run.started', {});
-      ev('tool.started', { tool_name: 'terminal', preview: 'ls', args: 'ls' });
-      ev('tool.completed', { tool_name: 'terminal' });
-      ev('assistant.delta', { delta: 'Bon' });
-      ev('assistant.delta', { delta: 'jour' });
-      ev('assistant.completed', { content: 'Bonjour' });
-      ev('run.completed', {});
-      ev('done', {});
-      return void res.end();
-    }
-    res.writeHead(404).end();
-  });
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
-  url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
-});
-afterAll(() => void server.close());
-
-test('run Hermes : persistance du texte et des outils, événements rejouables', async () => {
+test('run : persistance du texte et des outils, événements rejouables', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
-  const adapter = new HermesAdapter({ id: 'h', type: 'hermes', name: 'H', url, apiKey: 'k', profiles: ['default'] });
+  async function* events() {
+    yield { type: 'run.started' as const };
+    yield { type: 'tool.started' as const, id: 't1', name: 'terminal', args: 'ls' };
+    yield { type: 'tool.completed' as const, id: 't1', name: 'terminal' };
+    yield { type: 'message.delta' as const, text: 'Bon' };
+    yield { type: 'message.delta' as const, text: 'jour' };
+    yield { type: 'message.final' as const, text: 'Bonjour' };
+    yield { type: 'run.completed' as const };
+  }
+  const adapter = {
+    id: 'h',
+    name: 'H',
+    type: 'fake',
+    capabilities: () => ({}),
+    send: async () => ({ runId: 'r1', sessionId: 'sess', events: events() }),
+    abort: async () => {},
+  } as unknown as AgentAdapter;
   const runs = new RunManager(db, new Map([['h', adapter]]));
   const finished = new Promise<string>((r) => (runs.onRunFinished = (_c, o) => r(o)));
 
@@ -61,7 +39,7 @@ test('run Hermes : persistance du texte et des outils, événements rejouables',
   expect(msgs[1]!.text).toBe('Bonjour');
   expect(msgs[1]!.status).toBe('done');
   expect(msgs[1]!.toolCalls).toMatchObject([{ name: 'terminal', status: 'done', args: 'ls' }]);
-  expect(runs.eventsSince(0).length).toBe(6);
+  expect(runs.eventsSince(0).length).toBe(7);
   expect(runs.isRunning(conv.id)).toBe(false);
 });
 

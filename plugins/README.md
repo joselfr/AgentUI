@@ -19,7 +19,7 @@ supprimable normalement.
 
 Côté AgentUI : déclarer l'agent dans `agents.config.yaml` (`type: gateway`, `token` de 16 caractères minimum).
 Le plugin se connecte à `ws(s)://<agentui>/gateway` ; en Docker sur le même réseau : `ws://agentui:8080/gateway`.
-Les adapters directs (`hermes` via api_server, `openclaw` via le WebSocket opérateur) restent disponibles en parallèle.
+Les anciens adapters directs (`hermes` via api_server, `openclaw` via le WebSocket opérateur) ont été supprimés.
 
 Les widgets `chart`, `map` et `code` sont aussi exposés comme outils de plugin (`agentui_chart`, `agentui_map`, `agentui_code`,
 voir `SPIKE.md`), et les widgets interactifs `ask`, `confirm` et `form` comme outils **bloquants** (`agentui_ask`,
