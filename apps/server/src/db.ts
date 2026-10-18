@@ -90,6 +90,31 @@ export function openDb(dataDir: string): DB {
       data TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS miniapps (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      icon TEXT NOT NULL DEFAULT 'apps',
+      description TEXT NOT NULL DEFAULT '',
+      version INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS miniapp_docs (
+      app_id TEXT NOT NULL REFERENCES miniapps(id) ON DELETE CASCADE,
+      collection TEXT NOT NULL,
+      id TEXT NOT NULL,
+      json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (app_id, collection, id)
+    );
+    CREATE TABLE IF NOT EXISTS miniapp_kv (
+      app_id TEXT NOT NULL REFERENCES miniapps(id) ON DELETE CASCADE,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (app_id, key)
+    );
   `);
   try {
     // Last read of the chat (ms): agent messages more recent than this are "unread".

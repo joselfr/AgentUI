@@ -276,3 +276,22 @@ test('plugin disconnection: run resumed if declared active on reconnection, othe
   expect(runs.getMessages(b.id)[1]!.text).toMatch(/lost/);
   expect(rb.runId).not.toBe(ra.runId);
 });
+
+test('apps: app.op from the plugin is executed for its agent and answered with app.result', async () => {
+  const { adapter } = setup();
+  const seen: unknown[] = [];
+  adapter.onAppOp = async (op, args) => {
+    seen.push([op, args]);
+    if (op === 'boom') throw new Error('nope');
+    return { ok: true };
+  };
+  const p = new FakePlugin();
+  adapter.attach(p, hello());
+  expect(p.sent[0]).toEqual({ type: 'welcome', protocol: 1, apps: true });
+  p.frame({ type: 'app.op', id: 'a1', op: 'list', args: {} });
+  p.frame({ type: 'app.op', id: 'a2', op: 'boom', args: {} });
+  await tick();
+  expect(seen[0]).toEqual(['list', {}]);
+  expect(p.sent.find((m) => m.id === 'a1')).toEqual({ type: 'app.result', id: 'a1', ok: true, result: { ok: true } });
+  expect(p.sent.find((m) => m.id === 'a2')).toMatchObject({ ok: false, error: 'nope' });
+});

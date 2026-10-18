@@ -17,6 +17,10 @@ import { RunManager } from './runs.js';
 import { PushService } from './push.js';
 import { AttachmentError, AttachmentStore } from './attachments.js';
 import { createReadStream } from 'node:fs';
+import { AppData } from './miniapps/data.js';
+import { registerMiniApps } from './miniapps/routes.js';
+import { AppError, MiniAppStore } from './miniapps/store.js';
+import { handleAppOp, isAppOp, opError } from './miniapps/ops.js';
 
 const COOKIE = 'agentui_session';
 
@@ -68,6 +72,7 @@ async function main() {
   // Validation errors (zod) → readable 400 rather than 500
   app.setErrorHandler((err: unknown, _req, reply) => {
     if (err instanceof z.ZodError) return reply.code(400).send({ error: err.issues.map((i) => i.message).join(' ; ') });
+    if (err instanceof AppError) return reply.code(err.status).send({ error: err.message });
     const e = err as { statusCode?: number; message?: string };
     const code = e.statusCode ?? 500;
     if (code >= 500) app.log.error(err);
@@ -285,6 +290,17 @@ async function main() {
     return { ok: true };
   });
 
+  // ---------- Mini-apps (created by the agents, shown in the Apps tab) ----------
+  const apps = new MiniAppStore(db, env.dataDir);
+  apps.onChange = (id, kind) => runs.broadcast({ type: 'app.changed', appId: id, removed: kind === 'removed' });
+  registerMiniApps(app, {
+    store: apps,
+    data: new AppData(db),
+    secret,
+    userOf,
+    runtimeDir: resolve(process.env.APP_RUNTIME_DIST ?? '../../packages/app-runtime/dist'),
+  });
+
   // ---------- WebSocket ----------
   app.get('/ws', { websocket: true }, (socket, req) => {
     if (!userOf(req.cookies)) {
@@ -321,6 +337,11 @@ async function main() {
   // The plugin installed in the platform connects here; authentication by the agent's token (first message).
   const gateways = [...adapters.values()].filter((a): a is GatewayAdapter => a instanceof GatewayAdapter);
   for (const g of gateways) {
+    g.onAppOp = async (op, args) => {
+      if (!isAppOp(op)) throw new AppError(`Unknown app operation "${op}".`);
+      return handleAppOp(apps, g.id, op, args);
+    };
+    g.onAppOpError = opError;
     g.onOutbound = (m) => {
       const conv = runs.deliver(g.id, m.conversationId, m.text, m.media, g.name, m.title);
       app.log.info({ agent: g.id, conversation: conv.id }, 'proactive message received');
@@ -362,7 +383,7 @@ async function main() {
   if (existsSync(webDist)) {
     await app.register(fastifyStatic, { root: webDist });
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
+      req.url.startsWith('/api/') || req.url.startsWith('/a/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
     );
   }
 
