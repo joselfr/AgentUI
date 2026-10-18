@@ -26,6 +26,4 @@ conservées dans la base (`data/agentui.db`) : ne pas la supprimer, sinon les ap
 Tests : `npm run e2e` (interface) et `npm run e2e:push` (voir l'en-tête de `e2e/push.mjs`).
 
 ## Site de présentation
-Page statique dans [`docs/`](docs/index.html) (GitHub Pages : branche `main`, dossier `/docs`). Renseigner `REPO_URL` en bas de la page pour afficher les boutons GitHub.
-Les captures (`docs/img/`) viennent d'une instance branchée sur un faux agent scénarisé : `e2e/demo/fake-agent.mjs` (se connecte sur `/gateway`) et
-`e2e/demo/capture.mjs <baseUrl> <utilisateur> <mot-de-passe> <dossier>` ; convertir ensuite en WebP (1600 px de large pour le desktop, 600 px pour le mobile).
+Page statique dans [`docs/`](docs/index.html), publiée par GitHub Pages (branche `main`, dossier `/docs`). Pour la modifier ou refaire ses captures : skill `update-site` (`.claude/skills/update-site/SKILL.md`).
