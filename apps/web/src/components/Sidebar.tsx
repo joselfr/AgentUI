@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Box, Button, IconButton, List, Typography } from '@mui/material';
 import Add from '@mui/icons-material/Add';
 import MenuOpen from '@mui/icons-material/MenuOpen';
@@ -45,6 +45,14 @@ export default function Sidebar(props: {
   const itemMenu = useItemMenu<Conversation>(!selection.selecting);
   const [renaming, setRenaming] = useState<Conversation>();
 
+  // À l'ouverture de la liste, la discussion active est amenée tout en haut
+  const listRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const box = listRef.current;
+    const cur = box?.querySelector<HTMLElement>('[data-current]');
+    if (box && cur) box.scrollTop = cur.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+  }, []);
+
   const item = (c: Conversation) => (
     <ConversationItem key={c.id} conv={c} current={c.id === props.currentId} agentName={agentName(c.agentId)}
       selecting={selection.selecting} checked={selection.has(c.id)} menuHandlers={itemMenu.bind(c)}
@@ -68,7 +76,7 @@ export default function Sidebar(props: {
       <SearchField query={search.query} onChange={search.setQuery} searching={search.searching} />
       {agents.length > 1 && !search.active && (
         <AgentFilter agents={agents} value={filter} onChange={(id) => { setAgentFilter(id); save('agentFilter', id); }} />)}
-      <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', px: 1, pb: 1 }}>
+      <Box ref={listRef} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', px: 1, pb: 1 }}>
         {search.active ? (
           <SearchResults hits={search.hits} searching={search.searching} q={search.q} currentId={props.currentId} agentName={agentName}
             onPick={(id) => { search.setQuery(''); props.onSelectConv(id); }} />

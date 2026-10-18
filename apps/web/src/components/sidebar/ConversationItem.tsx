@@ -9,7 +9,7 @@ export default function ConversationItem({ conv: c, current, agentName, selectin
   onClick: () => void; menuHandlers: Pick<ComponentProps<typeof ListItemButton>, 'onContextMenu' | 'onTouchStart' | 'onTouchMove' | 'onTouchEnd' | 'onTouchCancel'>;
 }) {
   return (
-    <ListItemButton selected={current} onClick={onClick} {...menuHandlers} sx={{ gap: 1, px: 1.5, WebkitTouchCallout: 'none', userSelect: 'none' }}>
+    <ListItemButton selected={current} data-current={current || undefined} onClick={onClick} {...menuHandlers} sx={{ gap: 1, px: 1.5, WebkitTouchCallout: 'none', userSelect: 'none' }}>
       {selecting && <Checkbox size="small" edge="start" checked={checked} tabIndex={-1} disableRipple sx={{ p: 0.5 }} inputProps={{ 'aria-label': `Sélectionner ${c.title}` }} />}
       {c.favorite && <Star aria-label="Favori" sx={{ fontSize: 16, color: 'warning.main', flexShrink: 0 }} />}
       <ListItemText sx={{ minWidth: 0 }} primary={c.title} secondary={`${agentName} · ${new Date(c.updatedAt).toLocaleDateString()}`}
