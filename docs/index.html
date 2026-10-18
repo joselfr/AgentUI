@@ -9,6 +9,8 @@
 <meta property="og:title" content="AgentUI — Le chat qui affiche vraiment ce que font vos agents">
 <meta property="og:description" content="Graphiques, tableaux, cartes, formulaires et suivis de tâches interactifs dans le chat de vos agents IA.">
 <meta property="og:image" content="img/hero-desktop.webp">
+<link rel="alternate" hreflang="fr" href="./">
+<link rel="alternate" hreflang="en" href="en/">
 <link rel="icon" href="img/icon.svg" type="image/svg+xml">
 <style>
   :root {
@@ -33,6 +35,7 @@
   .brand img { width: 30px; height: 30px; border-radius: 8px; }
   .nav nav { display: flex; gap: 24px; margin-left: auto; font-size: 15px; color: var(--muted); }
   .nav nav a { text-decoration: none; transition: color .15s; }
+  .nav nav a.lang { border: 1px solid var(--line); border-radius: 8px; padding: 2px 9px; font-weight: 700; font-size: 13px; color: var(--text); }
   .nav nav a:hover { color: var(--text); }
 
   /* Boutons */
@@ -138,7 +141,7 @@
     .row.flip .copy { order: 0; }
     .features { grid-template-columns: 1fr 1fr; }
     .flow { grid-template-columns: 1fr; gap: 30px; }
-    .nav nav a:not([data-repo-link]) { display: none; }
+    .nav nav a:not([data-repo-link]):not(.lang) { display: none; }
     .hero { padding-top: 56px; }
     .phone, .shot .phone, .row.flip .shot .phone { right: 2%; left: auto; bottom: -6%; width: 30%; }
   }
@@ -163,6 +166,7 @@
       <a href="#fonctions">Fonctions</a>
       <a href="#fonctionnement">Fonctionnement</a>
       <a href="#" data-repo-link hidden>GitHub</a>
+      <a class="lang" href="en/" hreflang="en" lang="en" title="English version">EN</a>
     </nav>
   </div>
 </header>

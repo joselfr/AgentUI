@@ -26,4 +26,4 @@ conservées dans la base (`data/agentui.db`) : ne pas la supprimer, sinon les ap
 Tests : `npm run e2e` (interface) et `npm run e2e:push` (voir l'en-tête de `e2e/push.mjs`).
 
 ## Site de présentation
-Page statique dans [`docs/`](docs/index.html), publiée par GitHub Pages (branche `main`, dossier `/docs`). Pour la modifier ou refaire ses captures : skill `update-site` (`.claude/skills/update-site/SKILL.md`).
+Page statique bilingue dans [`docs/`](docs/index.html) (français) et [`docs/en/`](docs/en/index.html) (anglais), publiée par GitHub Pages (branche `main`, dossier `/docs`). Pour la modifier ou refaire ses captures : skill `update-site` (`.claude/skills/update-site/SKILL.md`).

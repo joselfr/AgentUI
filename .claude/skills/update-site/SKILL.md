@@ -5,17 +5,17 @@ description: Mettre à jour la page de présentation d'AgentUI (docs/index.html,
 
 # Mettre à jour le site de présentation
 
-Page statique unique : `docs/index.html` (HTML + CSS + un peu de JS inline, aucune dépendance) et `docs/img/*.webp`. Servie par GitHub Pages (branche `main`, dossier `/docs`) ; `docs/.nojekyll` désactive Jekyll. Pas de build : ce qui est dans `docs/` est publié tel quel.
+Pages statiques : `docs/index.html` (français), `docs/en/index.html` (anglais) — HTML + CSS + un peu de JS inline, aucune dépendance — et `docs/img/*.webp`, partagées par les deux (l'anglais les référence en `../img/`). Servie par GitHub Pages (branche `main`, dossier `/docs`) ; `docs/.nojekyll` désactive Jekyll. Pas de build : ce qui est dans `docs/` est publié tel quel.
 
 Les captures ne viennent **pas** d'une vraie plateforme : un faux agent (`e2e/demo/fake-agent.mjs`) se connecte à une instance AgentUI jetable et joue des scénarios (graphique, tableau, carte, progression, code, confirmation, formulaire) avec de vrais appels d'outils `agentui_<widget>`. L'UI photographiée est donc toujours celle du code actuel, avec des données fictives et reproductibles.
 
 ## 1. Changer le texte ou la mise en page
 
-Éditer `docs/index.html` directement. Points à connaître :
+Éditer `docs/index.html`, **puis reporter le même changement dans `docs/en/index.html`** : les deux pages ont la même structure et doivent rester synchrones (mêmes sections, mêmes images, même ordre). L'interface d'AgentUI n'existant qu'en français, les captures restent françaises dans la version anglaise (le pied de page de l'anglaise le dit). Dans l'anglaise, traduire aussi les `alt` et les commentaires visibles, et garder `../img/`. Un sélecteur de langue (`a.lang`) est dans la navigation des deux pages. Points à connaître :
 - Couleurs en variables `:root` (`--bg #0e1015`, `--accent #ff5c5c`, celles de l'app) ; page sombre uniquement.
 - Une ligne de widget = `<div class="row">` (copie à gauche, capture à droite) ou `row flip` (inversé). Elle contient `.copy` (kicker, `h3`, `p`, liste, `<span class="tag">agentui_xxx</span>`) et `.shot` (une `.frame` desktop + une `.phone` mobile).
 - Les blocs `.reveal` apparaissent au défilement (sans JS ou avec mouvement réduit, tout est visible).
-- `REPO_URL` (script en bas) : mettre l'URL du dépôt pour afficher les boutons GitHub (masqués tant qu'elle est vide).
+- `REPO_URL` (script en bas, **dans les deux fichiers**) : mettre l'URL du dépôt pour afficher les boutons GitHub (masqués tant qu'elle est vide).
 - N'affirmer que ce que le code fait : vérifier dans `apps/web/src/components/` (rendu des widgets), `plugins/protocol/widget-tools.json` (arguments) ou le README avant de promettre une fonction.
 
 ## 2. Refaire les screenshots
@@ -41,15 +41,15 @@ La section `#taches` de la page s'appuie sur deux choses du faux agent : `JOBS` 
 
 1. **Scénario** : dans `e2e/demo/fake-agent.mjs`, ajouter un objet à `SCENARIOS` (`match` : regex sur le message, `intro`, `tools: [[type, arguments]]`, `outro`). Widget bloquant (`ask`/`confirm`/`form`) : champ `blocking: [type, arguments]` (le run reste ouvert pendant la capture). Les arguments suivent `plugins/protocol/widget-tools.json`.
 2. **Capture** : dans `e2e/demo/capture.mjs`, ajouter l'entrée à `SCENARIOS` (`id`, `prompt` qui déclenche le `match`, `ready` = sélecteur visible quand le widget est affiché, `blocking`) et, si besoin, aux listes `only` des variantes claires/mobile.
-3. **Page** : copier une `.row` existante dans la section `#widgets`, en alternant `flip`, avec les images `desktop-dark-<id>.webp` / `mobile-dark-<id>.webp`.
+3. **Page** (FR et EN) : copier une `.row` existante dans la section `#widgets`, en alternant `flip`, avec les images `desktop-dark-<id>.webp` / `mobile-dark-<id>.webp`.
 4. Refaire les captures (étape 2).
 
 ## 4. Vérifier avant de publier
 
-- Ouvrir la page dans Chromium (Playwright est installé : `playwright-core`, `/usr/bin/chromium`) en 1440 px et 390 px ; faire défiler pour charger les images `loading="lazy"` ; contrôler `document.documentElement.scrollWidth - innerWidth === 0` (pas de débordement horizontal), aucune image cassée (`[...document.images].filter(i => !i.naturalWidth)`) et aucune erreur de console.
+- Pour chaque langue, ouvrir la page dans Chromium (Playwright est installé : `playwright-core`, `/usr/bin/chromium`) en 1440 px et 390 px ; faire défiler pour charger les images `loading="lazy"` ; contrôler `document.documentElement.scrollWidth - innerWidth === 0` (pas de débordement horizontal), aucune image cassée (`[...document.images].filter(i => !i.naturalWidth)`) et aucune erreur de console.
 - Regarder une capture pleine page (outil Read) : alignement des téléphones superposés, texte lisible sur mobile.
 - Poids : `du -sh docs/img` (viser ~1-2 Mo ; ne pas committer de PNG).
 
 ## 5. Publier
 
-Commit (`docs/`, `e2e/demo/` si modifiés) puis push sur `main` : GitHub Pages republie tout seul. Premier déploiement : Settings → Pages → *Deploy from a branch* → `main` / `/docs`. Ne pas pousser sans demande explicite de l'utilisateur.
+Commit (`docs/` — français et anglais —, `e2e/demo/` si modifiés) puis push sur `main` : GitHub Pages republie tout seul. Premier déploiement : Settings → Pages → *Deploy from a branch* → `main` / `/docs`. Ne pas pousser sans demande explicite de l'utilisateur.
