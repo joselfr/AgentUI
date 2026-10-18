@@ -10,7 +10,7 @@ import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
-import { expandWidgetTokens, interactiveBlocks, outOfTextWidgets, parseWidget, WIDGET_ATTACHMENT_PREFIX, type ToolCallLike } from '../widget';
+import { dropStrayFence, expandWidgetTokens, interactiveBlocks, outOfTextWidgets, parseWidget, WIDGET_ATTACHMENT_PREFIX, type ToolCallLike } from '../widget';
 import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
@@ -90,7 +90,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
   // The widget of an `agentui_<type>` tool takes the place of the token the agent wrote in its text; the call is also still listed with the other tools.
   // Widgets that evolve during the run (progress): shown as soon as their tool call, without waiting for the agent's text.
   const live = useMemo(() => (m.role === 'user' ? [] : outOfTextWidgets(m.toolCalls ?? [], allTools)), [m.role, m.toolCalls, allTools]);
-  const text = useMemo(() => (m.role === 'user' ? m.text : expandWidgetTokens(m.text, m.toolCalls ?? [], allTools, m.status !== 'streaming')), [m.role, m.text, m.toolCalls, m.status, allTools]);
+  const text = useMemo(() => (m.role === 'user' ? m.text : dropStrayFence(expandWidgetTokens(m.text, m.toolCalls ?? [], allTools, m.status !== 'streaming'))), [m.role, m.text, m.toolCalls, m.status, allTools]);
   // `pre` must keep the same identity from one render to the next: otherwise React unmounts and remounts it, and the widgets
   // (form input, map, checked boxes) lose their state and focus on every chat render.
   const latest = useRef({ m, answers, onAnswer });

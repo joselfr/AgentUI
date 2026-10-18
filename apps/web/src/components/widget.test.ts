@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandWidgetTokens, outOfTextWidgets, stepTimes } from './widget';
+import { dropStrayFence, expandWidgetTokens, outOfTextWidgets, stepTimes } from './widget';
 
 const chart = { kind: 'bar', x: ['a'], series: [{ name: 's', y: [1] }] };
 const tool = (id: string, token = 'a3f9c1', args: unknown = chart, name = 'agentui_chart') =>
@@ -110,3 +110,17 @@ describe('image widget: mapping of copied files', () => {
   });
 });
 
+
+describe('dropStrayFence', () => {
+  const w = '```widget\n{"type":"ask","arguments":{"question":"?"}}\n```';
+  it('removes an empty fence left open before a widget block', () => {
+    expect(dropStrayFence(`Text.\n\`\`\`\n\n${w}`)).toBe(`Text.\n\n${w}`);
+  });
+  it('keeps a code block that is properly closed before the widget', () => {
+    const t = `\`\`\`js\nlet a;\n\`\`\`\n\n${w}`;
+    expect(dropStrayFence(t)).toBe(t);
+  });
+  it('leaves a text without a stray fence untouched', () => {
+    expect(dropStrayFence(w)).toBe(w);
+  });
+});

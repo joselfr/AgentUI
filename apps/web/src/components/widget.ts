@@ -7,6 +7,29 @@ export function parseWidget(raw: string): { type: string; arguments: Record<stri
   } catch { return undefined; }
 }
 
+/**
+ * Removes an empty fence left open just before a ```widget / ```ask block (stray "```" at the end of the agent's text):
+ * Markdown would read it as the opener of a code block and the widget fence as its closer, so the widget would
+ * never render and its JSON would show up as plain text.
+ */
+export function dropStrayFence(text: string): string {
+  const lines = text.split('\n');
+  let opener = -1; // index of the open fence, -1 if none
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]!;
+    if (!/^\s*```/.test(l)) continue;
+    if (opener < 0) { opener = i; continue; }
+    // Open fence: the widget fence is dropped into it only if the block so far is blank and the opener has no language
+    if (/^```(widget|ask)[^\S\n]*$/.test(l.trim()) && /^\s*```\s*$/.test(lines[opener]!) && lines.slice(opener + 1, i).every((x) => !x.trim())) {
+      lines.splice(opener, 1);
+      i--; opener = i; // the widget fence is now the opener
+      continue;
+    }
+    opener = -1;
+  }
+  return lines.join('\n');
+}
+
 const INTERACTIVE = new Set(['ask', 'confirm', 'form']);
 
 /** Interactive blocks of a text (`ask`/`confirm`/`form` widgets and legacy ```ask block), in order: each waits for an answer. */
