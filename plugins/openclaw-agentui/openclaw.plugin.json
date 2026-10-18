@@ -1,7 +1,7 @@
 {
   "id": "agentui",
   "channels": ["agentui"],
-  "contracts": { "tools": ["agentui_chart", "agentui_map", "agentui_code"] },
+  "contracts": { "tools": ["agentui_chart", "agentui_map", "agentui_code", "agentui_table", "agentui_progress", "agentui_image", "agentui_ask", "agentui_confirm", "agentui_form"] },
   "name": "AgentUI",
   "description": "Canal AgentUI : OpenClaw se connecte à AgentUI (WebSocket sortante) selon l'AgentUI Channel Protocol v1.",
   "configSchema": {

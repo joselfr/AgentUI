@@ -2,7 +2,7 @@
 //   npm run build:test && node --test --experimental-test-module-mocks test/
 import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
@@ -429,6 +429,8 @@ test('outils-widgets : agentui_chart / map / code, réservés aux runs AgentUI',
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
   assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_ask', 'agentui_confirm', 'agentui_form']);
+  // Le manifeste déclare exactement ces outils (contracts.tools), sinon OpenClaw avertit au chargement
+  assert.deepEqual(JSON.parse(readFileSync(new URL('../openclaw.plugin.json', import.meta.url), 'utf8')).contracts.tools, opts.names);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
   const tools = factory({ messageChannel: 'agentui' });
   assert.deepEqual(tools.map((t) => t.name), opts.names);
