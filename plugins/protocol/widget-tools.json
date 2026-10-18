@@ -303,7 +303,7 @@
   "tokenInstruction": "Place this token as is in your reply, where the component should appear.",
   "blockingTools": {
     "ask": {
-      "description": "Asks the user a question in AgentUI (choice buttons) and waits for the answer. Use only if you really need information. The tool BLOCKS until the user answers and returns the answer as its result: write nothing else in the same turn, then continue your task based on the answer.",
+      "description": "Asks the user a question in AgentUI (choice buttons or free answer) and waits for the answer. Use only if you really need information. The tool BLOCKS until the user answers and returns the answer as its result: write nothing else in the same turn, then continue your task based on the answer.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -316,7 +316,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Proposed choices (at least one, always include an \"Other\" choice if a free answer may be needed). For an open question, ask it in your reply instead."
+            "description": "Proposed choices. Without options: free answer."
           },
           "multiple": {
             "type": "boolean",
@@ -324,8 +324,7 @@
           }
         },
         "required": [
-          "question",
-          "options"
+          "question"
         ]
       }
     },

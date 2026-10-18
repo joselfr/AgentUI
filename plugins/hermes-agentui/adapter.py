@@ -1109,8 +1109,6 @@ def _ask_error(key: str, args: Dict[str, Any]) -> Optional[str]:
     """Semantic checks of the interactive tools (the JSON schema cannot express them)."""
     if key == "ask" and not str(args.get("question") or "").strip():
         return "The question is empty."
-    if key == "ask" and not [o for o in args.get("options") or [] if str(o).strip()]:
-        return "Options are required: propose at least one choice (add an \"Other\" choice for a free answer), or ask your question in your reply."
     if key == "confirm" and not str(args.get("title") or "").strip():
         return "The title is empty."
     if key == "form":
