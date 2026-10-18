@@ -10,6 +10,7 @@ import type { AgentEvent, GatewayMessage, Media, Usage } from './protocol.js';
 import { getAgentUIRuntime } from './runtime.js';
 import { listSubAgents } from './agents.js';
 import { jobAction, listJobs } from './cron.js';
+import { listSkills } from './skills.js';
 import { randomBytes } from 'node:crypto';
 import type { AskResult, RunHost } from './hosts.js';
 import { resolveQuestion } from './question.js';
@@ -507,6 +508,13 @@ export class AgentUIBridge implements RunHost {
               ? this.usageOf(conv, sub) ?? null
               : await this.setModel(conv, String(params.model ?? ''), typeof params.provider === 'string' ? params.provider : undefined, sub);
         client?.send({ type: 'rpc.result', id: msg.id, result });
+      } catch (e) {
+        client?.send({ type: 'rpc.result', id: msg.id, error: e instanceof Error ? e.message : String(e) });
+      }
+    } else if (msg.method === 'listSkills') {
+      try {
+        const sub = typeof params.subAgentId === 'string' && params.subAgentId ? params.subAgentId : undefined;
+        client?.send({ type: 'rpc.result', id: msg.id, result: listSkills(this.p.cfg, sub) });
       } catch (e) {
         client?.send({ type: 'rpc.result', id: msg.id, error: e instanceof Error ? e.message : String(e) });
       }

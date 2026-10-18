@@ -21,7 +21,7 @@ const CAPABILITIES: Capabilities = {
   subagents: false, // TODO : sessions de sous-agents (outil sessions_spawn) via les événements d'agent
   reasoning: true,
   toolDetails: true,
-  skills: false,
+  skills: true,
   jobs: true,
   jobControl: true,
   sessionDelete: true,
