@@ -108,10 +108,28 @@ The app must look native. **Use the components above and the CSS variables; neve
 
 - Variables: `--au-bg` (page), `--au-paper` (cards), `--au-raised` (inputs/hover), `--au-accent`, `--au-on-accent`, `--au-text`, `--au-muted`, `--au-line` (borders), `--au-danger`, `--au-success`, `--au-warning`, `--au-info`, `--au-radius` (12px), `--au-radius-sm`, `--au-font`, `--au-mono`.
 - Custom CSS goes in a `.css` file imported from a module, referencing those variables: `border: 1px solid var(--au-line); background: var(--au-paper); border-radius: var(--au-radius);`.
-- Base font size is 14px; spacing multiples of 4/8px. Mobile first: the app is also used on a phone (≥ 320px wide) — use `wrap`, avoid fixed widths, keep touch targets ≥ 40px.
+- Base font size is 14px; spacing multiples of 4/8px. Design **mobile first** (see the section below): the app is mostly used on a phone.
 - The page itself does not scroll: `Page` scrolls internally. Do not use `100vh` tricks; fill the available space.
 - No external resources in the frontend (images, fonts, scripts, CDN, direct `fetch` to the internet): the iframe is sandboxed and its CSP blocks them. Use inline SVG or `data:` URLs; fetch external data through `ctx.fetch` in the backend. For live data, refresh with `setInterval` + `api.get(...)` or `useApi`.
 - No `localStorage`/cookies (opaque origin): persist through the backend.
+
+### Mobile first
+
+Users open apps on a phone at least as often as on a desktop. Design the narrow layout first (one column, 320–400 px wide), then enhance for wider screens — never the opposite.
+
+- Start with a single column: `Stack` (vertical) as the page content, full-width `TextField` / `Select` / `Button`. Put side-by-side controls in a `Row` with `wrap` so they stack when there is no room.
+- Keep `Page` as the root (it already limits width to 860 px and reduces padding on small screens). Do not set pixel widths on containers; use `flex: 1`, `min-width: 0` and percentages.
+- Several columns only from a width threshold, in your CSS file:
+  ```css
+  .cards { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 700px) { .cards { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
+  ```
+- `Table` scrolls horizontally inside its container: keep few columns, or render a `List` / `Card` per row on small screens.
+- Touch: targets ≥ 40 px (the provided `Button` / `IconButton` already are), spacing between tappable items, no interaction that exists only on hover (tooltips, hover menus), no tiny text (< 12 px).
+- Long texts: let them wrap or truncate with ellipsis *and* make the full text reachable; avoid horizontal scrolling of the whole page.
+- Charts: use `Chart` with a `height` around 200–240 and few labels; it adapts to the container width.
+- Dialogs fit the screen (`Dialog` is limited to the viewport and scrolls); keep their content short.
+- Test mentally (or with `getComputedStyle`) at 360 px wide before delivering.
 
 ## Backend (`server/*.js`)
 
@@ -152,6 +170,6 @@ export function DELETE(req, ctx) {
 
 - `src/main.tsx` default-exports the component and the build returned `ok: true`.
 - Handles loading, empty and error states (`Spinner`, `EmptyState`, `Alert`).
-- Only `@agentui/ui` components / `--au-*` variables for styling; works in light and dark mode and on a narrow screen.
+- Only `@agentui/ui` components / `--au-*` variables for styling; works in light and dark mode and is usable at 360 px wide (mobile first, no horizontal page scroll).
 - Texts follow the user's language (`useLang()`), or the language you are talking in.
 - Backend validates input and returns `ctx.status(400, …)` on bad requests.
