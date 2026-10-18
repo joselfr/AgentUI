@@ -1,13 +1,11 @@
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import { alpha, createTheme } from '@mui/material/styles';
+import { FONT_MONO, FONT_SANS, themeAccents, themeTokens } from '@agentui/shared';
 
-export const MONO = '"JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace';
+export const MONO = FONT_MONO;
 
-const tokens = {
-  dark: { bg: '#0e1015', paper: '#161a22', raised: '#1c212b', accent: '#ff5c5c', accentHover: '#ff7a7a', line: 'rgba(255,255,255,0.08)', text: '#e8eaf0', muted: '#8b93a5' },
-  light: { bg: '#f6f7f9', paper: '#ffffff', raised: '#eef0f4', accent: '#e5484d', accentHover: '#d23a3f', line: 'rgba(15,20,30,0.10)', text: '#171a21', muted: '#5d6575' },
-};
+const tokens = themeTokens;
 
 export const makeTheme = (mode: 'light' | 'dark') => {
   const t = tokens[mode];
@@ -15,17 +13,17 @@ export const makeTheme = (mode: 'light' | 'dark') => {
     palette: {
       mode,
       primary: { main: t.accent, dark: t.accentHover, contrastText: '#fff' },
-      secondary: { main: '#8b6cf0' },
-      success: { main: '#22c55e' },
-      warning: { main: '#f59e0b' },
-      error: { main: mode === 'dark' ? '#ff6b6b' : '#d23a3f' },
+      secondary: { main: themeAccents.secondary },
+      success: { main: themeAccents.success },
+      warning: { main: themeAccents.warning },
+      error: { main: t.danger },
       background: { default: t.bg, paper: t.paper },
       text: { primary: t.text, secondary: t.muted },
       divider: t.line,
     },
     shape: { borderRadius: 12 },
     typography: {
-      fontFamily: '"Inter Variable", Inter, system-ui, sans-serif',
+      fontFamily: FONT_SANS,
       h5: { fontWeight: 650, letterSpacing: '-0.02em' },
       h6: { fontWeight: 650, letterSpacing: '-0.01em' },
       subtitle1: { fontWeight: 600, letterSpacing: '-0.01em' },

@@ -243,4 +243,20 @@ export type ServerPush =
   | { type: 'event'; seq: number; agentId: string; sessionId: string; runId: string; event: AgentEvent }
   | { type: 'agent.status'; agentId: string; status: ConnStatus; detail?: string }
   /** Chat marked read (from another device): remove its "unread" indicator. */
-  | { type: 'conversation.read'; conversationId: string };
+  | { type: 'conversation.read'; conversationId: string }
+  /** A mini-app was created, rebuilt or removed: refresh the Apps tab / reload the open iframe. */
+  | { type: 'app.changed'; appId: string; removed?: boolean };
+export * from './theme.js';
+
+/** Mini-app created by an agent, shown in the Apps tab. */
+export interface MiniApp {
+  id: string;
+  agentId: string;
+  name: string;
+  /** Icon name (see the apps skill); the web app falls back to a generic one. */
+  icon: string;
+  description: string;
+  /** Incremented on each build: the open iframe reloads when it changes. */
+  version: number;
+  updatedAt: number;
+}
