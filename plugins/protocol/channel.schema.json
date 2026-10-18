@@ -542,6 +542,32 @@
         {
           "properties": {
             "type": {
+              "const": "app.op"
+            },
+            "id": {
+              "type": "string"
+            },
+            "op": {
+              "enum": [
+                "create",
+                "write",
+                "read",
+                "list",
+                "delete_file",
+                "remove",
+                "logs"
+              ]
+            },
+            "args": {}
+          },
+          "required": [
+            "id",
+            "op"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
               "const": "pong"
             }
           }
@@ -561,6 +587,9 @@
             },
             "protocol": {
               "const": 1
+            },
+            "apps": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -683,6 +712,27 @@
           "required": [
             "id",
             "method"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "app.result"
+            },
+            "id": {
+              "type": "string"
+            },
+            "ok": {
+              "type": "boolean"
+            },
+            "result": {},
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "ok"
           ]
         },
         {

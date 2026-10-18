@@ -444,5 +444,156 @@
     }
   },
   "updateInstruction": "Update applied: the displayed component has changed. Do not write the token.",
-  "progressInstruction": "The component is already displayed in the chat: do not write this token in your reply. To update it, call the tool again with update = this token and the complete state of the steps."
+  "progressInstruction": "The component is already displayed in the chat: do not write this token in your reply. To update it, call the tool again with update = this token and the complete state of the steps.",
+  "appTools": {
+    "guide": {
+      "description": "Returns the guide for building AgentUI apps (React + backend shown in the Apps tab): file layout, UI components, CSS variables, backend API, rules. READ IT BEFORE creating or modifying an app.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "create": {
+      "description": "Creates (or renames) an app shown in the Apps tab of AgentUI. Then send its files with agentui_app_write. Call agentui_app_guide first if you have not read the guide.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name displayed in the Apps tab."
+          },
+          "icon": {
+            "type": "string",
+            "description": "Icon name from the guide (default: apps)."
+          },
+          "description": {
+            "type": "string",
+            "description": "One short sentence."
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      }
+    },
+    "write": {
+      "description": "Writes files of an app (created or replaced) then builds it. Paths: src/main.tsx (required, default-exports the root React component), other src/** modules, and server/<route>.js for the backend. Returns {ok:true} or {ok:false, errors:[{file,line,message}]}: on errors, fix and write again (the previous working version stays online).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+          },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 40,
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "e.g. src/main.tsx, src/styles.css, server/todos.js"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Full file content."
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "files"
+        ]
+      }
+    },
+    "read": {
+      "description": "Reads a file of one of your apps.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+          },
+          "path": {
+            "type": "string",
+            "description": "e.g. src/main.tsx"
+          }
+        },
+        "required": [
+          "id",
+          "path"
+        ]
+      }
+    },
+    "list": {
+      "description": "Lists your apps with their files.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "delete_file": {
+      "description": "Deletes a file of one of your apps then rebuilds it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path"
+        ]
+      }
+    },
+    "remove": {
+      "description": "Permanently deletes an app with its files and its data. Only on explicit request of the user (ask for confirmation with agentui_confirm first).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    "logs": {
+      "description": "Recent backend logs of an app (console.log output, handler errors, timeouts) — use it to debug server/*.js.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    }
+  }
 }

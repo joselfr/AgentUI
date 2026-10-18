@@ -9,6 +9,8 @@ export interface RunHost {
   askBlocking(conversationId: string, key: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<AskResult> | undefined;
   /** Pushes a media into the chat's running run; `false` if no run is in progress. */
   emitMedia(conversationId: string, media: Media): boolean;
+  /** Mini-app operation on the AgentUI server; `undefined` if this bridge is not connected. */
+  appOp(op: string, args: unknown): Promise<unknown> | undefined;
 }
 
 /** Bridges of the connected accounts (accountId → bridge). */
@@ -25,4 +27,13 @@ export function askUser(conversationId: string, key: string, args: Record<string
 export function emitMedia(conversationId: string, media: Media): boolean {
   for (const host of runHosts.values()) if (host.emitMedia(conversationId, media)) return true;
   return false;
+}
+
+/** Runs a mini-app operation (`create`, `write`…) on the AgentUI server through the first connected account. */
+export function appOp(op: string, args: unknown): Promise<unknown> {
+  for (const host of runHosts.values()) {
+    const pending = host.appOp(op, args);
+    if (pending) return pending;
+  }
+  return Promise.reject(new Error('AgentUI is not connected.'));
 }

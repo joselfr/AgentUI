@@ -4,10 +4,11 @@
 import { randomBytes } from 'node:crypto';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
-import { askUser, emitMedia } from './hosts.js';
+import { appOp, askUser, emitMedia } from './hosts.js';
 import { imagesError, readLocalImage } from './images.js';
 
-export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools), ...Object.keys(spec.blockingTools)].map((k) => spec.prefix + k);
+export const APP_TOOL_PREFIX = `${spec.prefix}app_`;
+export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools), ...Object.keys(spec.blockingTools)].map((k) => spec.prefix + k).concat(Object.keys(spec.appTools).map((k) => APP_TOOL_PREFIX + k));
 
 type Args = Record<string, any>;
 
@@ -97,6 +98,17 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: key === 'progress' ? spec.progressInstruction : spec.tokenInstruction, ...(key === 'image' ? { files } : {}) }) }], details: { token } };
       },
     }));
-    return [...display, ...blocking];
+    // Mini-apps: files are built and stored on the AgentUI server; the result (or the build errors) comes back to the model.
+    const apps = Object.entries(spec.appTools).map(([op, tool]) => ({
+      name: APP_TOOL_PREFIX + op,
+      label: APP_TOOL_PREFIX + op,
+      description: tool.description,
+      parameters: tool.parameters as any,
+      async execute(_id: string, args: Args) {
+        const result = op === 'guide' ? { guide: spec.appGuide } : await appOp(op, args);
+        return { content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result) }], details: { op } };
+      },
+    }));
+    return [...display, ...blocking, ...apps];
   }, { names: WIDGET_TOOL_NAMES });
 }

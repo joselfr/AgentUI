@@ -20,18 +20,20 @@ d'agents (Hermes, OpenClaw…). Schéma JSON : [`channel.schema.json`](channel.s
 | `event` | `conversationId`, `runId`, `event` | Un événement de run, au format `AgentEvent` d'AgentUI (voir plus bas). |
 | `outbound` | `id`, `conversationId?`, `title?`, `text?`, `media?: Media[]` | **Message proactif** (cron, rappel, outil `send_message`…) hors de tout run. Sans `conversationId`, AgentUI le range dans la discussion « maison » de l'agent. `title` : titre proposé si la discussion doit être créée (ex. « ⏰ nom-de-la-tâche » pour un cron). |
 | `rpc.result` | `id`, `result?` \| `error?` | Réponse à un `rpc`. |
+| `app.op` | `id`, `op`, `args?` | Opération sur les **apps** de l'agent (onglet Apps) : `create`, `write`, `read`, `list`, `delete_file`, `remove`, `logs`. Réponse : `app.result`. Un agent ne touche qu'à ses propres apps. |
 | `pong` | — | Réponse à `ping`. |
 
 ## Messages AgentUI → plugin
 
 | `type` | Champs | Rôle |
 |---|---|---|
-| `welcome` | `protocol: 1` | Accepte le `hello`. |
+| `welcome` | `protocol: 1`, `apps?: true` | Accepte le `hello`. `apps: true` : le serveur gère les trames `app.op`. |
 | `inbound` | `conversationId`, `runId`, `text`, `subAgentId?`, `attachments?: Media[]` | Message de l'utilisateur. **Chaque `conversationId` est un chat distinct** pour la plateforme, et donc une session distincte (fils multiples). Le `runId` est choisi par AgentUI. |
 | `abort` | `conversationId`, `runId` | Arrêter le run. |
 | `reply` | `conversationId`, `runId`, `text` | Réponse de l'utilisateur à une question que l'agent pose **en plein run** (annoncée par `question.requested`). Le plugin la remet à l'agent en attente : le run se poursuit et se termine normalement, ce n'est pas un nouvel `inbound`. Facultatif : AgentUI n'en envoie que tant qu'une question est ouverte. |
 | `approval` | `conversationId`, `runId`, `id`, `approve: boolean`, `scope?: "once" \| "session" \| "always"` | Réponse à un `approval.request`. |
 | `rpc` | `id`, `method`, `params?` | Appel optionnel. Méthode inconnue : `rpc.result` avec `error`. Méthodes : `listSubAgents` → `[{ id, name, description?, isDefault? }]` ; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (si `capabilities.jobs`) ; `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (si `capabilities.jobControl`) ; `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (si `capabilities.skills`) ; `readSkill {skillId, subAgentId?}` → `{ content }` (Markdown de la skill, si `capabilities.skills`) ; `deleteSession {conversationId}` → `{ ok: true }` (si `capabilities.sessionDelete`) ; `listModels` → `[{ provider, providerName, id }]`, `setModel {conversationId, model, provider?, subAgentId?}` → `{ model, provider?, message? }` et `sessionUsage {conversationId, subAgentId?}` → `Usage` ou `null` (si `capabilities.models`). Dates en millisecondes. |
+| `app.result` | `id`, `ok`, `result?` \| `error?` | Réponse à un `app.op`. `ok: false` : `error` est un message lisible par l'agent (id invalide, app d'un autre agent…). Un build qui échoue n'est **pas** une erreur : `ok: true` avec `result = { ok: false, errors: [{ file, line, message }] }`. |
 | `ping` | — | Maintien de la connexion. |
 
 ## Événements (`event.event`)
@@ -79,6 +81,15 @@ Les widgets interactifs `ask`, `confirm` et `form` sont des outils **bloquants**
 `{"type": …, "arguments": …}` au texte du run, attend la trame `reply` et renvoie `{"answer": "<texte de la réponse>"}` à
 l'agent ; il émet ensuite `question.resolved`. Un `abort`, une fin de run ou un délai le débloquent avec une erreur. Le bloc
 Markdown reste une convention de repli pour un agent sans plugin.
+
+## Apps (outils `agentui_app_*`)
+
+Un agent peut créer de petites applications (frontend React + backend d'API) affichées dans l'onglet **Apps**. Les fichiers
+vivent sur le serveur AgentUI ; le plugin n'est qu'un relais : chaque outil `agentui_app_<op>` (section `appTools` de
+`widget-tools.json`) envoie une trame `app.op` et attend l'`app.result` correspondant (délai conseillé : 60 s). Exception :
+`agentui_app_guide`, local, renvoie le guide `apps-guide.md` (embarqué par `sync-widget-tools.mjs` sous `appGuide`, et publié
+aussi comme skill `.claude/skills/agentui-apps`). Le serveur compile (esbuild), isole le backend (worker + vm) et sert
+l'app dans une iframe sandbox ; voir `apps-guide.md` pour la contrainte côté agent.
 
 ## Règles
 

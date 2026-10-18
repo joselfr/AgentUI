@@ -163,6 +163,12 @@ class FakeAgent:
                     args = {"fields": [{"name": "a", "label": "A"}, {"name": "a", "label": "B"}]}
                 self.answers[chat] = json.loads(Ctx.tools["agentui_" + key](args))
                 return "fait"
+            if event.text == "app-tools":  # agentui_app_*: guide is local, the others go through app.op / app.result
+                guide = json.loads(Ctx.tools["agentui_app_guide"]({}))
+                wrote = json.loads(Ctx.tools["agentui_app_write"]({"id": "todo", "files": [{"path": "src/main.tsx", "content": "x"}]}))
+                failed = json.loads(Ctx.tools["agentui_app_remove"]({"id": "nope"}))
+                self.answers[chat] = (guide, wrote, failed)
+                return "fait"
             if event.text == "prog-widget":  # progress widget: the 2nd call (update) returns the same token
                 steps = [{"label": "A", "status": "running"}]
                 first = json.loads(Ctx.tools["agentui_progress"]({"steps": steps}))
@@ -327,6 +333,18 @@ async def main():
         await server.until(lambda f: f.get("runId") == "r3d" and f["event"]["type"] == "question.resolved" and f["event"]["id"] == requested[0])
         await server.until(lambda f: f.get("runId") == "r3d" and f["event"]["type"] == "run.completed")
         assert agent.answers["c3d"] == {"answer": "Bleu"}, agent.answers
+        # apps: the tool blocks on app.op until the server answers with app.result
+        await server.send({"type": "inbound", "conversationId": "c3g", "runId": "r3g", "text": "app-tools"})
+        op = (await server.until(lambda f: f.get("type") == "app.op"))[-1]
+        assert op["op"] == "write" and op["args"]["id"] == "todo", op
+        await server.send({"type": "app.result", "id": op["id"], "ok": True, "result": {"ok": False, "errors": [{"file": "src/main.tsx", "line": 1, "message": "boom"}]}})
+        op2 = (await server.until(lambda f: f.get("type") == "app.op"))[-1]
+        assert op2["op"] == "remove", op2
+        await server.send({"type": "app.result", "id": op2["id"], "ok": False, "error": "Unknown app \"nope\"."})
+        await server.until(lambda f: f.get("runId") == "r3g" and f["event"]["type"] == "run.completed")
+        guide, wrote, failed = agent.answers["c3g"]
+        assert "Building apps for AgentUI" in guide["guide"] and wrote["errors"][0]["message"] == "boom" and "Unknown app" in failed["error"], agent.answers
+        print("✓ app tools: guide, write (build errors), remove (error)")
         # stop while waiting: the tool hands control back without an answer
         await server.send({"type": "inbound", "conversationId": "c3e", "runId": "r3e", "text": "tool-confirm"})
         await server.until(lambda f: f.get("runId") == "r3e" and '\\"type\\": \\"confirm\\"' in json.dumps(f, ensure_ascii=False))

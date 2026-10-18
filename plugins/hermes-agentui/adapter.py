@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import concurrent.futures
 import hashlib
 import json
 import logging
@@ -370,6 +371,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._approvals: Dict[str, str] = {}  # approval id → Hermes session_key
         self._clarifies: Dict[str, Tuple[str, str]] = {}  # chat → (session_key, clarify_id) of the pending question
         self._asks: Dict[str, _Ask] = {}  # chat → question of a pending interactive tool
+        self._app_ops: Dict[str, concurrent.futures.Future] = {}  # app.op id → future resolved by app.result
         self._session_chat: Dict[str, str] = {}  # Hermes session_id (agent or sub-agent) → conversationId
         self._session_subagent: Dict[str, str] = {}  # session_id of a sub-agent → AgentUI sub-agent id
         self._closing = False
@@ -518,8 +520,31 @@ class AgentUIAdapter(BasePlatformAdapter):
             self._on_reply(msg)
         elif kind == "rpc":
             asyncio.create_task(self._on_rpc(msg))
+        elif kind == "app.result":
+            with self._lock:
+                fut = self._app_ops.pop(str(msg.get("id")), None)
+            if fut is not None and not fut.done():
+                if msg.get("ok"):
+                    fut.set_result(msg.get("result"))
+                else:
+                    fut.set_exception(RuntimeError(msg.get("error") or "App operation failed."))
         elif kind == "ping":
             self._post({"type": "pong"})
+
+    def app_op(self, op: str, args: Dict[str, Any], timeout: float = 60.0) -> Any:
+        """Runs a mini-app operation (create, write…) on the AgentUI server and waits for its result (agent thread)."""
+        fut: concurrent.futures.Future = concurrent.futures.Future()
+        op_id = f"app_{uuid.uuid4().hex[:12]}"
+        with self._lock:
+            self._app_ops[op_id] = fut
+        self._post({"type": "app.op", "id": op_id, "op": op, "args": args})
+        try:
+            return fut.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise RuntimeError("No answer from AgentUI (is the server up to date? apps need a recent AgentUI).")
+        finally:
+            with self._lock:
+                self._app_ops.pop(op_id, None)
 
     async def _on_inbound(self, msg: dict) -> None:
         conv, run_id = msg["conversationId"], msg["runId"]
@@ -1233,14 +1258,35 @@ def _register_widget_tools(ctx) -> None:
 
         return handler
 
-    for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler)):
+    def make_app_handler(op: str):
+        def handler(args: Dict[str, Any], **_kw: Any) -> str:
+            try:
+                from gateway.session_context import get_session_env
+
+                if get_session_env("HERMES_SESSION_PLATFORM") != PLATFORM:
+                    return json.dumps({"error": "Apps only exist in AgentUI."}, ensure_ascii=False)
+            except Exception:
+                pass
+            if op == "guide":
+                return json.dumps({"guide": spec["appGuide"]}, ensure_ascii=False)
+            adapter = _ACTIVE
+            if adapter is None:
+                return json.dumps({"error": "AgentUI is not connected."}, ensure_ascii=False)
+            try:
+                return json.dumps(adapter.app_op(op, args), ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": str(e) or type(e).__name__}, ensure_ascii=False)
+
+        return handler
+
+    for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler), ("appTools", None)):
         for key, tool in spec.get(kind, {}).items():
-            name = spec["prefix"] + key
+            name = spec["prefix"] + ("app_" if kind == "appTools" else "") + key
             ctx.register_tool(
                 name=name,
                 toolset="agentui",
                 schema={"name": name, "description": tool["description"], "parameters": tool["parameters"]},
-                handler=handlers(key),
+                handler=(make_app_handler(key) if kind == "appTools" else handlers(key)),
                 description=tool["description"],
                 emoji="🖥️",
             )

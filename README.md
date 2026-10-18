@@ -20,6 +20,15 @@ The platform connects to AgentUI the way it connects to Telegram, through a chan
 platform side, a WebSocket connection on `/gateway`. It brings proactive messages (crons, spontaneous sends), filed in
 the "Messages from <agent>" chat. Protocol, Hermes / OpenClaw plugins and installation: [`plugins/`](plugins/README.md).
 
+## Apps built by the agents
+Agents with a channel plugin can build small apps (React frontend + backend API) shown in the **Apps** tab, using the tools
+`agentui_app_*` and the guide in [`plugins/protocol/apps-guide.md`](plugins/protocol/apps-guide.md) (also the `agentui-apps` skill).
+- Files live in `DATA_DIR/miniapps/<id>/`; the server compiles them with esbuild. Backend routes (`server/*.js`) run in an isolated worker,
+  namespaced per app (`/api/apps/<id>/x/…`) and protected by the AgentUI session; data is stored in SQLite, scoped per app.
+- The frontend runs in a sandboxed iframe (no access to the session cookie). The `@agentui/ui` kit (`packages/app-runtime`, built by
+  `npm run build`, served from `APP_RUNTIME_DIST`) gives it React, chart.js, components and the `--au-*` CSS variables of the current theme.
+- `node e2e/apps.mjs` is the browser E2E (throwaway server + fake plugin).
+
 ## Push notifications
 Enable them in Settings → "Notify me when an agent replies". They require **HTTPS** (except on `localhost`);
 on iPhone, the app must first be added to the home screen. VAPID keys are generated at first start and
