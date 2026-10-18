@@ -10,11 +10,11 @@ const safePath = (p: unknown): string | undefined =>
   typeof p === 'string' && !p.split('?')[0]!.split('/').some((s) => s === '..' || s === '.') && !/^[a-z]+:/i.test(p) && !p.startsWith('//') ? p.replace(/^\/+/, '') : undefined;
 
 /**
- * Runs a mini-app in a sandboxed iframe (`allow-scripts` only: opaque origin, no access to the session cookie nor to /api).
+ * Runs a miniapp in a sandboxed iframe (`allow-scripts` only: opaque origin, no access to the session cookie nor to /api).
  * The only way out is this postMessage bridge: the host replays the app's requests on its own backend namespace
- * (`/api/apps/<id>/x/…`) with the user's session, and pushes the theme and language.
+ * (`/api/miniapps/<id>/x/…`) with the user's session, and pushes the theme and language.
  */
-export default function AppFrame({ app, dataKey = 0 }: { app: MiniApp; dataKey?: number }) {
+export default function MiniappFrame({ app, dataKey = 0 }: { app: MiniApp; dataKey?: number }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const muiTheme = useTheme();
   const lang = useLang() && getLang();
@@ -27,7 +27,7 @@ export default function AppFrame({ app, dataKey = 0 }: { app: MiniApp; dataKey?:
   useEffect(() => {
     let live = true;
     setBase(undefined); setReady(false); setAppError(''); setErr('');
-    api.appSession(app.id).then((s) => live && setBase(s.base)).catch((e) => live && setErr((e as Error).message));
+    api.miniappSession(app.id).then((s) => live && setBase(s.base)).catch((e) => live && setErr((e as Error).message));
     return () => { live = false; };
   }, [app.id, app.version]);
 
@@ -51,7 +51,7 @@ export default function AppFrame({ app, dataKey = 0 }: { app: MiniApp; dataKey?:
         const reply = (status: number, body: unknown) => w.postMessage({ type: 'agentui:fetch.result', id: m.id, status, body }, '*');
         if (path === undefined) return reply(400, { error: 'Invalid path' });
         try {
-          const res = await fetch(`/api/apps/${encodeURIComponent(app.id)}/x/${path}`, {
+          const res = await fetch(`/api/miniapps/${encodeURIComponent(app.id)}/x/${path}`, {
             method, credentials: 'same-origin',
             headers: { 'X-Requested-With': 'agentui', ...(method === 'GET' || m.body == null ? {} : { 'Content-Type': 'application/json' }) },
             body: method === 'GET' || m.body == null ? undefined : JSON.stringify(m.body),
@@ -74,7 +74,7 @@ export default function AppFrame({ app, dataKey = 0 }: { app: MiniApp; dataKey?:
       {base && (
         <iframe ref={frame} key={`${app.id}-${app.version}`} title={app.name} src={base} sandbox="allow-scripts" onLoad={postTheme}
           style={{ flex: 1, width: '100%', border: 0, background: 'transparent', colorScheme: mode }} />)}
-      {appError && <Alert severity="error" onClose={() => setAppError('')} sx={{ position: 'absolute', left: 8, right: 8, bottom: 8, whiteSpace: 'pre-wrap', maxHeight: '40%', overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{t('apps.error')}: {appError}</Alert>}
+      {appError && <Alert severity="error" onClose={() => setAppError('')} sx={{ position: 'absolute', left: 8, right: 8, bottom: 8, whiteSpace: 'pre-wrap', maxHeight: '40%', overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{t('miniapps.error')}: {appError}</Alert>}
     </Box>
   );
 }

@@ -20,7 +20,7 @@ export const SANDBOX_LIMITS = { timeoutMs: 3000, maxResponseBytes: 2 * 1024 * 10
  * Worker code. One worker per request: it is killed at the timeout.
  * The handler runs in a `vm` context without Node globals, without `eval`/`new Function`; the only door to the
  * outside is a host function, captured in a closure of the bootstrap and removed from the global scope, which exchanges
- * JSON strings only (synchronously, via Atomics) with the main thread, which scopes every data access to the app.
+ * JSON strings only (synchronously, via Atomics) with the main thread, which scopes every data access to the miniapp.
  * Best-effort isolation for code written by the user's own agent, not a barrier against a determined attacker.
  */
 const WORKER_CODE = `
@@ -155,12 +155,12 @@ export function runHandler(opts: {
       clearTimeout(timer);
       timer = setTimeout(() => {
         opts.log(`timeout: ${opts.req.method} ${opts.req.path}`);
-        finish({ status: 504, body: { error: 'The app handler took too long.' } });
+        finish({ status: 504, body: { error: 'The miniapp handler took too long.' } });
       }, SANDBOX_LIMITS.timeoutMs + 500);
     };
     total = setTimeout(() => {
       opts.log(`timeout (total): ${opts.req.method} ${opts.req.path}`);
-      finish({ status: 504, body: { error: 'The app handler took too long.' } });
+      finish({ status: 504, body: { error: 'The miniapp handler took too long.' } });
     }, SANDBOX_LIMITS.maxTotalMs);
     arm();
     worker.on('message', (m: any) => {

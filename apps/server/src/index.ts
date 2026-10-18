@@ -290,14 +290,14 @@ async function main() {
     return { ok: true };
   });
 
-  // ---------- Mini-apps (created by the agents, shown in the Apps tab) ----------
+  // ---------- Miniapps (created by the agents, shown in the Miniapps tab) ----------
   const apps = new MiniAppStore(db, env.dataDir);
-  apps.onChange = (id, kind) => runs.broadcast({ type: 'app.changed', appId: id, removed: kind === 'removed' });
+  apps.onChange = (id, kind) => runs.broadcast({ type: 'miniapp.changed', appId: id, removed: kind === 'removed' });
   const appData = new AppData(db);
   const dataTimers = new Map<string, ReturnType<typeof setTimeout>>();
   apps.onData = (id) => {
-    if (dataTimers.has(id)) return; // coalesced: one push per 300 ms and app
-    dataTimers.set(id, setTimeout(() => { dataTimers.delete(id); runs.broadcast({ type: 'app.data', appId: id }); }, 300));
+    if (dataTimers.has(id)) return; // coalesced: one push per 300 ms and miniapp
+    dataTimers.set(id, setTimeout(() => { dataTimers.delete(id); runs.broadcast({ type: 'miniapp.data', appId: id }); }, 300));
   };
   registerMiniApps(app, {
     store: apps,
@@ -343,11 +343,11 @@ async function main() {
   // The plugin installed in the platform connects here; authentication by the agent's token (first message).
   const gateways = [...adapters.values()].filter((a): a is GatewayAdapter => a instanceof GatewayAdapter);
   for (const g of gateways) {
-    g.onAppOp = async (op, args) => {
-      if (!isAppOp(op)) throw new AppError(`Unknown app operation "${op}".`);
+    g.onMiniappOp = async (op, args) => {
+      if (!isAppOp(op)) throw new AppError(`Unknown miniapp operation "${op}".`);
       return handleAppOp(apps, appData, g.id, op, args);
     };
-    g.onAppOpError = opError;
+    g.onMiniappOpError = opError;
     g.onOutbound = (m) => {
       const conv = runs.deliver(g.id, m.conversationId, m.text, m.media, g.name, m.title);
       app.log.info({ agent: g.id, conversation: conv.id }, 'proactive message received');
@@ -389,7 +389,7 @@ async function main() {
   if (existsSync(webDist)) {
     await app.register(fastifyStatic, { root: webDist });
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') || req.url.startsWith('/a/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
+      req.url.startsWith('/api/') || req.url.startsWith('/m/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
     );
   }
 

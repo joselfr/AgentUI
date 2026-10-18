@@ -47,7 +47,7 @@ export const toDto = (r: MiniAppRow): MiniApp => ({
   updatedAt: r.updated_at,
 });
 
-/** Files of the mini-apps (`<dataDir>/miniapps/<id>/{src,server,dist}`) + their metadata in SQLite. */
+/** Files of the miniapps (`<dataDir>/miniapps/<id>/{src,server,dist}`) + their metadata in SQLite. */
 export class MiniAppStore {
   readonly root: string;
   private logs = new Map<string, string[]>();
@@ -60,7 +60,7 @@ export class MiniAppStore {
   }
 
   dir(id: string): string {
-    if (!APP_ID_RE.test(id)) throw new AppError(`Invalid app id "${id}" (lowercase letters, digits and dashes, 2-40 chars, starts with a letter).`);
+    if (!APP_ID_RE.test(id)) throw new AppError(`Invalid miniapp id "${id}" (lowercase letters, digits and dashes, 2-40 chars, starts with a letter).`);
     return join(this.root, id);
   }
 
@@ -73,7 +73,7 @@ export class MiniAppStore {
     return r && toDto(r);
   }
 
-  /** Notified when the data of an app changed (agent tool or backend handler): open iframes refresh. */
+  /** Notified when the data of a miniapp changed (agent tool or handler): open iframes refresh. */
   onData?: (id: string) => void;
   dataChanged(id: string): void {
     this.onData?.(id);
@@ -83,27 +83,27 @@ export class MiniAppStore {
     this.owned(id, agentId);
   }
 
-  /** The agent can only touch its own apps. */
+  /** The agent can only touch its own miniapps. */
   private owned(id: string, agentId: string): MiniApp {
     const a = this.get(id);
-    if (!a) throw new AppError(`Unknown app "${id}". Create it first with agentui_app_create.`, 404);
-    if (a.agentId !== agentId) throw new AppError(`App "${id}" belongs to another agent.`, 403);
+    if (!a) throw new AppError(`Unknown miniapp "${id}". Create it first with agentui_miniapp_create.`, 404);
+    if (a.agentId !== agentId) throw new AppError(`Miniapp "${id}" belongs to another agent.`, 403);
     return a;
   }
 
   create(agentId: string, input: { id: string; name: string; icon?: string; description?: string }): MiniApp {
     const dir = this.dir(input.id);
     const name = input.name.trim().slice(0, 60);
-    if (!name) throw new AppError('The app needs a name.');
+    if (!name) throw new AppError('The miniapp needs a name.');
     const now = Date.now();
     const existing = this.get(input.id);
     if (existing) {
-      if (existing.agentId !== agentId) throw new AppError(`App "${input.id}" already exists (other agent).`, 403);
+      if (existing.agentId !== agentId) throw new AppError(`Miniapp "${input.id}" already exists (other agent).`, 403);
       this.db
         .prepare('UPDATE miniapps SET name = ?, icon = ?, description = ?, updated_at = ? WHERE id = ?')
         .run(name, (input.icon ?? existing.icon).slice(0, 40), (input.description ?? existing.description).slice(0, 300), now, input.id);
     } else {
-      if (this.list().length >= APP_LIMITS.maxApps) throw new AppError(`Too many apps (maximum ${APP_LIMITS.maxApps}).`);
+      if (this.list().length >= APP_LIMITS.maxApps) throw new AppError(`Too many miniapps (maximum ${APP_LIMITS.maxApps}).`);
       this.db
         .prepare('INSERT INTO miniapps (id, agent_id, name, icon, description, created_at, updated_at) VALUES (?,?,?,?,?,?,?)')
         .run(input.id, agentId, name, (input.icon ?? 'apps').slice(0, 40), (input.description ?? '').slice(0, 300), now, now);
@@ -116,7 +116,7 @@ export class MiniAppStore {
 
   remove(id: string, agentId?: string): void {
     if (agentId) this.owned(id, agentId);
-    else if (!this.get(id)) throw new AppError(`Unknown app "${id}".`, 404);
+    else if (!this.get(id)) throw new AppError(`Unknown miniapp "${id}".`, 404);
     this.db.prepare('DELETE FROM miniapps WHERE id = ?').run(id); // docs / kv: ON DELETE CASCADE
     rmSync(this.dir(id), { recursive: true, force: true });
     this.logs.delete(id);
@@ -125,10 +125,10 @@ export class MiniAppStore {
 
   private safePath(id: string, path: string): string {
     if (!FILE_RE.test(path) || path.includes('..') || path.includes('//')) {
-      throw new AppError(`Invalid path "${path}": must be src/** or server/** (tsx, ts, jsx, js, css, json, svg, txt, md).`);
+      throw new AppError(`Invalid path "${path}": must be src/** (front) or server/** (handlers) (tsx, ts, jsx, js, css, json, svg, txt, md).`);
     }
     if (path.startsWith('server/') && !SERVER_RE.test(path)) {
-      throw new AppError(`Invalid backend path "${path}": backend files are flat, e.g. server/todos.js.`);
+      throw new AppError(`Invalid handler path "${path}": handler files are flat, e.g. server/todos.js.`);
     }
     const base = this.dir(id);
     const full = resolve(base, path);
@@ -173,7 +173,7 @@ export class MiniAppStore {
       sizes.set(f.path, bytes);
     }
     if (sizes.size > APP_LIMITS.maxFiles) throw new AppError(`Too many files (maximum ${APP_LIMITS.maxFiles}).`);
-    if ([...sizes.values()].reduce((a, b) => a + b, 0) > APP_LIMITS.maxTotalBytes) throw new AppError('The app is too large.');
+    if ([...sizes.values()].reduce((a, b) => a + b, 0) > APP_LIMITS.maxTotalBytes) throw new AppError('The miniapp is too large.');
     for (const f of files) {
       const full = this.safePath(id, f.path);
       mkdirSync(dirname(full), { recursive: true });
@@ -204,7 +204,7 @@ export class MiniAppStore {
     return existsSync(p) ? p : undefined;
   }
 
-  /** Compiled backend handler (`dist/server/<name>.cjs`). */
+  /** Compiled handler (`dist/server/<name>.cjs`). */
   serverCode(id: string, name: string): string | undefined {
     if (!/^[A-Za-z0-9_-]+$/.test(name)) return undefined;
     const p = join(this.dir(id), 'dist', 'server', `${name}.cjs`);

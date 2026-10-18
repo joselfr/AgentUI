@@ -66,27 +66,27 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
   const { store, data, secret, runtimeDir } = o;
   const must = (id: string) => {
     const a = store.get(id);
-    if (!a) throw new AppError('Unknown app', 404);
+    if (!a) throw new AppError('Unknown miniapp', 404);
     return a;
   };
 
   // ---------- Authenticated API (cookie + CSRF checked by the global /api hook) ----------
-  app.get('/api/apps', async () => store.list());
-  app.get<{ Params: { id: string } }>('/api/apps/:id', async (req) => must(req.params.id));
-  app.delete<{ Params: { id: string } }>('/api/apps/:id', async (req) => {
+  app.get('/api/miniapps', async () => store.list());
+  app.get<{ Params: { id: string } }>('/api/miniapps/:id', async (req) => must(req.params.id));
+  app.delete<{ Params: { id: string } }>('/api/miniapps/:id', async (req) => {
     store.remove(req.params.id);
     return { ok: true };
   });
-  app.get<{ Params: { id: string } }>('/api/apps/:id/session', async (req) => {
+  app.get<{ Params: { id: string } }>('/api/miniapps/:id/session', async (req) => {
     const a = must(req.params.id);
     const user = o.userOf(req.cookies)!;
-    return { base: `/a/${a.id}/${signAppToken(secret, user.id, a.id)}/`, version: a.version, name: a.name };
+    return { base: `/m/${a.id}/${signAppToken(secret, user.id, a.id)}/`, version: a.version, name: a.name };
   });
 
-  /** Backend of an app: `/api/apps/<id>/x/<route>/…` → `server/<route>.js`, else `server/index.js`. */
+  /** Handlers of a miniapp: `/api/miniapps/<id>/x/<route>/…` → `server/<route>.js`, else `server/index.js`. */
   app.route<{ Params: { id: string; '*': string } }>({
     method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    url: '/api/apps/:id/x/*',
+    url: '/api/miniapps/:id/x/*',
     handler: async (req, reply) => {
       const a = must(req.params.id);
       const rest = req.params['*'].replace(/^\/+/, '');
@@ -99,7 +99,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         path = '/' + rest;
         code = store.serverCode(a.id, 'index');
       }
-      if (!code) return reply.code(404).send({ error: `No backend route "${rest || '/'}" in this app.` });
+      if (!code) return reply.code(404).send({ error: `No handler for route "${rest || '/'}" in this miniapp.` });
       const user = o.userOf(req.cookies)!;
       const res = await runHandler({
         code,
@@ -125,13 +125,13 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
       .send(createReadStream(file));
   };
 
-  app.get<{ Params: { id: string; token: string; '*': string } }>('/a/:id/:token/*', async (req, reply) => {
+  app.get<{ Params: { id: string; token: string; '*': string } }>('/m/:id/:token/*', async (req, reply) => {
     const { id, token } = req.params;
     if (!verifyAppToken(secret, id, token)) return reply.code(403).send({ error: 'forbidden' });
     const a = store.get(id);
     if (!a) return reply.code(404).send({ error: 'not found' });
     const rest = req.params['*'];
-    const base = `/a/${id}/${token}/`;
+    const base = `/m/${id}/${token}/`;
 
     if (rest === '' || rest === 'index.html') {
       const nonce = randomBytes(16).toString('base64');

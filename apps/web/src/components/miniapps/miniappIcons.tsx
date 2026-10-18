@@ -25,7 +25,7 @@ import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
 
 /** Icon names an agent can give to its app (documented in the apps skill). Unknown names fall back to `apps`. */
-export const APP_ICONS: Record<string, ComponentType<{ fontSize?: 'small' | 'medium' | 'large' }>> = {
+export const MINIAPP_ICONS: Record<string, ComponentType<{ fontSize?: 'small' | 'medium' | 'large' }>> = {
   apps: AppsOutlined, checklist: ChecklistOutlined, chart: BarChartOutlined, calendar: CalendarMonthOutlined, notes: StickyNote2Outlined,
   timer: TimerOutlined, shopping: ShoppingCartOutlined, finance: AccountBalanceWalletOutlined, home: HomeOutlined, star: StarBorder,
   book: MenuBookOutlined, fitness: FitnessCenterOutlined, music: MusicNoteOutlined, code: CodeOutlined, map: MapOutlined,
@@ -33,7 +33,7 @@ export const APP_ICONS: Record<string, ComponentType<{ fontSize?: 'small' | 'med
   weather: WbSunnyOutlined, idea: LightbulbOutlined, health: FavoriteBorder, tools: TuneOutlined,
 };
 
-export function AppIcon({ name, fontSize = 'medium' }: { name: string; fontSize?: 'small' | 'medium' | 'large' }) {
-  const I = APP_ICONS[name] ?? AppsOutlined;
+export function MiniappIcon({ name, fontSize = 'medium' }: { name: string; fontSize?: 'small' | 'medium' | 'large' }) {
+  const I = MINIAPP_ICONS[name] ?? AppsOutlined;
   return <I fontSize={fontSize} />;
 }

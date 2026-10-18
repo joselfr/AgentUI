@@ -6,7 +6,7 @@ import { AppError } from './store.js';
 
 export const FETCH_LIMITS = { timeoutMs: 15_000, maxBytes: 2 * 1024 * 1024, maxRedirects: 3, maxCalls: 10, maxRequestBytes: 512 * 1024 };
 
-/** Loopback, private, link-local, CGNAT, multicast… : never reachable from an app (internal containers, metadata services). */
+/** Loopback, private, link-local, CGNAT, multicast… : never reachable from a miniapp (internal containers, metadata services). */
 export function isPrivateAddress(addr: string): boolean {
   const a = addr.toLowerCase();
   if (isIP(a) === 6) {
@@ -70,7 +70,7 @@ function once(url: URL, init: { method: string; headers: Record<string, string>;
 
 const STRIP_ON_REDIRECT = ['authorization', 'cookie', 'proxy-authorization'];
 
-/** `ctx.fetch(url, { method?, headers?, body? })` of the app backends: http(s) only, public addresses only, bounded size/time. */
+/** `ctx.fetch(url, { method?, headers?, body? })` of the miniapp handlers: http(s) only, public addresses only, bounded size/time. */
 /** `allowPrivate` is for tests only: the sandbox never sets it. */
 export async function appFetch(rawUrl: unknown, rawInit: unknown, allowPrivate = false): Promise<AppFetchResult> {
   let url: URL;
@@ -82,7 +82,7 @@ export async function appFetch(rawUrl: unknown, rawInit: unknown, allowPrivate =
   const init = (rawInit && typeof rawInit === 'object' ? rawInit : {}) as { method?: string; headers?: Record<string, unknown>; body?: unknown };
   let method = String(init.method ?? 'GET').toUpperCase();
   if (!/^(GET|POST|PUT|PATCH|DELETE|HEAD)$/.test(method)) throw new AppError(`Method ${method} is not allowed.`);
-  const headers: Record<string, string> = { 'user-agent': 'AgentUI-App/1', accept: '*/*' };
+  const headers: Record<string, string> = { 'user-agent': 'AgentUI-Miniapp/1', accept: '*/*' };
   for (const [k, v] of Object.entries(init.headers ?? {})) if (typeof v === 'string' && /^[A-Za-z0-9-]+$/.test(k) && k.toLowerCase() !== 'host') headers[k.toLowerCase()] = v;
   let body: string | undefined;
   if (init.body !== undefined && init.body !== null && method !== 'GET' && method !== 'HEAD') {

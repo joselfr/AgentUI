@@ -1,6 +1,6 @@
-// E2E of the mini-apps: throwaway AgentUI server + fake channel plugin that creates an app (frontend + backend) through
-// `app.op` frames, then a browser checks the Apps tab, the themed iframe, the backend round trip and the sandbox.
-//   node e2e/apps.mjs [screenshots-folder]      (needs: npm run build for web + app-runtime, system Chromium)
+// E2E of the miniapps: throwaway AgentUI server + fake channel plugin that creates a miniapp (front + handlers) through
+// `miniapp.op` frames, then a browser checks the Miniapps tab, the themed iframe, the handler round trip and the sandbox.
+//   node e2e/miniapps.mjs [screenshots-folder]      (needs: npm run build for web + app-runtime, system Chromium)
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,10 +8,10 @@ import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { WebSocket } from 'ws';
 
-const shots = process.argv[2] ?? join(tmpdir(), 'agentui-apps-shots');
+const shots = process.argv[2] ?? join(tmpdir(), 'agentui-miniapps-shots');
 mkdirSync(shots, { recursive: true });
 const PORT = 8191, TOKEN = 'e2e-token-0123456789abcdef', base = `http://localhost:${PORT}`;
-const dir = mkdtempSync(join(tmpdir(), 'agentui-e2e-apps-'));
+const dir = mkdtempSync(join(tmpdir(), 'agentui-e2e-miniapps-'));
 mkdirSync(join(dir, 'data'));
 import { writeFileSync } from 'node:fs';
 writeFileSync(join(dir, 'agents.yaml'), `agents:\n  - id: atlas\n    type: gateway\n    name: Atlas\n    token: ${TOKEN}\n`);
@@ -34,14 +34,14 @@ let welcome;
 ws.on('message', (raw) => {
   const m = JSON.parse(String(raw));
   if (m.type === 'welcome') welcome = m;
-  if (m.type === 'app.result') pending.get(m.id)?.(m);
+  if (m.type === 'miniapp.result') pending.get(m.id)?.(m);
 });
 await new Promise((r) => ws.on('open', r));
 ws.send(JSON.stringify({ type: 'hello', protocol: 1, token: TOKEN, agent: { type: 'e2e', name: 'Atlas' }, capabilities: { sessions: true, abort: true, approvals: false, subagents: false, reasoning: false, toolDetails: false, skills: false, jobs: false, jobControl: false, attachments: { images: false, files: false, maxBytes: 0 } } }));
 await new Promise((r) => { const t = setInterval(() => welcome && (clearInterval(t), r()), 50); });
 let n = 0;
-const op = (o, args) => new Promise((resolve) => { const id = `o${++n}`; pending.set(id, resolve); ws.send(JSON.stringify({ type: 'app.op', id, op: o, args })); });
-check('welcome announces apps support', welcome.apps === true);
+const op = (o, args) => new Promise((resolve) => { const id = `o${++n}`; pending.set(id, resolve); ws.send(JSON.stringify({ type: 'miniapp.op', id, op: o, args })); });
+check('welcome announces miniapps support', welcome.miniapps === true);
 
 const MAIN = `import { useState } from 'react';
 import { Page, Card, Stack, Row, Button, TextField, List, ListItem, IconButton, Spinner, EmptyState, Chart, Chip, useApi, api, useTheme } from '@agentui/ui';
@@ -58,7 +58,7 @@ export default function App() {
         {todos.data?.length === 0 && <EmptyState icon="checklist" title="Nothing to do" />}
         <Card padding={4}><List>{todos.data?.map((t) => <ListItem key={t.id} primary={t.title} trailing={<IconButton icon="delete" label="Delete" onClick={async () => { await api.delete('todos/' + t.id); todos.reload(); }} />} />)}</List></Card>
         <Card><Chart type="bar" labels={['a', 'b', 'c']} series={[{ name: 's', data: [1, 3, 2] }]} height={160} /></Card>
-        <button id="probe" onClick={async () => { try { await fetch('/api/apps'); document.title = 'leak'; } catch { document.title = 'blocked'; } }}>probe</button>
+        <button id="probe" onClick={async () => { try { await fetch('/api/miniapps'); document.title = 'leak'; } catch { document.title = 'blocked'; } }}>probe</button>
       </Stack>
     </Page>
   );
@@ -80,7 +80,7 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', arg
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'en-US' });
 const page = await ctx.newPage();
 const errors = [];
-if (process.env.DEBUG) { page.on('requestfailed', (r) => console.log('REQFAIL', r.url(), r.failure()?.errorText)); page.on('response', (r) => r.url().includes('/a/') && console.log('RESP', r.status(), r.url())); page.on('console', (m) => console.log('CONSOLE', m.type(), m.text())); }
+if (process.env.DEBUG) { page.on('requestfailed', (r) => console.log('REQFAIL', r.url(), r.failure()?.errorText)); page.on('response', (r) => r.url().includes('/m/') && console.log('RESP', r.status(), r.url())); page.on('console', (m) => console.log('CONSOLE', m.type(), m.text())); }
 page.on('pageerror', (e) => !/Content Security Policy/.test(e.message) && errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && !/favicon|401|403|Content Security Policy/.test(m.text()) && errors.push(m.text()));
 try {
@@ -88,19 +88,25 @@ try {
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-pass-123');
   await page.getByRole('button', { name: /Sign in|Se connecter/ }).click();
-  await page.getByRole('link', { name: 'Apps' }).or(page.getByRole('button', { name: 'Apps' })).first().click();
+  await page.getByRole('link', { name: 'Miniapps' }).or(page.getByRole('button', { name: 'Miniapps' })).first().click();
   await page.getByText('Simple tasks').waitFor({ timeout: 10000 });
-  check('Apps tab lists the app', true);
+  // theme follows the system, so it can be flipped later while the miniapp is open (the nav rail is hidden there)
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.getByRole('button', { name: 'Settings' }).or(page.getByLabel('Settings')).first().click();
+  await page.getByRole('combobox').first().click();
+  await page.getByRole('option', { name: 'System' }).click();
+  await page.keyboard.press('Escape');
+  check('Miniapps tab lists the miniapp', true);
   await page.screenshot({ path: join(shots, 'apps-list.png') });
   await page.getByText('Simple tasks').click();
-  if (process.env.DEBUG) { await page.waitForTimeout(2500); for (const f of page.frames()) if (f.url().includes('/a/todo/')) console.log('IMPORT', await f.evaluate(async () => { try { const m = await import(window.__AGENTUI.entry); return 'ok ' + Object.keys(m); } catch (e) { return 'ERR ' + e.message; } })); }
+  if (process.env.DEBUG) { await page.waitForTimeout(2500); for (const f of page.frames()) if (f.url().includes('/m/todo/')) console.log('IMPORT', await f.evaluate(async () => { try { const m = await import(window.__AGENTUI.entry); return 'ok ' + Object.keys(m); } catch (e) { return 'ERR ' + e.message; } })); }
   const frame = page.frameLocator('iframe[title="Todo"]');
   await frame.getByText('Nothing to do').waitFor({ timeout: 10000 });
-  check('app renders in the sandboxed iframe (components + backend GET)', true);
+  check('miniapp renders in the sandboxed iframe (components + handler GET)', true);
   await frame.getByPlaceholder('New task').fill('Buy milk');
   await frame.getByRole('button', { name: 'Add' }).click();
   await frame.getByText('Buy milk').waitFor({ timeout: 5000 });
-  check('backend round trip through the host bridge (POST then GET)', true);
+  check('handler round trip through the host bridge (POST then GET)', true);
   const bg = async () => frame.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor);
   const dark = await bg();
   await page.screenshot({ path: join(shots, 'app-dark.png') });
@@ -109,11 +115,8 @@ try {
   check('agent data op inserts', pushed.ok === true && pushed.result.title === 'From the agent', JSON.stringify(pushed).slice(0, 120));
   await frame.getByText('From the agent').waitFor({ timeout: 5000 }).then(() => check('open iframe refreshes after an agent data push', true), () => check('open iframe refreshes after an agent data push', false));
   check('agent data op: other agent refused / unknown app', (await op('data', { id: 'nope', action: 'find', collection: 'todos' })).ok === false);
-  // theme switch from the host
-  await page.getByRole('button', { name: 'Settings' }).or(page.getByLabel('Settings')).first().click();
-  await page.getByRole('combobox').first().click();
-  await page.getByRole('option', { name: 'Light' }).click();
-  await page.keyboard.press('Escape');
+  // theme switch from the host (system scheme flips while the miniapp is open)
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.waitForTimeout(500);
   const light = await bg();
   check('theme change reaches the iframe', dark !== light, `${dark} → ${light}`);
@@ -121,12 +124,12 @@ try {
   // sandbox: direct fetch to /api from the app is blocked (CSP connect-src none)
   await frame.locator('#probe').click();
   await page.waitForTimeout(500);
-  const title = await page.frames().find((f) => f.url().includes('/a/todo/'))?.evaluate(() => document.title);
-  check('app cannot call /api directly', title === 'blocked', String(title));
+  const title = await page.frames().find((f) => f.url().includes('/m/todo/'))?.evaluate(() => document.title);
+  check('miniapp cannot call /api directly', title === 'blocked', String(title));
   // without cookie: the static route needs a valid token and the backend needs the session
-  const anon = await fetch(`${base}/api/apps/todo/x/todos`);
-  check('backend refuses unauthenticated calls', anon.status === 401);
-  const anonFile = await fetch(`${base}/a/todo/bad.token/app.js`);
+  const anon = await fetch(`${base}/api/miniapps/todo/x/todos`);
+  check('handlers refuse unauthenticated calls', anon.status === 401);
+  const anonFile = await fetch(`${base}/m/todo/bad.token/app.js`);
   check('static files refuse a bad token', anonFile.status === 403);
   // mobile
   await page.setViewportSize({ width: 390, height: 780 });

@@ -1,4 +1,4 @@
-/** Design tokens shared by the web app (MUI theme) and the mini-app runtime (CSS variables). Single source of truth. */
+/** Design tokens shared by the web app (MUI theme) and the miniapp runtime (CSS variables). Single source of truth. */
 export type ThemeMode = 'light' | 'dark';
 
 export const themeTokens = {
@@ -15,7 +15,7 @@ export const chartPalette = (mode: ThemeMode): string[] => [themeTokens[mode].ac
 export const FONT_SANS = '"Inter Variable", Inter, system-ui, sans-serif';
 export const FONT_MONO = '"JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace';
 
-/** CSS variables (`--au-*`) pushed by the host to the mini-app iframes. */
+/** CSS variables (`--au-*`) pushed by the host to the miniapp iframes. */
 export function themeCssVars(mode: ThemeMode): Record<string, string> {
   const t = themeTokens[mode];
   return {

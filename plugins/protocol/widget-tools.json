@@ -445,26 +445,26 @@
   },
   "updateInstruction": "Update applied: the displayed component has changed. Do not write the token.",
   "progressInstruction": "The component is already displayed in the chat: do not write this token in your reply. To update it, call the tool again with update = this token and the complete state of the steps.",
-  "appTools": {
+  "miniappTools": {
     "guide": {
-      "description": "Returns the guide for building AgentUI apps (React + backend shown in the Apps tab): file layout, UI components, CSS variables, backend API, rules. READ IT BEFORE creating or modifying an app.",
+      "description": "Returns the guide for building AgentUI miniapps (React front + handlers, shown in the Miniapps tab): file layout, UI components, CSS variables, backend API, rules. READ IT BEFORE creating or modifying a miniapp.",
       "parameters": {
         "type": "object",
         "properties": {}
       }
     },
     "create": {
-      "description": "Creates (or renames) an app shown in the Apps tab of AgentUI. Then send its files with agentui_app_write. Call agentui_app_guide first if you have not read the guide.",
+      "description": "Creates (or renames) a miniapp shown in the Miniapps tab of AgentUI. Then send its files with agentui_miniapp_write. Call agentui_miniapp_guide first if you have not read the guide.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+            "description": "Miniapp id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
           },
           "name": {
             "type": "string",
-            "description": "Name displayed in the Apps tab."
+            "description": "Name displayed in the Miniapps tab."
           },
           "icon": {
             "type": "string",
@@ -482,13 +482,13 @@
       }
     },
     "write": {
-      "description": "Writes files of an app (created or replaced) then builds it. Paths: src/main.tsx (required, default-exports the root React component), other src/** modules, and server/<route>.js for the backend. Returns {ok:true} or {ok:false, errors:[{file,line,message}]}: on errors, fix and write again (the previous working version stays online).",
+      "description": "Writes files of a miniapp (created or replaced) then builds it. Paths: src/main.tsx (required, default-exports the root React component), other src/** modules, and server/<route>.js for the handlers (server side). Returns {ok:true} or {ok:false, errors:[{file,line,message}]}: on errors, fix and write again (the previous working version stays online).",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+            "description": "Miniapp id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
           },
           "files": {
             "type": "array",
@@ -520,13 +520,13 @@
       }
     },
     "read": {
-      "description": "Reads a file of one of your apps.",
+      "description": "Reads a file of one of your miniapps.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+            "description": "Miniapp id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
           },
           "path": {
             "type": "string",
@@ -540,20 +540,20 @@
       }
     },
     "list": {
-      "description": "Lists your apps with their files.",
+      "description": "Lists your miniapps with their files.",
       "parameters": {
         "type": "object",
         "properties": {}
       }
     },
     "delete_file": {
-      "description": "Deletes a file of one of your apps then rebuilds it.",
+      "description": "Deletes a file of one of your miniapps then rebuilds it.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+            "description": "Miniapp id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
           },
           "path": {
             "type": "string"
@@ -566,13 +566,13 @@
       }
     },
     "remove": {
-      "description": "Permanently deletes an app with its files and its data. Only on explicit request of the user (ask for confirmation with agentui_confirm first).",
+      "description": "Permanently deletes a miniapp with its files and its data. Only on explicit request of the user (ask for confirmation with agentui_confirm first).",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+            "description": "Miniapp id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
           }
         },
         "required": [
@@ -581,13 +581,13 @@
       }
     },
     "logs": {
-      "description": "Recent backend logs of an app (console.log output, handler errors, timeouts) — use it to debug server/*.js.",
+      "description": "Recent handler logs of a miniapp (console.log output, handler errors, timeouts) — use it to debug your handlers (server/*.js).",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "App id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
+            "description": "Miniapp id: lowercase letters, digits and dashes, 2-40 characters, starting with a letter (e.g. habit-tracker)."
           }
         },
         "required": [
@@ -596,13 +596,13 @@
       }
     },
     "data": {
-      "description": "Reads or writes the data of one of your apps (the same collections and key/value store its backend handlers see through ctx.db / ctx.kv). Use it to push data into an app from outside a user request — typically from a cron job or after fetching something yourself — and to inspect what the app stored. Open iframes refresh automatically. Actions: find (collection, filter?, limit?, sort?, desc?), get (collection, doc_id), insert (collection, doc), update (collection, doc_id, doc = fields to merge), remove (collection, doc_id), kv_get / kv_delete (key), kv_set (key, value).",
+      "description": "Reads or writes the data of one of your miniapps (the same collections and key/value store its handlers see through ctx.db / ctx.kv). Use it to push data into a miniapp from outside a user request — typically from a cron job or after fetching something yourself — and to inspect what the miniapp stored. Open miniapps refresh automatically. Actions: find (collection, filter?, limit?, sort?, desc?), get (collection, doc_id), insert (collection, doc), update (collection, doc_id, doc = fields to merge), remove (collection, doc_id), kv_get / kv_delete (key), kv_set (key, value).",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "App id."
+            "description": "Miniapp id."
           },
           "action": {
             "type": "string",

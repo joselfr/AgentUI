@@ -66,11 +66,11 @@ const APPROVE_RE = /\/approve\s+([A-Za-z0-9_-]+)\s+allow-once/;
 
 const ASK_TIMEOUT_MS = 30 * 60_000;
 
-const APP_OP_TIMEOUT_MS = 60_000;
+const MINIAPP_OP_TIMEOUT_MS = 60_000;
 
 export class AgentUIBridge implements RunHost {
   private runs = new Map<string, Run>();
-  private appOps = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  private miniappOps = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 
   constructor(
     private p: {
@@ -97,13 +97,13 @@ export class AgentUIBridge implements RunHost {
         return this.onReply(msg);
       case 'rpc':
         return this.onRpc(msg);
-      case 'app.result': {
-        const p = this.appOps.get(msg.id);
+      case 'miniapp.result': {
+        const p = this.miniappOps.get(msg.id);
         if (!p) return;
         clearTimeout(p.timer);
-        this.appOps.delete(msg.id);
+        this.miniappOps.delete(msg.id);
         if (msg.ok) p.resolve(msg.result);
-        else p.reject(new Error(msg.error ?? 'App operation failed.'));
+        else p.reject(new Error(msg.error ?? 'Miniapp operation failed.'));
         return;
       }
       default:
@@ -311,18 +311,18 @@ export class AgentUIBridge implements RunHost {
     });
   }
 
-  appOp(op: string, args: unknown): Promise<unknown> | undefined {
+  miniappOp(op: string, args: unknown): Promise<unknown> | undefined {
     const client = this.p.client();
     if (!client) return undefined;
-    const id = `app_${randomBytes(6).toString('hex')}`;
+    const id = `miniapp_${randomBytes(6).toString('hex')}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.appOps.delete(id);
-        reject(new Error('No answer from AgentUI (is the server up to date? apps need a recent AgentUI).'));
-      }, APP_OP_TIMEOUT_MS);
+        this.miniappOps.delete(id);
+        reject(new Error('No answer from AgentUI (is the server up to date? miniapps need a recent AgentUI).'));
+      }, MINIAPP_OP_TIMEOUT_MS);
       timer.unref?.();
-      this.appOps.set(id, { resolve, reject, timer });
-      client.send({ type: 'app.op', id, op, args });
+      this.miniappOps.set(id, { resolve, reject, timer });
+      client.send({ type: 'miniapp.op', id, op, args });
     });
   }
 

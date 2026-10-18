@@ -8,7 +8,7 @@ type Doc = Record<string, unknown>;
 const matches = (doc: Doc, filter: Doc): boolean =>
   Object.entries(filter).every(([k, v]) => JSON.stringify(doc[k]) === JSON.stringify(v));
 
-/** Data of the mini-apps (document collections + key/value), always scoped by `app_id`. */
+/** Data of the miniapps (document collections + key/value), always scoped by `app_id`. */
 export class AppData {
   constructor(private db: DB) {}
 

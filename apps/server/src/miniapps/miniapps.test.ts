@@ -14,7 +14,7 @@ let store: MiniAppStore;
 let data: AppData;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'agentui-apps-'));
+  dir = mkdtempSync(join(tmpdir(), 'agentui-miniapps-'));
   db = openDb(dir);
   store = new MiniAppStore(db, dir);
   data = new AppData(db);

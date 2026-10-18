@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Runtime served to the mini-app iframes: React, chart.js and the @agentui/ui kit (themed with --au-* CSS variables).",
+  "description": "Runtime served to the miniapp iframes: React, chart.js and the @agentui/ui kit (themed with --au-* CSS variables).",
   "scripts": { "build": "node build.mjs", "typecheck": "tsc -p . --noEmit" },
   "dependencies": { "@fontsource-variable/inter": "^5.3.0", "@fontsource-variable/jetbrains-mono": "^5.3.0", "chart.js": "^4.4.7", "react": "^18.3.1", "react-dom": "^18.3.1" },
   "devDependencies": { "@types/react": "^18.3.12", "@types/react-dom": "^18.3.1", "esbuild": "^0.21.5", "typescript": "^5.6.3" }

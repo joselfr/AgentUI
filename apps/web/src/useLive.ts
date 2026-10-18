@@ -10,10 +10,10 @@ export function useLive(opts: {
   onStatus: (agentId: string, s: ConnStatus, detail?: string) => void;
   /** Chat marked read from another device. */
   onRead?: (conversationId: string) => void;
-  /** A mini-app was created / rebuilt / removed. */
-  onAppChanged?: (appId: string, removed: boolean) => void;
-  /** The data of a mini-app changed. */
-  onAppData?: (appId: string) => void;
+  /** A miniapp was created / rebuilt / removed. */
+  onMiniappChanged?: (appId: string, removed: boolean) => void;
+  /** The data of a miniapp changed. */
+  onMiniappData?: (appId: string) => void;
   onOpen: () => void;
   onUnauthorized: () => void;
 }) {
@@ -38,8 +38,8 @@ export function useLive(opts: {
         const p = JSON.parse(m.data as string) as ServerPush;
         if (p.type === 'event') ref.current.onEvent(p);
         else if (p.type === 'conversation.read') ref.current.onRead?.(p.conversationId);
-        else if (p.type === 'app.data') ref.current.onAppData?.(p.appId);
-        else if (p.type === 'app.changed') ref.current.onAppChanged?.(p.appId, !!p.removed);
+        else if (p.type === 'miniapp.data') ref.current.onMiniappData?.(p.appId);
+        else if (p.type === 'miniapp.changed') ref.current.onMiniappChanged?.(p.appId, !!p.removed);
         else ref.current.onStatus(p.agentId, p.status, p.detail);
       };
       ws.onclose = (e) => {

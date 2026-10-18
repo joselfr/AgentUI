@@ -27,10 +27,10 @@ to the agent, without ending its turn). Their schemas are in `protocol/widget-to
 `node plugins/sync-widget-tools.mjs` to copy them into both plugins (Hermes: the `widget_tools.json` file must be
 copied along with `adapter.py`).
 
-The **apps** tools (`agentui_app_guide`, `agentui_app_create`, `agentui_app_write`, …; `appTools` section of the same file) let an
-agent build small React + backend applications shown in AgentUI's **Apps** tab. They are relayed to the server with the
-`app.op` / `app.result` frames; the guide the agent reads is `protocol/apps-guide.md` (the sync script embeds it in each plugin and
-publishes it as the `agentui-apps` skill in `.claude/skills/`).
+The **miniapp** tools (`agentui_miniapp_guide`, `agentui_miniapp_create`, `agentui_miniapp_write`, …; `miniappTools` section of the same file) let an
+agent build miniapps (a React front + server-side handlers) shown in AgentUI's **Miniapps** tab. They are relayed to the server with the
+`miniapp.op` / `miniapp.result` frames; the guide the agent reads is `protocol/miniapps-guide.md` (the sync script embeds it in each plugin and
+publishes it as the `agentui-miniapps` skill in `.claude/skills/`).
 
 ## Test a plugin without AgentUI (fake server)
 

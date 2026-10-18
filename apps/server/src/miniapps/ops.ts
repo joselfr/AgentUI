@@ -31,17 +31,17 @@ const SCHEMAS = {
 export type AppOp = keyof typeof SCHEMAS;
 export const isAppOp = (s: unknown): s is AppOp => typeof s === 'string' && s in SCHEMAS;
 
-/** Operations a plugin can request on behalf of its agent (frame `app.op`). Throws `AppError` / `ZodError` for the agent. */
+/** Operations a plugin can request on behalf of its agent (frame `miniapp.op`). Throws `AppError` / `ZodError` for the agent. */
 export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: string, op: AppOp, rawArgs: unknown): Promise<unknown> {
   const a = SCHEMAS[op].parse(rawArgs ?? {}) as any;
   switch (op) {
     case 'create': {
       const app = store.create(agentId, a);
-      return { app, next: 'Write src/main.tsx (default-export a React component) with agentui_app_write, and optionally server/<route>.js for the backend.' };
+      return { app, next: 'Write src/main.tsx (default-export a React component) with agentui_miniapp_write, and optionally handlers in server/<route>.js.' };
     }
     case 'write': {
       const r = await store.writeFiles(a.id, agentId, a.files);
-      return r.ok ? { ok: true, files: r.files, url: `/apps/${a.id}` } : { ok: false, errors: r.errors, note: 'Build failed: the previous working version (if any) is still served. Fix the errors and write the files again.' };
+      return r.ok ? { ok: true, files: r.files, url: `/miniapps/${a.id}` } : { ok: false, errors: r.errors, note: 'Build failed: the previous working version (if any) is still served. Fix the errors and write the files again.' };
     }
     case 'read':
       return { path: a.path, content: store.readFile(a.id, agentId, a.path) };

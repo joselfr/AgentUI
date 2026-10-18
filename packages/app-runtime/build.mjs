@@ -1,4 +1,4 @@
-// Builds the runtime served to the mini-app iframes (dist/): react, react-dom, jsx-runtime, chart.js, @agentui/ui, boot, base.css, fonts.
+// Builds the runtime served to the miniapp iframes (dist/): react, react-dom, jsx-runtime, chart.js, @agentui/ui, boot, base.css, fonts.
 import { createRequire } from 'node:module';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

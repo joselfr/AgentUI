@@ -118,9 +118,9 @@ export class GatewayAdapter implements AgentAdapter {
   private ping?: NodeJS.Timeout;
   /** Wired by the server: records a proactive message in the right conversation. */
   onOutbound?: (msg: GatewayOutbound) => void | Promise<void>;
-  /** Mini-app operation requested by the plugin for its agent (frame `app.op`); the result goes back in `app.result`. */
-  onAppOp?: (op: string, args: unknown) => Promise<unknown>;
-  onAppOpError?: (e: unknown) => string;
+  /** Miniapp operation requested by the plugin for its agent (frame `miniapp.op`); the result goes back in `miniapp.result`. */
+  onMiniappOp?: (op: string, args: unknown) => Promise<unknown>;
+  onMiniappOpError?: (e: unknown) => string;
 
   constructor(private cfg: GatewayConfig) {
     this.id = cfg.id;
@@ -167,14 +167,14 @@ export class GatewayAdapter implements AgentAdapter {
   attach(socket: GatewaySocket, hello: Json) {
     if (hello.mode === 'send-only') {
       // One-off connection (cron outside the gateway, CLI): does not replace the main connection.
-      socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onAppOp ? { apps: true } : {}) }));
+      socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onMiniappOp ? { miniapps: true } : {}) }));
       socket.on('message', (raw) => void this.onFrame(raw, socket));
       return;
     }
     if (this.socket && this.socket !== socket) this.socket.close(4000, 'replaced by a new connection');
     this.socket = socket;
     this.hello = hello;
-    socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onAppOp ? { apps: true } : {}) }));
+    socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onMiniappOp ? { miniapps: true } : {}) }));
     const version = hello.agent?.version ? ` ${hello.agent.version}` : '';
     this.setState('connected', `${hello.agent?.type ?? 'plugin'}${version}`);
 
@@ -231,14 +231,14 @@ export class GatewayAdapter implements AgentAdapter {
           media: (Array.isArray(msg.media) ? msg.media : []).map(toMedia),
         });
         return;
-      case 'app.op': {
+      case 'miniapp.op': {
         if (from !== this.socket) return;
         const id = String(msg.id);
-        if (!this.onAppOp) return this.write({ type: 'app.result', id, ok: false, error: 'Apps are not available on this server.' });
+        if (!this.onMiniappOp) return this.write({ type: 'miniapp.result', id, ok: false, error: 'Miniapps are not available on this server.' });
         try {
-          this.write({ type: 'app.result', id, ok: true, result: await this.onAppOp(String(msg.op), msg.args) });
+          this.write({ type: 'miniapp.result', id, ok: true, result: await this.onMiniappOp(String(msg.op), msg.args) });
         } catch (e) {
-          this.write({ type: 'app.result', id, ok: false, error: this.onAppOpError?.(e) ?? (e as Error).message });
+          this.write({ type: 'miniapp.result', id, ok: false, error: this.onMiniappOpError?.(e) ?? (e as Error).message });
         }
         return;
       }

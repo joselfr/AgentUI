@@ -542,7 +542,7 @@
         {
           "properties": {
             "type": {
-              "const": "app.op"
+              "const": "miniapp.op"
             },
             "id": {
               "type": "string"
@@ -589,7 +589,7 @@
             "protocol": {
               "const": 1
             },
-            "apps": {
+            "miniapps": {
               "type": "boolean"
             }
           },
@@ -718,7 +718,7 @@
         {
           "properties": {
             "type": {
-              "const": "app.result"
+              "const": "miniapp.result"
             },
             "id": {
               "type": "string"

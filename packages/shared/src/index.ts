@@ -244,13 +244,13 @@ export type ServerPush =
   | { type: 'agent.status'; agentId: string; status: ConnStatus; detail?: string }
   /** Chat marked read (from another device): remove its "unread" indicator. */
   | { type: 'conversation.read'; conversationId: string }
-  /** A mini-app was created, rebuilt or removed: refresh the Apps tab / reload the open iframe. */
-  | { type: 'app.changed'; appId: string; removed?: boolean }
-  /** The data of a mini-app changed: its open iframe refetches. */
-  | { type: 'app.data'; appId: string };
+  /** A miniapp was created, rebuilt or removed: refresh the Miniapps tab / reload the open iframe. */
+  | { type: 'miniapp.changed'; appId: string; removed?: boolean }
+  /** The data of a miniapp changed: its open iframe refetches. */
+  | { type: 'miniapp.data'; appId: string };
 export * from './theme.js';
 
-/** Mini-app created by an agent, shown in the Apps tab. */
+/** Mini-app created by an agent, shown in the Miniapps tab. */
 export interface MiniApp {
   id: string;
   agentId: string;

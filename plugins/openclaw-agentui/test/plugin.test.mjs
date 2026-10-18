@@ -428,7 +428,7 @@ test('widget tools: agentui_chart / map / code, reserved for AgentUI runs', asyn
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_ask', 'agentui_confirm', 'agentui_form', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'data'].map((k) => `agentui_app_${k}`)]);
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_ask', 'agentui_confirm', 'agentui_form', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'data'].map((k) => `agentui_miniapp_${k}`)]);
   // The manifest declares exactly these tools (contracts.tools), otherwise OpenClaw warns at load
   assert.deepEqual(JSON.parse(readFileSync(new URL('../openclaw.plugin.json', import.meta.url), 'utf8')).contracts.tools, opts.names);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
@@ -458,23 +458,23 @@ test('widget tools: agentui_chart / map / code, reserved for AgentUI runs', asyn
   await assert.rejects(table.execute('t8', { columns: [{ label: 'A' }], rows: [[{ a: 1 }]] }), /neither text/);
 });
 
-test('app tools: guide is local, other operations go through app.op / app.result', async () => {
+test('miniapp tools: guide is local, other operations go through miniapp.op / miniapp.result', async () => {
   const entry = (await import('../dist/index.js')).default;
   let factory;
   entry.registerFull({ registerService: () => {}, registerTool: (f) => (factory = f) });
   const tools = factory({ messageChannel: 'agentui' });
-  const byName = (n) => tools.find((t) => t.name === `agentui_app_${n}`);
+  const byName = (n) => tools.find((t) => t.name === `agentui_miniapp_${n}`);
   const guide = JSON.parse((await byName('guide').execute('g1', {})).content[0].text).guide;
-  assert.match(guide, /Building apps for AgentUI/);
+  assert.match(guide, /Building miniapps for AgentUI/);
   const call = byName('write').execute('w1', { id: 'todo', files: [{ path: 'src/main.tsx', content: 'x' }] });
-  const [frame] = (await until((f) => f.type === 'app.op')).slice(-1);
+  const [frame] = (await until((f) => f.type === 'miniapp.op')).slice(-1);
   assert.deepEqual([frame.op, frame.args.id], ['write', 'todo']);
-  send({ type: 'app.result', id: frame.id, ok: true, result: { ok: false, errors: [{ file: 'src/main.tsx', line: 1, message: 'boom' }] } });
+  send({ type: 'miniapp.result', id: frame.id, ok: true, result: { ok: false, errors: [{ file: 'src/main.tsx', line: 1, message: 'boom' }] } });
   assert.equal(JSON.parse((await call).content[0].text).errors[0].message, 'boom');
   const failing = byName('remove').execute('r1', { id: 'todo' });
-  const [f2] = (await until((f) => f.type === 'app.op')).slice(-1);
-  send({ type: 'app.result', id: f2.id, ok: false, error: 'Unknown app "todo".' });
-  await assert.rejects(failing, /Unknown app/);
+  const [f2] = (await until((f) => f.type === 'miniapp.op')).slice(-1);
+  send({ type: 'miniapp.result', id: f2.id, ok: false, error: 'Unknown miniapp "todo".' });
+  await assert.rejects(failing, /Unknown miniapp/);
 });
 
 test('deletion: deleteSession erases the session of each agent (one chat = one direct peer)', async () => {

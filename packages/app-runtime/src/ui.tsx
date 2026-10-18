@@ -1,4 +1,4 @@
-/** `@agentui/ui`: components, hooks and bridge for mini-apps. Everything is themed by the host through `--au-*` CSS variables. */
+/** `@agentui/ui`: components, hooks and bridge for miniapps. Everything is themed by the host through `--au-*` CSS variables. */
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Chart as ChartJS } from 'chart.js';
 import { Icon } from './icons';

@@ -20,7 +20,7 @@ const fmt = (m: Message): BuildError => ({
 });
 
 /**
- * Compiles an app: frontend `src/main.tsx` → `dist/app.js` (+ `dist/app.css`), backend `server/*.{js,ts}` → `dist/server/*.cjs`.
+ * Compiles a miniapp: front `src/main.tsx` → `dist/app.js` (+ `dist/app.css`), handlers `server/*.{js,ts}` → `dist/server/*.cjs`.
  * Returns the errors (empty = ok). The previous `dist/` is kept untouched if the build fails.
  */
 export async function buildApp(dir: string): Promise<{ ok: boolean; errors: BuildError[] }> {

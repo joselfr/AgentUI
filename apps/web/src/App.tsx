@@ -21,8 +21,8 @@ import SettingsDialog, { type ThemeMode } from './components/SettingsDialog';
 import { AgentsPage } from './components/pages/AgentsPage';
 import { JobsPage } from './components/pages/JobsPage';
 import { SkillsPage } from './components/pages/SkillsPage';
-import { AppsPage } from './components/pages/AppsPage';
-import AppView from './components/apps/AppView';
+import { MiniappsPage } from './components/pages/MiniappsPage';
+import MiniappView from './components/miniapps/MiniappView';
 import { toOutgoing, type AttachmentView } from './attachments';
 import { t, useLang } from './i18n';
 
@@ -37,12 +37,12 @@ export default function App() {
   const [auth, setAuth] = useState<'loading' | 'out' | 'in'>('loading');
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [convs, setConvs] = useState<Conversation[]>([]);
-  // The route is the source of truth: `/` new conversation, `/c/:id` a chat, `/agents` `/skills` `/jobs` `/apps` (`/apps/:id` one app) the other pages.
+  // The route is the source of truth: `/` new conversation, `/c/:id` a chat, `/agents` `/skills` `/jobs` `/miniapps` (`/miniapps/:id` one miniapp) the other pages.
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const currentId = matchPath('/c/:id', pathname)?.params.id;
-  const appId = matchPath('/apps/:id', pathname)?.params.id;
-  const view: View = appId ? 'apps' : (['agents', 'skills', 'jobs', 'apps'] as const).find((v) => pathname === `/${v}`) ?? 'chats';
+  const appId = matchPath('/miniapps/:id', pathname)?.params.id;
+  const view: View = appId ? 'miniapps' : (['agents', 'skills', 'jobs', 'miniapps'] as const).find((v) => pathname === `/${v}`) ?? 'chats';
   const setCurrentId = useCallback((id: string | undefined, replace = false) => navigate(id ? `/c/${id}` : '/', { replace }), [navigate]);
   const chatPath = useRef('/'); // last Chats route, reopened when coming back from another page
   if (view === 'chats') chatPath.current = pathname;
@@ -62,8 +62,8 @@ export default function App() {
   const [sub, setSub] = useState<string | undefined>(() => load<string | null>('newSub', null) ?? undefined);
   const [newAgent, setNewAgent] = useState<string | undefined>(() => load<string | null>('newAgent', null) ?? undefined);
   const [convsLoaded, setConvsLoaded] = useState(false);
-  const [dataTick, setDataTick] = useState<{ appId: string; n: number }>({ appId: '', n: 0 }); // data of a mini-app changed
-  const [appsTick, setAppsTick] = useState(0); // bumped when a mini-app changes (refresh of the Apps pages)
+  const [dataTick, setDataTick] = useState<{ appId: string; n: number }>({ appId: '', n: 0 }); // data of a miniapp changed
+  const [miniappsTick, setMiniappsTick] = useState(0); // bumped when a miniapp changes (refresh of the Miniapps pages)
   const currentRef = useRef<string>();
   currentRef.current = currentId;
   // "Read" = chat open, Chats page shown and tab visible; otherwise new messages stay unread.
@@ -131,7 +131,7 @@ export default function App() {
   }, [auth, pathname, search, savedId, navigate]);
   // Unknown route: back to home
   useEffect(() => {
-    if (auth === 'in' && !currentId && !appId && !['/', '/agents', '/skills', '/jobs', '/apps'].includes(pathname)) navigate('/', { replace: true });
+    if (auth === 'in' && !currentId && !appId && !['/', '/agents', '/skills', '/jobs', '/miniapps'].includes(pathname)) navigate('/', { replace: true });
   }, [auth, currentId, pathname, navigate]);
   useEffect(() => {
     if (auth !== 'in') return;
@@ -200,8 +200,8 @@ export default function App() {
     enabled: auth === 'in',
     onEvent,
     onStatus: (id, status, detail) => setAgents((as) => as.map((a) => (a.id === id ? { ...a, status, statusDetail: detail } : a))),
-    onAppChanged: () => setAppsTick((n) => n + 1),
-    onAppData: (appId) => setDataTick((d) => ({ appId, n: d.n + 1 })),
+    onMiniappChanged: () => setMiniappsTick((n) => n + 1),
+    onMiniappData: (appId) => setDataTick((d) => ({ appId, n: d.n + 1 })),
     onRead: (id) => setConvs((cs) => cs.map((c) => (c.id === id ? { ...c, unread: false } : c))),
     onOpen: () => { refreshLists(); if (currentRef.current) loadMessages(currentRef.current); },
     onUnauthorized: onUnauth,
@@ -296,7 +296,7 @@ export default function App() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); navigate('/'); }} />}
             {view === 'skills' && <SkillsPage agents={agents} />}
-            {view === 'apps' && (appId ? <AppView key={appId} id={appId} refreshKey={appsTick} dataKey={dataTick.appId === appId ? dataTick.n : 0} onBack={() => navigate('/apps')} /> : <AppsPage agents={agents} refreshKey={appsTick} onOpen={(id) => navigate(`/apps/${id}`)} />)}
+            {view === 'miniapps' && (appId ? <MiniappView key={appId} id={appId} refreshKey={miniappsTick} dataKey={dataTick.appId === appId ? dataTick.n : 0} onBack={() => navigate('/miniapps')} /> : <MiniappsPage agents={agents} refreshKey={miniappsTick} onOpen={(id) => navigate(`/miniapps/${id}`)} />)}
             {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => navigate(`/c/${id}`)} />}
           </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}

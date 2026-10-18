@@ -72,9 +72,9 @@ export const api = {
   send: (id: string, text: string, attachments: OutgoingAttachment[] = []) =>
     call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments }),
   abort: (id: string) => call('POST', `/conversations/${id}/abort`),
-  apps: () => call<MiniApp[]>('GET', '/apps'),
-  app: (id: string) => call<MiniApp>('GET', `/apps/${id}`),
-  removeApp: (id: string) => call<{ ok: true }>('DELETE', `/apps/${id}`),
-  appSession: (id: string) => call<{ base: string; version: number; name: string }>('GET', `/apps/${id}/session`),
+  miniapps: () => call<MiniApp[]>('GET', '/miniapps'),
+  miniapp: (id: string) => call<MiniApp>('GET', `/miniapps/${id}`),
+  removeMiniapp: (id: string) => call<{ ok: true }>('DELETE', `/miniapps/${id}`),
+  miniappSession: (id: string) => call<{ base: string; version: number; name: string }>('GET', `/miniapps/${id}/session`),
   approval: (id: string, approvalId: string, approve: boolean) => call('POST', `/conversations/${id}/approval`, { approvalId, approve }),
 };

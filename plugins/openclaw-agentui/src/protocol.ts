@@ -70,13 +70,13 @@ export type PluginMessage =
   | { type: 'event'; conversationId: string; runId: string; event: AgentEvent }
   | { type: 'outbound'; id: string; conversationId?: string; title?: string; text?: string; media?: Media[] }
   | { type: 'rpc.result'; id: string; result?: unknown; error?: string }
-  /** Request on the agent's mini-apps (create, write files…); answered by `app.result`. */
-  | { type: 'app.op'; id: string; op: string; args?: unknown }
+  /** Request on the agent's miniapps (create, write files…); answered by `miniapp.result`. */
+  | { type: 'miniapp.op'; id: string; op: string; args?: unknown }
   | { type: 'pong' };
 
 export type GatewayMessage =
-  | { type: 'welcome'; protocol: number; apps?: boolean }
-  | { type: 'app.result'; id: string; ok: boolean; result?: unknown; error?: string }
+  | { type: 'welcome'; protocol: number; miniapps?: boolean }
+  | { type: 'miniapp.result'; id: string; ok: boolean; result?: unknown; error?: string }
   | { type: 'inbound'; conversationId: string; runId: string; text: string; subAgentId?: string; attachments?: Media[] }
   | { type: 'abort'; conversationId: string; runId: string }
   | { type: 'reply'; conversationId: string; runId: string; text: string }
