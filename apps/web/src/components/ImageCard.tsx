@@ -45,9 +45,9 @@ function Tile({ img, r, onOpen, last, more, single }: { img: Img; r: Resolved; o
   }
   return (
     <Box component="button" type="button" onClick={onOpen} aria-label={img.alt ?? img.caption ?? t('chat.enlarge')}
-      sx={{ ...frame, p: 0, m: 0, cursor: 'zoom-in', display: 'block', width: '100%', font: 'inherit', color: 'inherit', ...(single && { maxHeight: 340 }) }}>
+      sx={{ ...frame, p: 0, m: 0, cursor: 'zoom-in', display: 'block', width: '100%', font: 'inherit', color: 'inherit', ...(single && { maxHeight: 'min(420px, 60dvh)' }) }}>
       <img src={r.state === 'ok' ? r.url : ''} alt={img.alt ?? img.caption ?? ''} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)}
-        style={{ width: '100%', height: single ? 'auto' : '100%', maxHeight: single ? 340 : undefined, objectFit: single ? 'contain' : 'cover', display: 'block' }} />
+        style={{ width: '100%', height: single ? 'auto' : '100%', maxHeight: single ? 'calc(min(420px, 60dvh) - 2px)' : undefined, objectFit: single ? 'contain' : 'cover', display: 'block' }} />
       {isRemote(img.src) && !last && (
         <Box component="span" sx={{ position: 'absolute', left: 6, bottom: 6, bgcolor: 'rgba(0,0,0,.55)', color: '#fff', borderRadius: '6px', px: 0.75, fontSize: 11 }}>{host(img.src)}</Box>
       )}
@@ -71,23 +71,23 @@ function Lightbox({ gallery, resolve, index, onIndex, onClose }: { gallery: Gall
   const url = r.state === 'ok' ? r.url : undefined;
   const btn = { color: '#fff', bgcolor: 'rgba(255,255,255,.12)', '&:hover': { bgcolor: 'rgba(255,255,255,.2)' }, borderRadius: '8px', fontSize: 13, px: 1.25 } as const;
   return (
-    <Dialog open onClose={onClose} fullScreen PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,.92)', backgroundImage: 'none', color: '#fff', display: 'grid', gridTemplateRows: 'auto 1fr auto', border: 0 } }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.5 }}>
+    <Dialog open onClose={onClose} fullScreen PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,.92)', backgroundImage: 'none', color: '#fff', display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) auto', height: 'var(--app-height, 100dvh)', maxHeight: 'var(--app-height, 100dvh)', overflow: 'hidden', border: 0, pt: 'env(safe-area-inset-top)', pb: 'env(safe-area-inset-bottom)', pl: 'env(safe-area-inset-left)', pr: 'env(safe-area-inset-right)' } }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.5, flexShrink: 0 }}>
         <Typography sx={{ flex: 1, fontSize: 13, minWidth: 0 }} noWrap>{n > 1 ? `${index + 1} / ${n}` : ''}{n > 1 && img.caption ? ' — ' : ''}{img.caption}</Typography>
         {isRemote(img.src) && <IconButton component="a" href={img.src} target="_blank" rel="noreferrer noopener" sx={btn}>{t('image.open')}</IconButton>}
         {url && <IconButton component="a" href={url} download sx={btn}>{t('image.download')}</IconButton>}
         <IconButton onClick={onClose} aria-label={t('common.close')} sx={btn}>✕</IconButton>
       </Box>
-      <Box sx={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: 0, p: 1 }}
+      <Box sx={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: 0, overflow: 'hidden', p: 1 }}
         onTouchStart={(e) => { touch.current = e.touches[0]!.clientX; }}
         onTouchEnd={(e) => { if (touch.current === null) return; const dx = e.changedTouches[0]!.clientX - touch.current; touch.current = null; if (Math.abs(dx) > 50 && n > 1) go(dx < 0 ? 1 : -1); }}>
-        {url ? <img src={url} alt={img.alt ?? img.caption ?? ''} referrerPolicy="no-referrer" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Typography color="inherit" sx={{ opacity: 0.7 }}>{t('image.unavailable')}</Typography>}
+        {url ? <img src={url} alt={img.alt ?? img.caption ?? ''} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', minHeight: 0, objectFit: 'contain' }} /> : <Typography color="inherit" sx={{ opacity: 0.7 }}>{t('image.unavailable')}</Typography>}
         {n > 1 && (<>
           <IconButton onClick={() => go(-1)} aria-label={t('image.previous')} sx={{ ...btn, position: 'absolute', left: 8, top: '50%', fontSize: 22 }}>‹</IconButton>
           <IconButton onClick={() => go(1)} aria-label={t('image.next')} sx={{ ...btn, position: 'absolute', right: 8, top: '50%', fontSize: 22 }}>›</IconButton>
         </>)}
       </Box>
-      <Typography sx={{ textAlign: 'center', p: 1.5, fontSize: 13, minHeight: 24 }}>{img.caption}</Typography>
+      <Typography sx={{ textAlign: 'center', px: 1.5, py: 1, fontSize: 13, minHeight: 24, overflowWrap: 'anywhere', maxHeight: '20dvh', overflowY: 'auto' }}>{img.caption}</Typography>
     </Dialog>
   );
 }
