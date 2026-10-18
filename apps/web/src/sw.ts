@@ -6,7 +6,7 @@ declare const self: any;
 
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
-registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//, /^\/ws/] }));
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//, /^\/ws/, /^\/a\//] }));
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e: any) => e.waitUntil(self.clients.claim()));

@@ -4,15 +4,17 @@ import ChatBubbleOutline from '@mui/icons-material/ChatBubbleOutline';
 import EventRepeat from '@mui/icons-material/EventRepeat';
 import SmartToyOutlined from '@mui/icons-material/SmartToyOutlined';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
+import AppsOutlined from '@mui/icons-material/AppsOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import type { ReactNode } from 'react';
 import { t, type Key } from '../i18n';
 
-export type View = 'chats' | 'jobs' | 'agents' | 'skills';
+export type View = 'chats' | 'jobs' | 'agents' | 'skills' | 'apps';
 export const NAV = 64;
 
 const items: Array<{ id: View; label: Key; icon: ReactNode }> = [
   { id: 'chats', label: 'nav.chats', icon: <ChatBubbleOutline /> },
+  { id: 'apps', label: 'nav.apps', icon: <AppsOutlined /> },
   { id: 'jobs', label: 'nav.jobs', icon: <EventRepeat /> },
   { id: 'agents', label: 'nav.agents', icon: <SmartToyOutlined /> },
   { id: 'skills', label: 'nav.skills', icon: <AutoAwesomeOutlined /> },
