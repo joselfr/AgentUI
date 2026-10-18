@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0e1015">
 <meta property="og:title" content="AgentUI — The chat that actually shows what your agents do">
 <meta property="og:description" content="Interactive charts, tables, maps, forms and task trackers inside your AI agents’ chat.">
-<meta property="og:image" content="../img/hero-desktop.webp">
+<meta property="og:image" content="../img/en/hero-desktop.webp">
 <link rel="alternate" hreflang="fr" href="../">
 <link rel="alternate" hreflang="en" href="./">
 <link rel="icon" href="../img/icon.svg" type="image/svg+xml">
@@ -151,6 +151,21 @@
     .nav .wrap { gap: 12px; }
     .btn { padding: 11px 18px; }
   }
+
+  /* Comparatif */
+  .cmp-wrap { margin-top: 48px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  table.cmp { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 15px; }
+  .cmp th, .cmp td { padding: 14px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  .cmp tbody tr:last-child th, .cmp tbody tr:last-child td { border-bottom: 0; }
+  .cmp thead th { background: var(--bg-2); font-size: 14px; color: var(--muted); font-weight: 600; }
+  .cmp thead th small { display: block; font-weight: 400; margin-top: 2px; }
+  .cmp tbody th { font-weight: 600; color: var(--text); width: 26%; }
+  .cmp td { color: var(--muted); width: 24.6%; }
+  .cmp .us { background: color-mix(in srgb, var(--accent) 9%, transparent); color: #d6dbe8; }
+  .cmp thead th.us { color: var(--accent); }
+  .cmp b { display: inline-block; width: 1.3em; font-weight: 800; }
+  .cmp .y b { color: var(--ok); } .cmp .p b { color: #e5b567; } .cmp .n b { color: #8a93a6; }
+  .cmp-legend { color: var(--muted); font-size: 14px; margin-top: 14px; }
 </style>
 <noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
 </head>
@@ -165,6 +180,7 @@
       <a href="#themes">Interface</a>
       <a href="#fonctions">Features</a>
       <a href="#fonctionnement">How it works</a>
+      <a href="#comparatif">Comparison</a>
       <a href="#" data-repo-link hidden>GitHub</a>
       <a class="lang" href="../" hreflang="fr" lang="fr" title="Version française">FR</a>
     </nav>
@@ -185,9 +201,9 @@
       <div class="hero-shot reveal">
         <div class="frame">
           <div class="bar"><span></span><span></span><span></span></div>
-          <img src="../img/hero-desktop.webp" alt="AgentUI on desktop: an agent answers with an interactive chart" width="1600" height="1067" fetchpriority="high">
+          <img src="../img/en/hero-desktop.webp" alt="AgentUI on desktop: an agent answers with an interactive chart" width="1600" height="1067" fetchpriority="high">
         </div>
-        <div class="phone"><img src="../img/hero-mobile.webp" alt="AgentUI on mobile: step-by-step migration tracker" width="600" height="1300" loading="lazy"></div>
+        <div class="phone"><img src="../img/en/hero-mobile.webp" alt="AgentUI on mobile: step-by-step migration tracker" width="600" height="1300" loading="lazy"></div>
       </div>
     </div>
   </div>
@@ -217,8 +233,8 @@
           <p><span class="tag">agentui_chart</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="../img/desktop-dark-chart.webp" alt="Chart widget: monthly revenue" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-chart.webp" alt="Chart widget on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-dark-chart.webp" alt="Chart widget: monthly revenue" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-chart.webp" alt="Chart widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
@@ -231,8 +247,8 @@
           <p><span class="tag">agentui_table</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="../img/desktop-dark-table.webp" alt="Table widget: plan comparison" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-table.webp" alt="Table widget on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-dark-table.webp" alt="Table widget: plan comparison" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-table.webp" alt="Table widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
@@ -245,8 +261,8 @@
           <p><span class="tag">agentui_map</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="../img/desktop-dark-map.webp" alt="Map widget: Thursday’s round in Toulouse" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-map.webp" alt="Map widget on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-dark-map.webp" alt="Map widget: Thursday’s round in Toulouse" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-map.webp" alt="Map widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
@@ -259,8 +275,8 @@
           <p><span class="tag">agentui_progress</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="../img/desktop-dark-progress.webp" alt="Progress widget: database migration" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-progress.webp" alt="Progress widget on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-dark-progress.webp" alt="Progress widget: database migration" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-progress.webp" alt="Progress widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
@@ -273,8 +289,8 @@
           <p><span class="tag">agentui_code</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="../img/desktop-dark-code.webp" alt="Code widget: a fix shown as a diff" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-code.webp" alt="Code widget on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-dark-code.webp" alt="Code widget: a fix shown as a diff" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-code.webp" alt="Code widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
@@ -287,8 +303,8 @@
           <p><span class="tag">agentui_confirm</span><span class="tag">agentui_form</span><span class="tag">agentui_ask</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="../img/desktop-dark-form.webp" alt="Form widget: planning a trip" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-confirm.webp" alt="Confirmation widget on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-dark-form.webp" alt="Form widget: planning a trip" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-confirm.webp" alt="Confirmation widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
     </div>
@@ -311,8 +327,8 @@
           <ul><li>One conversation per task, filed under “Cron tasks”</li><li>“Unread” dot and a “New message” marker</li><li>Tables, lists and other widgets inside the message</li></ul>
         </div>
         <div class="shot">
-          <div class="frame"><img src="../img/desktop-dark-cron.webp" alt="A cron task conversation: morning briefing with an agenda table" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-cron.webp" alt="Cron message on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-dark-cron.webp" alt="A cron task conversation: morning briefing with an agenda table" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-cron.webp" alt="Cron message on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
@@ -331,8 +347,8 @@
           <div class="note">A task posts to AgentUI when it is configured to deliver its results there; its failures can follow the same path.</div>
         </div>
         <div class="shot">
-          <div class="frame"><img class="crop" src="../img/desktop-dark-jobs.webp" alt="Tasks page: three scheduled tasks, one of them failing" width="1600" height="600" loading="lazy"></div>
-          <div class="phone"><img src="../img/mobile-dark-jobs.webp" alt="Tasks page on mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img class="crop" src="../img/en/desktop-dark-jobs.webp" alt="Tasks page: three scheduled tasks, one of them failing" width="1600" height="600" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-jobs.webp" alt="Tasks page on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
     </div>
@@ -348,16 +364,16 @@
       </div>
       <div class="themes-grid">
         <div class="stack reveal">
-          <div class="frame"><img src="../img/desktop-light-chart.webp" alt="AgentUI in light theme" width="1600" height="1067" loading="lazy"></div>
+          <div class="frame"><img src="../img/en/desktop-light-chart.webp" alt="AgentUI in light theme" width="1600" height="1067" loading="lazy"></div>
           <p class="cap">Light theme · desktop</p>
         </div>
         <div class="pair reveal">
           <div>
-            <div class="frame"><img src="../img/mobile-light-progress.webp" alt="AgentUI mobile in light theme" width="600" height="1300" loading="lazy"></div>
+            <div class="frame"><img src="../img/en/mobile-light-progress.webp" alt="AgentUI mobile in light theme" width="600" height="1300" loading="lazy"></div>
             <p class="cap">Light · mobile</p>
           </div>
           <div>
-            <div class="frame"><img src="../img/mobile-dark-liste.webp" alt="Conversation list on mobile" width="600" height="1300" loading="lazy"></div>
+            <div class="frame"><img src="../img/en/mobile-dark-liste.webp" alt="Conversation list on mobile" width="600" height="1300" loading="lazy"></div>
             <p class="cap">Conversation list</p>
           </div>
         </div>
@@ -414,6 +430,38 @@
     </div>
   </section>
 
+  <!-- COMPARISON -->
+  <section id="comparatif">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">Comparison</span>
+        <h2>Where AgentUI stands, honestly.</h2>
+        <p class="sub">Against messengers (Telegram, Discord…) and web interfaces that go through the API (Open WebUI, Hermes WebUI…). Each approach has its strengths.</p>
+      </div>
+      <div class="cmp-wrap reveal">
+        <table class="cmp">
+          <thead><tr><th></th><th>Messengers<small>Telegram, Discord, WhatsApp…</small></th><th>Web UI via API<small>Open WebUI, Hermes WebUI…</small></th><th class="us">AgentUI<small>Channel plugin + PWA</small></th></tr></thead>
+          <tbody>
+            <tr><th>Several conversations</th><td class="p"><b>~</b>Topics or threads, depending on the messenger</td><td class="y"><b>✓</b>Yes</td><td class="y us"><b>✓</b>One distinct session per conversation</td></tr>
+            <tr><th>Rich rendering (charts, tables, maps, forms)</th><td class="n"><b>✗</b>Text and buttons</td><td class="p"><b>~</b>Markdown, depends on the tool</td><td class="y us"><b>✓</b>Widgets called like tools</td></tr>
+            <tr><th>Tools, reasoning, sub-agents, cost</th><td class="n"><b>✗</b>Not shown</td><td class="p"><b>~</b>Partial, depends on the API</td><td class="y us"><b>✓</b>Native protocol events</td></tr>
+            <tr><th>Approvals and questions mid-run</th><td class="p"><b>~</b>Inline buttons, DIY</td><td class="n"><b>✗</b>Not in a chat API</td><td class="y us"><b>✓</b>Native, the run carries on</td></tr>
+            <tr><th>Proactive messages (crons, reminders)</th><td class="y"><b>✓</b>Yes</td><td class="n"><b>✗</b>No channel for the agent</td><td class="y us"><b>✓</b>Dedicated “Messages from the agent” chat</td></tr>
+            <tr><th>Managing scheduled tasks and skills</th><td class="n"><b>✗</b>No</td><td class="p"><b>~</b>Depends on the UI: some allow it</td><td class="y us"><b>✓</b>Pause, run, errors, reading</td></tr>
+            <tr><th>Mobile push notifications</th><td class="y"><b>✓</b>Excellent, nothing to set up</td><td class="p"><b>~</b>Varies by tool</td><td class="p us"><b>~</b>Yes, but HTTPS required (iPhone: home screen)</td></tr>
+            <tr><th>Agent behind a NAT</th><td class="y"><b>✓</b>Yes</td><td class="n"><b>✗</b>The API must be reachable</td><td class="y us"><b>✓</b>Outgoing connection from the plugin</td></tr>
+            <tr><th>Data under your control</th><td class="n"><b>✗</b>Goes through a third party</td><td class="y"><b>✓</b>Self-hosted</td><td class="y us"><b>✓</b>Self-hosted</td></tr>
+            <tr><th>Setup</th><td class="y"><b>✓</b>Almost nothing</td><td class="p"><b>~</b>A UI to install and wire up</td><td class="p us"><b>~</b>A service + one plugin per platform</td></tr>
+            <tr><th>Maturity and community</th><td class="y"><b>✓</b>Very mature</td><td class="y"><b>✓</b>Large communities</td><td class="n us"><b>✗</b>Young, a single maintainer</td></tr>
+            <tr><th>Independence from the platform</th><td class="y"><b>✓</b>Good</td><td class="y"><b>✓</b>Very good (standard API)</td><td class="p us"><b>~</b>A plugin to maintain for Hermes, OpenClaw…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cmp-legend">✓ well covered · ~ partial or with caveats · ✗ missing or poorly suited. General assessments, which vary by tool and version.</p>
+      <div class="note reveal"><strong>In short.</strong> To simply talk to an agent from your phone, a messenger is enough and takes less effort. For a general-purpose or multi-user chat interface, a UI via API is more complete. AgentUI targets real agents: tools, sub-agents, crons, approvals, widgets. The trade-off: one more service to host and plugins to maintain.</div>
+    </div>
+  </section>
+
   <!-- APPEL FINAL -->
   <section class="final">
     <div class="wrap">
@@ -432,7 +480,7 @@
 <footer>
   <div class="wrap">
     <span class="brand"><img src="../img/icon.svg" alt="" width="26" height="26">AgentUI</span>
-    <span>Screenshots were generated with a demo agent. The app interface is currently in French only.</span>
+    <span>Screenshots were generated with a demo agent, using the English interface.</span>
   </div>
 </footer>
 

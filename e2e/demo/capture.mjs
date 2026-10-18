@@ -1,44 +1,62 @@
 // Captures for the presentation site (docs/img) from an AgentUI instance wired to e2e/demo/fake-agent.mjs.
-//   node e2e/demo/capture.mjs <baseUrl> <user> <password> <output-folder>
+//   node e2e/demo/capture.mjs <baseUrl> <user> <password> <output-folder> [fr|en]
+//   (en: English interface and content; the fake agent must be started with DEMO_LANG=en)
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 
-const [base, user, pass, out] = process.argv.slice(2);
+const [base, user, pass, out, lang = 'fr'] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 const AGENT = 'Atlas';
 
+const TEXT = {
+  fr: {
+    locale: 'fr-FR', username: 'Utilisateur', password: 'Mot de passe', signIn: 'Se connecter', newChat: 'Nouvelle conversation', start: 'Démarrer',
+    composer: (a) => `Message à ${a}`, stop: 'Arrêter', cronSection: /^Tâches cron/, jobsNav: /^Tâches/, chats: /discussions|menu/i,
+    morning: '⏰ Résumé du matin', backup: 'Sauvegarde nocturne',
+    prompts: { chart: 'Montre-moi l’évolution des ventes de cette année', table: 'Fais-moi un comparatif des offres', map: 'Prépare l’itinéraire de ma visite de jeudi', progress: 'Lance la migration vers la nouvelle base', code: 'Corrige le bug de date dans le script', confirm: 'Supprime les anciennes sauvegardes', form: 'Organise mon voyage à Lyon' },
+    ready: { confirm: 'text=Garder', form: 'text=Lancer la recherche' },
+  },
+  en: {
+    locale: 'en-US', username: 'Username', password: 'Password', signIn: 'Sign in', newChat: 'New conversation', start: 'Start',
+    composer: (a) => `Message ${a}`, stop: 'Stop', cronSection: /^Cron tasks/, jobsNav: /^Tasks/, chats: /chats|menu/i,
+    morning: '⏰ Morning briefing', backup: 'Nightly backup',
+    prompts: { chart: 'Show me this year’s sales trend', table: 'Make me a comparison of the plans', map: 'Plan the route for my Thursday visit', progress: 'Start the migration to the new database', code: 'Fix the date bug in the script', confirm: 'Delete the old backups', form: 'Organize my trip to Lyon' },
+    ready: { confirm: 'text=Keep', form: 'text=Start the search' },
+  },
+}[lang];
+
 // Each scenario: message sent, capture name, wait for completion.
 const SCENARIOS = [
-  { id: 'chart', prompt: 'Montre-moi l’évolution des ventes de cette année', ready: 'canvas', blocking: false },
-  { id: 'table', prompt: 'Fais-moi un comparatif des offres', ready: 'table', blocking: false },
-  { id: 'map', prompt: 'Prépare l’itinéraire de ma visite de jeudi', ready: '.leaflet-container', blocking: false },
-  { id: 'progress', prompt: 'Lance la migration vers la nouvelle base', ready: null, blocking: false, settle: 7000 },
-  { id: 'code', prompt: 'Corrige le bug de date dans le script', ready: 'text=src/booking.ts', blocking: false },
-  { id: 'confirm', prompt: 'Supprime les anciennes sauvegardes', ready: 'text=Garder', blocking: true },
-  { id: 'form', prompt: 'Organise mon voyage à Lyon', ready: 'text=Lancer la recherche', blocking: true },
+  { id: 'chart', prompt: TEXT.prompts.chart, ready: 'canvas', blocking: false },
+  { id: 'table', prompt: TEXT.prompts.table, ready: 'table', blocking: false },
+  { id: 'map', prompt: TEXT.prompts.map, ready: '.leaflet-container', blocking: false },
+  { id: 'progress', prompt: TEXT.prompts.progress, ready: null, blocking: false, settle: 7000 },
+  { id: 'code', prompt: TEXT.prompts.code, ready: 'text=src/booking.ts', blocking: false },
+  { id: 'confirm', prompt: TEXT.prompts.confirm, ready: TEXT.ready.confirm, blocking: true },
+  { id: 'form', prompt: TEXT.prompts.form, ready: TEXT.ready.form, blocking: true },
 ];
 
 // Outside the played scenarios: chat of a cron task (created by the proactive message) and the "Tasks" page.
 const EXTRA = [
   { id: 'cron', ready: 'table' },
-  { id: 'jobs', ready: 'text=Sauvegarde nocturne', path: '/jobs' },
+  { id: 'jobs', ready: `text=${TEXT.backup}`, path: '/jobs' },
 ];
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] });
 
 async function login(page) {
   await page.goto(base);
-  await page.getByLabel('Utilisateur').fill(user);
-  await page.getByLabel('Mot de passe').fill(pass);
-  await page.getByRole('button', { name: 'Se connecter' }).click();
-  await page.getByText('Nouvelle conversation').first().waitFor({ timeout: 15000 });
+  await page.getByLabel(TEXT.username).fill(user);
+  await page.getByLabel(TEXT.password).fill(pass);
+  await page.getByRole('button', { name: TEXT.signIn }).click();
+  await page.getByText(TEXT.newChat).first().waitFor({ timeout: 15000 });
 }
 
 const idOf = (page) => page.url().match(/\/c\/([^/?#]+)/)?.[1];
 const ids = {};
 
 const ctxOpts = (name) => ({
-  deviceScaleFactor: 2, locale: 'fr-FR',
+  deviceScaleFactor: 2, locale: TEXT.locale,
   ...(name.startsWith('mobile') ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 960 } }),
 });
 const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStorage.setItem('themeMode', JSON.stringify(t)), theme); return ctx; };
@@ -49,13 +67,13 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
   const page = await ctx.newPage();
   await login(page);
   for (const s of SCENARIOS) {
-    await page.getByRole('button', { name: 'Nouvelle conversation', exact: true }).click();
-    await page.getByRole('button', { name: 'Démarrer' }).click({ timeout: 3000 }).catch(() => {}); // agent choice
-    const box = page.getByPlaceholder(`Message à ${AGENT}`);
+    await page.getByRole('button', { name: TEXT.newChat, exact: true }).click();
+    await page.getByRole('button', { name: TEXT.start }).click({ timeout: 3000 }).catch(() => {}); // agent choice
+    const box = page.getByPlaceholder(TEXT.composer(AGENT));
     await box.fill(s.prompt);
     await box.press('Enter');
     if (s.ready) await page.locator(s.ready).first().waitFor({ timeout: 30000 });
-    if (!s.blocking) await page.locator('[aria-label="Arrêter"]').waitFor({ state: 'detached', timeout: 30000 }).catch(() => {});
+    if (!s.blocking) await page.locator(`[aria-label="${TEXT.stop}"]`).waitFor({ state: 'detached', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(s.settle ?? 2500);
     ids[s.id] = idOf(page);
     if (s.blocking) { await page.reload(); await page.locator(s.ready).first().waitFor({ timeout: 30000 }); await page.waitForTimeout(1500); } // up-to-date list titles
@@ -63,14 +81,14 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
     console.log('desktop-dark', s.id, ids[s.id]);
   }
   // Cron chat: "Cron tasks" section of the list, then the "Tasks" page
-  await page.getByRole('button', { name: /^Tâches cron/ }).click();
-  await page.getByText('⏰ Résumé du matin').first().click();
+  await page.getByRole('button', { name: TEXT.cronSection }).click();
+  await page.getByText(TEXT.morning).first().click();
   await page.locator('table').first().waitFor({ timeout: 15000 });
   await page.waitForTimeout(2000);
   ids.cron = idOf(page);
   await page.screenshot({ path: `${out}/desktop-dark-cron.png` });
-  await page.getByRole('button', { name: /^Tâches/ }).first().click();
-  await page.getByText('Sauvegarde nocturne').first().waitFor({ timeout: 15000 });
+  await page.getByRole('button', { name: TEXT.jobsNav }).first().click();
+  await page.getByText(TEXT.backup).first().waitFor({ timeout: 15000 });
   await page.mouse.move(900, 900); // the menu tooltip must not appear
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${out}/desktop-dark-jobs.png` });
@@ -96,7 +114,7 @@ for (const [name, theme, only] of [
   }
   if (name === 'mobile-dark') { // chat list in a drawer
     await page.goto(`${base}/c/${ids.chart}`);
-    await page.getByRole('button', { name: /discussions|menu/i }).first().click().catch(() => {});
+    await page.getByRole('button', { name: TEXT.chats }).first().click().catch(() => {});
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${out}/mobile-dark-liste.png` });
   }

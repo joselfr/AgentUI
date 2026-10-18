@@ -11,7 +11,7 @@ The screenshots do **not** come from a real platform: a fake agent (`e2e/demo/fa
 
 ## 1. Change the text or the layout
 
-Edit `docs/index.html`, **then carry the same change over to `docs/en/index.html`**: both pages have the same structure and must stay in sync (same sections, same images, same order). The captures are taken with the French interface and the demo content is in French, so they stay French in the English version (the English page's footer says so). In the English page, also translate the `alt` attributes and the visible comments, and keep `../img/`. A language switcher (`a.lang`) is in the navigation of both pages. Things to know:
+Edit `docs/index.html`, **then carry the same change over to `docs/en/index.html`**: both pages have the same structure and must stay in sync (same sections, same images, same order). The English page uses its own captures in `docs/img/en/` (English interface and demo content, see section 2), referenced as `../img/en/…`; only `icon.svg` stays shared (`../img/icon.svg`). In the English page, also translate the `alt` attributes and the visible comments. A language switcher (`a.lang`) is in the navigation of both pages. Things to know:
 - Colors as `:root` variables (`--bg #0e1015`, `--accent #ff5c5c`, those of the app); dark page only.
 - A widget row = `<div class="row">` (copy on the left, capture on the right) or `row flip` (reversed). It contains `.copy` (kicker, `h3`, `p`, list, `<span class="tag">agentui_xxx</span>`) and `.shot` (one desktop `.frame` + one mobile `.phone`).
 - `.reveal` blocks appear on scroll (without JS or with reduced motion, everything is visible).
@@ -27,6 +27,15 @@ DEMO_DIR=<scratchpad>/demo e2e/demo/demo.sh down
 e2e/demo/demo.sh webp <scratchpad>/shots docs/img   # WebP: desktop 1600 px, mobile 600 px (+ hero-desktop / hero-mobile)
 ```
 
+**English captures** (`docs/img/en/`, used by `docs/en/`): same steps with `DEMO_LANG=en` for the fake agent (it then plays `e2e/demo/content.en.mjs` instead of `content.fr.mjs`) and the `en` argument for the capture script (English interface, English prompts):
+```sh
+DEMO_LANG=en DEMO_DIR=<scratchpad>/demo e2e/demo/demo.sh up
+node e2e/demo/capture.mjs http://localhost:8181 demo demo-pass-123 <scratchpad>/shots-en en
+DEMO_DIR=<scratchpad>/demo e2e/demo/demo.sh down
+e2e/demo/demo.sh webp <scratchpad>/shots-en docs/img/en
+```
+When the demo content changes (scenarios, jobs, cron messages), edit **both** `content.fr.mjs` and `content.en.mjs`, and the prompts / UI labels of `TEXT` in `capture.mjs` if needed.
+
 - Captures go to the scratchpad, never into the repository: only the `.webp` files of `docs/img/` are versioned.
 - `capture.mjs` plays each scenario in dark desktop (default theme), then reopens the chats in light desktop, dark mobile and light mobile. The theme is set through `localStorage.themeMode`.
 - **Look at the images** (Read tool) before keeping them: cut-off widget, stale chat title, map without background, error message… Port 8181 must be free (`DEMO_PORT` to change it).
@@ -35,7 +44,7 @@ e2e/demo/demo.sh webp <scratchpad>/shots docs/img   # WebP: desktop 1600 px, mob
   `grep -o 'img/[a-z0-9-]*\.[a-z]*' docs/index.html | sort -u | while read f; do [ -f docs/$f ] || echo MISSING $f; done`
 
 ### Cron tasks
-The `#taches` section of the page relies on two things in the fake agent: `JOBS` (answer to the `listJobs` RPC, hence the "Tasks" page: one task in error, with `lastError`) and `CRON_MESSAGES` (proactive `outbound` messages sent to the connection; a `conversationId` starting with `cron-…` creates the "⏰ title" chat in the "Cron tasks" section). `capture.mjs` photographs them through `EXTRA` (`cron` = "Résumé du matin" chat, `jobs` = `/jobs` page). To change the content of the messages or tasks, edit these two constants then redo the captures.
+The `#taches` section of the page relies on two things in the fake agent: `JOBS` (in `content.<lang>.mjs`; answer to the `listJobs` RPC, hence the "Tasks" page: one task in error, with `lastError`) and `CRON_MESSAGES` (also in `content.<lang>.mjs`; proactive `outbound` messages sent to the connection; a `conversationId` starting with `cron-…` creates the "⏰ title" chat in the "Cron tasks" section). `capture.mjs` photographs them through `EXTRA` (`cron` = "Résumé du matin" chat, `jobs` = `/jobs` page). To change the content of the messages or tasks, edit these two constants then redo the captures.
 
 ## 3. Present a new widget
 

@@ -151,6 +151,21 @@
     .nav .wrap { gap: 12px; }
     .btn { padding: 11px 18px; }
   }
+
+  /* Comparatif */
+  .cmp-wrap { margin-top: 48px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  table.cmp { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 15px; }
+  .cmp th, .cmp td { padding: 14px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  .cmp tbody tr:last-child th, .cmp tbody tr:last-child td { border-bottom: 0; }
+  .cmp thead th { background: var(--bg-2); font-size: 14px; color: var(--muted); font-weight: 600; }
+  .cmp thead th small { display: block; font-weight: 400; margin-top: 2px; }
+  .cmp tbody th { font-weight: 600; color: var(--text); width: 26%; }
+  .cmp td { color: var(--muted); width: 24.6%; }
+  .cmp .us { background: color-mix(in srgb, var(--accent) 9%, transparent); color: #d6dbe8; }
+  .cmp thead th.us { color: var(--accent); }
+  .cmp b { display: inline-block; width: 1.3em; font-weight: 800; }
+  .cmp .y b { color: var(--ok); } .cmp .p b { color: #e5b567; } .cmp .n b { color: #8a93a6; }
+  .cmp-legend { color: var(--muted); font-size: 14px; margin-top: 14px; }
 </style>
 <noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
 </head>
@@ -165,6 +180,7 @@
       <a href="#themes">Interface</a>
       <a href="#fonctions">Fonctions</a>
       <a href="#fonctionnement">Fonctionnement</a>
+      <a href="#comparatif">Comparatif</a>
       <a href="#" data-repo-link hidden>GitHub</a>
       <a class="lang" href="en/" hreflang="en" lang="en" title="English version">EN</a>
     </nav>
@@ -411,6 +427,38 @@
 
 <span class="c">// AgentUI affiche le graphique à cet endroit.</span></pre>
       </div>
+    </div>
+  </section>
+
+  <!-- COMPARATIF -->
+  <section id="comparatif">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">Comparatif</span>
+        <h2>Où AgentUI se place, honnêtement.</h2>
+        <p class="sub">Face aux messageries (Telegram, Discord…) et aux interfaces web qui passent par l’API (Open WebUI, Hermes WebUI…). Chaque approche a ses forces.</p>
+      </div>
+      <div class="cmp-wrap reveal">
+        <table class="cmp">
+          <thead><tr><th></th><th>Messageries<small>Telegram, Discord, WhatsApp…</small></th><th>UI web via API<small>Open WebUI, Hermes WebUI…</small></th><th class="us">AgentUI<small>Plugin canal + PWA</small></th></tr></thead>
+          <tbody>
+            <tr><th>Plusieurs discussions</th><td class="p"><b>~</b>Topics ou threads, selon la messagerie</td><td class="y"><b>✓</b>Oui</td><td class="y us"><b>✓</b>Une session distincte par discussion</td></tr>
+            <tr><th>Rendu riche (graphiques, tableaux, cartes, formulaires)</th><td class="n"><b>✗</b>Texte et boutons</td><td class="p"><b>~</b>Markdown, selon l’outil</td><td class="y us"><b>✓</b>Widgets appelés comme des outils</td></tr>
+            <tr><th>Outils, raisonnement, sous-agents, coût</th><td class="n"><b>✗</b>Non affichés</td><td class="p"><b>~</b>Partiel, dépend de l’API</td><td class="y us"><b>✓</b>Événements natifs du protocole</td></tr>
+            <tr><th>Approbations et questions en cours d’exécution</th><td class="p"><b>~</b>Boutons inline à bricoler</td><td class="n"><b>✗</b>Pas dans une API de chat</td><td class="y us"><b>✓</b>Natifs, la discussion continue</td></tr>
+            <tr><th>Messages proactifs (crons, rappels)</th><td class="y"><b>✓</b>Oui</td><td class="n"><b>✗</b>Pas de canal pour l’agent</td><td class="y us"><b>✓</b>Chat dédié « Messages de l’agent »</td></tr>
+            <tr><th>Pilotage des tâches planifiées et des skills</th><td class="n"><b>✗</b>Non</td><td class="p"><b>~</b>Selon l’UI : certaines le permettent</td><td class="y us"><b>✓</b>Pause, lancement, erreurs, lecture</td></tr>
+            <tr><th>Notifications push sur mobile</th><td class="y"><b>✓</b>Excellentes, rien à configurer</td><td class="p"><b>~</b>Variable selon l’outil</td><td class="p us"><b>~</b>Oui, mais HTTPS requis (iPhone : écran d’accueil)</td></tr>
+            <tr><th>Agent derrière un NAT</th><td class="y"><b>✓</b>Oui</td><td class="n"><b>✗</b>L’API doit être joignable</td><td class="y us"><b>✓</b>Connexion sortante du plugin</td></tr>
+            <tr><th>Données sous votre contrôle</th><td class="n"><b>✗</b>Passent par un tiers</td><td class="y"><b>✓</b>Auto-hébergé</td><td class="y us"><b>✓</b>Auto-hébergé</td></tr>
+            <tr><th>Mise en place</th><td class="y"><b>✓</b>Presque rien</td><td class="p"><b>~</b>Une UI à installer et à brancher</td><td class="p us"><b>~</b>Un service + un plugin par plateforme</td></tr>
+            <tr><th>Maturité et communauté</th><td class="y"><b>✓</b>Très mûr</td><td class="y"><b>✓</b>Grosses communautés</td><td class="n us"><b>✗</b>Jeune, un seul mainteneur</td></tr>
+            <tr><th>Indépendance vis-à-vis de la plateforme</th><td class="y"><b>✓</b>Bonne</td><td class="y"><b>✓</b>Très bonne (API standard)</td><td class="p us"><b>~</b>Un plugin à maintenir pour Hermes, OpenClaw…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cmp-legend">✓ bien couvert · ~ partiel ou avec réserves · ✗ absent ou peu adapté. Appréciations générales, qui varient selon l’outil et sa version.</p>
+      <div class="note reveal"><strong>En résumé.</strong> Pour simplement parler à un agent depuis le téléphone, une messagerie suffit et demande moins d’efforts. Pour une interface de chat généraliste ou multi-utilisateur, une UI via API est plus complète. AgentUI vise les vrais agents : outils, sous-agents, crons, approbations, widgets. Sa contrepartie : un service de plus à héberger et des plugins à maintenir.</div>
     </div>
   </section>
 
