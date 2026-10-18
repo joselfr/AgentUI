@@ -4,7 +4,7 @@ import type { ConnStatus } from '@agentui/shared';
 
 const dot: Record<ConnStatus, string> = { connected: 'success.main', connecting: 'warning.main', error: 'error.main', disconnected: 'text.disabled' };
 
-/** Pastille d'état de connexion d'un agent. */
+/** Connection status dot of an agent. */
 export default function StatusDot({ status, size = 8 }: { status: ConnStatus; size?: number }) {
   return (
     <Box component="span" aria-hidden sx={{

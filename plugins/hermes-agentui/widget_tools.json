@@ -2,7 +2,7 @@
   "prefix": "agentui_",
   "tools": {
     "chart": {
-      "description": "Affiche un graphique (courbes, barres ou camembert) dans la discussion AgentUI. À utiliser pour illustrer des données chiffrées ; accompagne-le d'une phrase d'explication. Renvoie un jeton [[agentui:…]] : écris-le tel quel dans ta réponse, à l'endroit où le composant doit apparaître, sans jamais écrire le JSON toi-même.",
+      "description": "Displays a chart (lines, bars or pie) in the AgentUI chat. Use it to illustrate numeric data; accompany it with a sentence of explanation. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -13,21 +13,21 @@
               "bar",
               "pie"
             ],
-            "description": "line = évolution, bar = comparaison, pie = répartition (une seule série)."
+            "description": "line = trend, bar = comparison, pie = breakdown (a single series)."
           },
           "title": {
             "type": "string"
           },
           "unit": {
             "type": "string",
-            "description": "Unité affichée après les valeurs."
+            "description": "Unit displayed after the values."
           },
           "x": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Libellés de l'axe X."
+            "description": "Labels of the X axis."
           },
           "series": {
             "type": "array",
@@ -43,7 +43,7 @@
                   "items": {
                     "type": "number"
                   },
-                  "description": "Autant de nombres que de libellés dans x."
+                  "description": "As many numbers as labels in x."
                 }
               },
               "required": [
@@ -61,7 +61,7 @@
       }
     },
     "map": {
-      "description": "Situe 1 à 10 lieux sur une carte OpenStreetMap dans la discussion AgentUI. Ne donne que des coordonnées dont tu es sûr. Renvoie un jeton [[agentui:…]] : écris-le tel quel dans ta réponse, à l'endroit où le composant doit apparaître, sans jamais écrire le JSON toi-même.",
+      "description": "Locates 1 to 10 places on an OpenStreetMap map in the AgentUI chat. Only give coordinates you are sure about. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -70,7 +70,7 @@
           },
           "maps": {
             "type": "boolean",
-            "description": "Ajoute un bouton global « Ouvrir dans Maps » (fiche du lieu, ou itinéraire dans l'ordre des points)."
+            "description": "Adds a global \"Open in Maps\" button (place page, or route in point order)."
           },
           "points": {
             "type": "array",
@@ -81,22 +81,22 @@
               "properties": {
                 "lat": {
                   "type": "number",
-                  "description": "Latitude en degrés décimaux."
+                  "description": "Latitude in decimal degrees."
                 },
                 "lon": {
                   "type": "number",
-                  "description": "Longitude en degrés décimaux."
+                  "description": "Longitude in decimal degrees."
                 },
                 "title": {
                   "type": "string"
                 },
                 "text": {
                   "type": "string",
-                  "description": "Markdown affiché dans la popup du point."
+                  "description": "Markdown displayed in the point's popup."
                 },
                 "maps": {
                   "type": "boolean",
-                  "description": "Bouton « Ouvrir dans Maps » sur ce point."
+                  "description": "\"Open in Maps\" button on this point."
                 }
               },
               "required": [
@@ -113,17 +113,17 @@
       }
     },
     "code": {
-      "description": "Présente un extrait de code, de configuration ou un diff (numéros de ligne, coloration, bouton Copier) dans la discussion AgentUI. À réserver aux extraits que l'utilisateur voudra copier ou relire. Renvoie un jeton [[agentui:…]] : écris-le tel quel dans ta réponse, à l'endroit où le composant doit apparaître, sans jamais écrire le JSON toi-même.",
+      "description": "Presents a code or configuration excerpt or a diff (line numbers, highlighting, Copy button) in the AgentUI chat. Reserve it for excerpts the user will want to copy or reread. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
       "parameters": {
         "type": "object",
         "properties": {
           "code": {
             "type": "string",
-            "description": "Le texte exact."
+            "description": "The exact text."
           },
           "language": {
             "type": "string",
-            "description": "ts, js, python, bash, json, yaml, sql, html, css, ou diff (lignes + / -)."
+            "description": "ts, js, python, bash, json, yaml, sql, html, css, or diff (+ / - lines)."
           },
           "filename": {
             "type": "string"
@@ -136,11 +136,11 @@
                 "string"
               ]
             },
-            "description": "Lignes à mettre en évidence : numéros ou plages comme \"6-7\"."
+            "description": "Lines to highlight: numbers or ranges like \"6-7\"."
           },
           "start": {
             "type": "integer",
-            "description": "Numéro de la première ligne (1 par défaut)."
+            "description": "Number of the first line (1 by default)."
           }
         },
         "required": [
@@ -149,7 +149,7 @@
       }
     },
     "table": {
-      "description": "Affiche un tableau de données (tri par colonne, repli des longs tableaux, copie en CSV) dans la discussion AgentUI. À utiliser pour comparer plusieurs éléments selon plusieurs critères ; accompagne-le d'une phrase d'explication. Renvoie un jeton [[agentui:…]] : écris-le tel quel dans ta réponse, à l'endroit où le composant doit apparaître, sans jamais écrire le JSON toi-même.",
+      "description": "Displays a data table (column sorting, folding of long tables, CSV copy) in the AgentUI chat. Use it to compare several items on several criteria; accompany it with a sentence of explanation. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -158,7 +158,7 @@
           },
           "caption": {
             "type": "string",
-            "description": "Précision sous le titre (période, source…)."
+            "description": "Note under the title (period, source…)."
           },
           "columns": {
             "type": "array",
@@ -176,11 +176,11 @@
                     "text",
                     "number"
                   ],
-                  "description": "number : aligné à droite, trié numériquement (défaut : text)."
+                  "description": "number: right-aligned, sorted numerically (default: text)."
                 },
                 "unit": {
                   "type": "string",
-                  "description": "Unité affichée après chaque nombre de la colonne."
+                  "description": "Unit displayed after each number of the column."
                 }
               },
               "required": [
@@ -201,7 +201,7 @@
                   "null"
                 ]
               },
-              "description": "Une valeur par colonne, dans l'ordre. null = cellule vide."
+              "description": "One value per column, in order. null = empty cell."
             }
           }
         },
@@ -212,7 +212,7 @@
       }
     },
     "progress": {
-      "description": "Affiche une checklist d'étapes avec barre d'avancement pour une tâche longue (plusieurs étapes, outils enchaînés), que tu mets à jour au fil du travail. Le composant apparaît automatiquement en haut de ta réponse dès le premier appel : n'écris JAMAIS le jeton dans ton texte. Pour chaque mise à jour, rappelle l'outil avec `update` = le jeton renvoyé par le premier appel et l'état COMPLET de toutes les étapes ; le composant change sur place. Passe l'étape en cours à `running`, termine-la à `done` (ou `failed`) avant de passer à la suivante. N'en crée qu'un par tâche ; inutile pour une tâche courte.",
+      "description": "Displays a checklist of steps with a progress bar for a long task (several steps, chained tools), which you update as the work goes. The component appears automatically at the top of your reply from the first call: NEVER write the token in your text. For each update, call the tool again with `update` = the token returned by the first call and the COMPLETE state of all steps; the component changes in place. Set the current step to `running`, finish it with `done` (or `failed`) before moving to the next. Create only one per task; pointless for a short task.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -241,7 +241,7 @@
                 },
                 "detail": {
                   "type": "string",
-                  "description": "Précision courte affichée sous l'étape (avancement, erreur…)."
+                  "description": "Short note displayed under the step (progress, error…)."
                 }
               },
               "required": [
@@ -252,7 +252,7 @@
           },
           "update": {
             "type": "string",
-            "description": "Jeton [[agentui:…]] renvoyé par le premier appel, pour mettre à jour ce composant au lieu d'en créer un autre."
+            "description": "[[agentui:…]] token returned by the first call, to update this component instead of creating another one."
           }
         },
         "required": [
@@ -261,7 +261,7 @@
       }
     },
     "image": {
-      "description": "Affiche une ou plusieurs images (galerie avec visionneuse plein écran) dans la discussion AgentUI. `src` : une URL https://… OU un chemin absolu d'un fichier de ta machine (png, jpeg, gif ou webp, 20 Mo max) que le plugin copie et sert à l'utilisateur ; n'utilise ni data: ni file:. Légende par image facultative. Accompagne les images d'une phrase d'explication. Renvoie un jeton [[agentui:…]] : écris-le tel quel dans ta réponse, à l'endroit où le composant doit apparaître, sans jamais écrire le JSON toi-même.",
+      "description": "Displays one or more images (gallery with full-screen viewer) in the AgentUI chat. `src`: an https://… URL OR an absolute path of a file on your machine (png, jpeg, gif or webp, 20 MB max) that the plugin copies and serves to the user; use neither data: nor file:. Caption per image is optional. Accompany the images with a sentence of explanation. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -277,15 +277,15 @@
               "properties": {
                 "src": {
                   "type": "string",
-                  "description": "URL https://… ou chemin absolu d'un fichier image sur ta machine."
+                  "description": "https://… URL or absolute path of an image file on your machine."
                 },
                 "caption": {
                   "type": "string",
-                  "description": "Légende affichée sous l'image."
+                  "description": "Caption displayed under the image."
                 },
                 "alt": {
                   "type": "string",
-                  "description": "Texte alternatif (accessibilité)."
+                  "description": "Alternative text (accessibility)."
                 }
               },
               "required": [
@@ -300,27 +300,27 @@
       }
     }
   },
-  "tokenInstruction": "Place ce jeton tel quel dans ta réponse, à l'endroit où le composant doit apparaître.",
+  "tokenInstruction": "Place this token as is in your reply, where the component should appear.",
   "blockingTools": {
     "ask": {
-      "description": "Pose une question à l'utilisateur dans AgentUI (boutons de choix ou réponse libre) et attend sa réponse. À utiliser seulement si tu as réellement besoin d'une information. L'outil BLOQUE jusqu'à la réponse de l'utilisateur et la renvoie en résultat : n'écris rien d'autre dans le même tour, puis poursuis ta tâche d'après la réponse.",
+      "description": "Asks the user a question in AgentUI (choice buttons or free answer) and waits for the answer. Use only if you really need information. The tool BLOCKS until the user answers and returns the answer as its result: write nothing else in the same turn, then continue your task based on the answer.",
       "parameters": {
         "type": "object",
         "properties": {
           "question": {
             "type": "string",
-            "description": "La question (Markdown permis)."
+            "description": "The question (Markdown allowed)."
           },
           "options": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Choix proposés. Sans options : réponse libre."
+            "description": "Proposed choices. Without options: free answer."
           },
           "multiple": {
             "type": "boolean",
-            "description": "Avec des options : l'utilisateur peut en choisir plusieurs (réponse : libellés séparés par des virgules)."
+            "description": "With options: the user may choose several (answer: labels separated by commas)."
           }
         },
         "required": [
@@ -329,29 +329,29 @@
       }
     },
     "confirm": {
-      "description": "Demande une autorisation à l'utilisateur avant une action risquée ou irréversible (deux boutons) et attend sa décision. La réponse est le libellé du bouton choisi ; n'agis qu'après un « oui ». L'outil BLOQUE jusqu'à la réponse de l'utilisateur et la renvoie en résultat : n'écris rien d'autre dans le même tour, puis poursuis ta tâche d'après la réponse.",
+      "description": "Asks the user for permission before a risky or irreversible action (two buttons) and waits for the decision. The answer is the label of the chosen button; only act after a \"yes\". The tool BLOCKS until the user answers and returns the answer as its result: write nothing else in the same turn, then continue your task based on the answer.",
       "parameters": {
         "type": "object",
         "properties": {
           "title": {
             "type": "string",
-            "description": "Ce qu'il faut autoriser, formulé en question."
+            "description": "What needs to be authorized, phrased as a question."
           },
           "text": {
             "type": "string",
-            "description": "Détail ou conséquences."
+            "description": "Detail or consequences."
           },
           "danger": {
             "type": "boolean",
-            "description": "Demande présentée en rouge."
+            "description": "Request shown in red."
           },
           "yes": {
             "type": "string",
-            "description": "Libellé du bouton de confirmation (défaut : Confirmer)."
+            "description": "Label of the confirm button (default: Confirm)."
           },
           "no": {
             "type": "string",
-            "description": "Libellé du bouton d'annulation (défaut : Annuler)."
+            "description": "Label of the cancel button (default: Cancel)."
           }
         },
         "required": [
@@ -360,7 +360,7 @@
       }
     },
     "form": {
-      "description": "Affiche un formulaire quand il te faut plusieurs informations d'un coup (plutôt que plusieurs questions) et attend qu'il soit envoyé. La réponse est une ligne « Libellé: valeur » par champ (« Oui »/« Non » pour une case, « — » si un champ facultatif est vide). L'outil BLOQUE jusqu'à la réponse de l'utilisateur et la renvoie en résultat : n'écris rien d'autre dans le même tour, puis poursuis ta tâche d'après la réponse.",
+      "description": "Displays a form when you need several pieces of information at once (rather than several questions) and waits for it to be submitted. The answer is one \"Label: value\" line per field (\"Yes\"/\"No\" for a checkbox, \"—\" if an optional field is empty). The tool BLOCKS until the user answers and returns the answer as its result: write nothing else in the same turn, then continue your task based on the answer.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -369,11 +369,11 @@
           },
           "text": {
             "type": "string",
-            "description": "Texte explicatif au-dessus des champs."
+            "description": "Explanatory text above the fields."
           },
           "submit": {
             "type": "string",
-            "description": "Libellé du bouton d'envoi."
+            "description": "Label of the submit button."
           },
           "fields": {
             "type": "array",
@@ -384,7 +384,7 @@
               "properties": {
                 "name": {
                   "type": "string",
-                  "description": "Identifiant unique du champ."
+                  "description": "Unique identifier of the field."
                 },
                 "label": {
                   "type": "string"
@@ -399,20 +399,20 @@
                     "select",
                     "checkbox"
                   ],
-                  "description": "Défaut : text. select exige options."
+                  "description": "Default: text. select requires options."
                 },
                 "options": {
                   "type": "array",
                   "items": {
                     "type": "string"
                   },
-                  "description": "Choix du kind select."
+                  "description": "Choices of the select kind."
                 },
                 "required": {
                   "type": "boolean"
                 },
                 "default": {
-                  "description": "Valeur initiale."
+                  "description": "Initial value."
                 },
                 "placeholder": {
                   "type": "string"
@@ -443,6 +443,6 @@
       }
     }
   },
-  "updateInstruction": "Mise à jour prise en compte : le composant affiché a changé. N'écris pas le jeton.",
-  "progressInstruction": "Le composant est déjà affiché dans la discussion : n'écris pas ce jeton dans ta réponse. Pour le mettre à jour, rappelle l'outil avec update = ce jeton et l'état complet des étapes."
+  "updateInstruction": "Update applied: the displayed component has changed. Do not write the token.",
+  "progressInstruction": "The component is already displayed in the chat: do not write this token in your reply. To update it, call the tool again with update = this token and the complete state of the steps."
 }

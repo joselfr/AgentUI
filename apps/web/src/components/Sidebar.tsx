@@ -18,7 +18,7 @@ import { useSelection } from './sidebar/useSelection';
 
 export const DRAWER = 280;
 
-/** Liste des discussions : favoris en tête, sections Tâches cron / Archivées, filtre par agent, recherche, sélection multiple. */
+/** Chat list: favorites first, Cron tasks / Archived sections, agent filter, search, multi-selection. */
 export default function Sidebar(props: {
   agents: AgentInfo[]; convs: Conversation[]; currentId?: string;
   onSelectConv: (id: string) => void; onNew: () => void; onDelete: (c: Conversation) => void; onArchive: (c: Conversation, archived: boolean) => void;
@@ -27,9 +27,9 @@ export default function Sidebar(props: {
   const { agents } = props;
   const agentName = (id: string) => agents.find((a) => a.id === id)?.name ?? id;
 
-  // Favoris en tête (tri stable : l'ordre par date de mise à jour est conservé dans chaque groupe)
+  // Favorites first (stable sort: the by-update-date order is kept within each group)
   const convs = [...props.convs].sort((a, b) => Number(b.favorite) - Number(a.favorite));
-  // Filtre par agent (mémorisé) : n'a de sens qu'avec plusieurs agents
+  // Agent filter (remembered): only makes sense with several agents
   const [agentFilter, setAgentFilter] = useState<string>(() => load('agentFilter', 'all'));
   const filter = agents.some((a) => a.id === agentFilter) ? agentFilter : 'all';
   const shown = convs.filter((c) => filter === 'all' || c.agentId === filter);
@@ -46,7 +46,7 @@ export default function Sidebar(props: {
   const itemMenu = useItemMenu<Conversation>(!selection.selecting);
   const [renaming, setRenaming] = useState<Conversation>();
 
-  // À l'ouverture de la liste, la discussion active est amenée tout en haut
+  // When the list opens, the active chat is brought to the very top
   const listRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const box = listRef.current;

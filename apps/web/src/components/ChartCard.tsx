@@ -9,7 +9,7 @@ ChartJS.register(ArcElement, BarController, BarElement, CategoryScale, DoughnutC
 interface Series { name: string; y: number[] }
 interface Chart { kind: 'line' | 'bar' | 'pie'; title?: string; unit?: string; x: string[]; series: Series[] }
 
-/** Arguments du widget `chart` : `{ kind: line|bar|pie, title?, unit?, x: [...], series: [{ name, y: [...] }] }`. `undefined` si invalide. */
+/** Arguments of the `chart` widget: `{ kind: line|bar|pie, title?, unit?, x: [...], series: [{ name, y: [...] }] }`. `undefined` if invalid. */
 export function parseChart(a: Record<string, unknown>): Chart | undefined {
   const c = a as unknown as Chart;
   if (!['line', 'bar', 'pie'].includes(c.kind) || !Array.isArray(c.x) || !Array.isArray(c.series) || !c.series.length) return undefined;
@@ -17,7 +17,7 @@ export function parseChart(a: Record<string, unknown>): Chart | undefined {
   return { ...c, x: c.x.map(String), series: c.series.slice(0, 6) };
 }
 
-/** Plus petit « beau » nombre ≥ v (1, 2, 2.5, 5 × 10ⁿ). */
+/** Smallest "nice" number ≥ v (1, 2, 2.5, 5 × 10ⁿ). */
 function niceCeil(v: number) {
   if (v <= 0) return 1;
   const p = 10 ** Math.floor(Math.log10(v));
@@ -27,7 +27,7 @@ const fmt = (v: number) => fmtNumber(v, 2);
 
 type Colors = { line: string; text: string; bg: string; fg: string; paper: string };
 
-/** Repère vertical pointillé sous le point survolé (courbes). */
+/** Dotted vertical guide under the hovered point (lines). */
 const crosshair: Plugin = {
   id: 'crosshair',
   afterDatasetsDraw(chart) {
@@ -39,7 +39,7 @@ const crosshair: Plugin = {
   },
 };
 
-/** Valeur au-dessus de chaque barre (graphique à une seule série). */
+/** Value above each bar (single-series chart). */
 const barLabels: Plugin = {
   id: 'barLabels',
   afterDatasetsDraw(chart, _a, opts: { on?: boolean; color?: string }) {
@@ -70,7 +70,7 @@ function Pie({ c, colors, color }: { c: Chart; colors: string[]; color: Colors }
     });
     chartRef.current = ch;
     return () => ch.destroy();
-    // `c` est recréé à chaque rendu du message (parseChart) : on ne reconstruit que si son contenu change
+    // `c` is recreated on every message render (parseChart): only rebuild if its content changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, colors, color.bg]);
   const highlight = (i: number | null) => {
@@ -107,7 +107,7 @@ function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: Colors 
   useEffect(() => {
     const all = c.series.flatMap((s) => s.y);
     const mn = Math.min(0, ...all), mx = Math.max(0, ...all);
-    // ~4 intervalles ronds, bornes alignées sur le pas (pas de graduations du type 37,5)
+    // ~4 round intervals, bounds aligned to the step (no ticks like 37.5)
     const step = niceCeil(Math.max(mx - mn, 1e-9) / 4);
     const lo = Math.floor(mn / step) * step, hi = Math.max(lo + step, Math.ceil(mx / step) * step);
     const ch = new ChartJS(ref.current!, {
@@ -143,7 +143,7 @@ function Plot({ c, colors, color }: { c: Chart; colors: string[]; color: Colors 
     });
     chartRef.current = ch;
     return () => ch.destroy();
-    // idem : clé de contenu, pas l'identité de `c`
+    // same: content key, not the identity of `c`
   }, [key, colors, color, line, unit]);
   const toggle = (k: number) => {
     const ch = chartRef.current; if (!ch) return;

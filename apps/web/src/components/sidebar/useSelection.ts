@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Conversation } from '../../api';
 
-/** Sélection multiple de discussions (mode « Sélectionner »). `selectable` = ce qui est actuellement affiché. */
+/** Multi-selection of chats ("Select" mode). `selectable` = what is currently displayed. */
 export function useSelection(all: Conversation[], selectable: Conversation[]) {
   const [selected, setSelected] = useState<Set<string>>();
   const chosen = all.filter((c) => selected?.has(c.id));

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentui.local/channel/v1.json",
   "title": "AgentUI Channel Protocol v1",
-  "description": "Trames échangées entre AgentUI et un plugin canal. Voir PROTOCOL.md.",
+  "description": "Frames exchanged between AgentUI and a channel plugin. See PROTOCOL.md.",
   "oneOf": [
     {
       "$ref": "#/$defs/PluginMessage"
@@ -76,7 +76,7 @@
         },
         "sessionDelete": {
           "type": "boolean",
-          "description": "Suppression de la session de plateforme quand l'utilisateur supprime la discussion (rpc deleteSession)"
+          "description": "Deletion of the platform session when the user deletes the chat (rpc deleteSession)"
         },
         "attachments": {
           "type": "object",

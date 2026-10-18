@@ -1,6 +1,6 @@
-/** Tableaux Markdown responsives : étiquette de colonne sur chaque cellule, et repère des tableaux « larges ». */
+/** Responsive Markdown tables: column label on each cell, and marker for "wide" tables. */
 
-/** À partir de ce nombre de colonnes, un tableau passe en cartes (une ligne par attribut) sur petit écran. */
+/** From this number of columns, a table turns into cards (one line per attribute) on small screens. */
 export const STACK_FROM_COLUMNS = 3;
 
 interface HastNode { type: string; tagName?: string; value?: string; properties?: Record<string, unknown>; children?: HastNode[] }
@@ -20,7 +20,7 @@ function annotate(table: HastNode) {
   if (headers.length >= STACK_FROM_COLUMNS) table.properties = { ...table.properties, className: [...((table.properties?.className as string[]) ?? []), 'stackable'] };
 }
 
-/** Plugin rehype : `<td data-label="Prix">` et `<table class="stackable">` pour les tableaux larges. */
+/** Rehype plugin: `<td data-label="Price">` and `<table class="stackable">` for wide tables. */
 export function rehypeTableLabels() {
   return (tree: HastNode) => {
     const walk = (n: HastNode) => { if (n.type === 'element' && n.tagName === 'table') annotate(n); n.children?.forEach(walk); };

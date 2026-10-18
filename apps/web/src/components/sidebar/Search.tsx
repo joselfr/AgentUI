@@ -8,7 +8,7 @@ import type { SearchHit } from '@agentui/shared';
 import { api } from '../../api';
 import { fmtDate, t } from '../../i18n';
 
-/** Recherche plein texte (titres et messages) : active dès 2 caractères, requêtes espacées de 250 ms. */
+/** Full-text search (titles and messages): active from 2 characters, requests spaced by 250 ms. */
 export function useSearch() {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<SearchHit[]>();
@@ -27,7 +27,7 @@ export function useSearch() {
   return { query, setQuery, q, active, hits, searching };
 }
 
-/** Champ de recherche : Échap l'efface, Ctrl/Cmd + K y amène le curseur. */
+/** Search field: Escape clears it, Ctrl/Cmd + K focuses it. */
 export function SearchField({ query, onChange, searching }: { query: string; onChange: (v: string) => void; searching: boolean }) {
   const input: RefObject<HTMLInputElement> = useRef(null);
   useEffect(() => {
@@ -52,7 +52,7 @@ export function SearchField({ query, onChange, searching }: { query: string; onC
   );
 }
 
-/** Extrait de message avec les mots recherchés surlignés. */
+/** Message excerpt with the searched words highlighted. */
 function Snippet({ text, marks }: { text: string; marks: [number, number][] }) {
   const parts: ReactNode[] = [];
   let at = 0;

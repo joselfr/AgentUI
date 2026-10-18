@@ -1,4 +1,4 @@
-// Agents OpenClaw exposés comme sous-agents dans AgentUI (même forme que l'adapter WebSocket opérateur).
+// OpenClaw agents exposed as sub-agents in AgentUI (same shape as the operator WebSocket adapter).
 import type { OpenClawConfig } from 'openclaw/plugin-sdk/channel-core';
 import { listAgentIds, resolveAgentConfig, resolveDefaultAgentId } from 'openclaw/plugin-sdk/agent-scope-runtime';
 

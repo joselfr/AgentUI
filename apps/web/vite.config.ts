@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'AgentUI',
         short_name: 'AgentUI',
-        lang: 'fr', // la variante anglaise est public/manifest.en.webmanifest (choisie à l'exécution, cf. i18n/index.ts)
+        lang: 'fr', // the English variant is public/manifest.en.webmanifest (chosen at runtime, see i18n/index.ts)
         description: 'Chat avec vos agents IA (OpenClaw, Hermes…)',
         theme_color: '#0e1015',
         background_color: '#0e1015',

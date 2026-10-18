@@ -195,6 +195,8 @@ export const fr = {
   'image.next': 'Suivante',
   'code.copied': '✓ Copié',
   'code.copy': 'Copier',
+  'code.fold': 'Replier',
+  'code.showLines': 'Afficher les {count} lignes',
 
   // Pages
   'agents.title': 'Agents',

@@ -1,5 +1,5 @@
-// Pont AgentUI ↔ runtime OpenClaw : un `inbound` devient un tour de canal (comme un message Telegram), et ce que
-// produit le tour (deltas, outils, approbations, réponse, médias, fin) repart vers AgentUI en `event`.
+// AgentUI ↔ OpenClaw runtime bridge: an `inbound` becomes a channel turn (like a Telegram message), and what
+// the turn produces (deltas, tools, approvals, reply, media, end) goes back to AgentUI as `event`.
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { OpenClawConfig } from 'openclaw/plugin-sdk/channel-core';
@@ -29,19 +29,19 @@ interface Run {
   conversationId: string;
   agentRunId?: string;
   subAgentId?: string;
-  /** Questions de l'outil `ask_user` en cours (arguments de l'outil) : le prompt du cœur devient un widget. */
+  /** Questions of the running `ask_user` tool (tool arguments): the core's prompt becomes a widget. */
   askQuestions?: AskQuestion[];
-  /** Identifiant de la question `ask_user` en attente (fourni avec son prompt) : c'est par lui qu'on la résout. */
+  /** Identifier of the pending `ask_user` question (provided with its prompt): it is how we resolve it. */
   askQuestionId?: string;
-  /** Appel d'outil `ask_user` en cours : sa fin (réponse, annulation, délai) ferme la question. */
+  /** Running `ask_user` tool call: its end (answer, cancellation, timeout) closes the question. */
   askToolId?: string;
-  /** Question d'un outil interactif (`agentui_ask`…) en attente : sa réponse (trame `reply`) débloque l'outil. */
+  /** Pending question of an interactive tool (`agentui_ask`…): its answer (`reply` frame) unblocks the tool. */
   toolAsk?: { id: string; answer: (text: string) => void; cancel: () => void };
   abort: AbortController;
-  /** Segments de texte déjà terminés (avant un outil) et segment en cours de streaming. */
+  /** Text segments already finished (before a tool) and the segment being streamed. */
   segments: string[];
   partial: string;
-  /** Textes livrés par le cœur (blocs / réponse finale) : font foi pour `message.final`. */
+  /** Texts delivered by the core (blocks / final reply): authoritative for `message.final`. */
   delivered: string[];
   tools: Set<string>;
   approvals: Set<string>;
@@ -56,7 +56,7 @@ const textOf = (content: unknown): string =>
       ? content.filter((p: Json) => p?.type === 'text' && typeof p.text === 'string').map((p: Json) => p.text).join('')
       : '';
 
-/** « fournisseur/modèle » → { provider, id } (un identifiant sans « / » n'a pas de fournisseur). */
+/** "provider/model" → { provider, id } (an identifier without "/" has no provider). */
 function splitRef(ref: string): { provider?: string; id: string } {
   const i = ref.indexOf('/');
   return i > 0 ? { provider: ref.slice(0, i), id: ref.slice(i + 1) } : { id: ref };
@@ -129,9 +129,9 @@ export class AgentUIBridge implements RunHost {
         media,
         run,
       });
-      if (!result.dispatched) throw new Error('message non admis par OpenClaw');
+      if (!result.dispatched) throw new Error('message not admitted by OpenClaw');
       if (run.abort.signal.aborted) this.finishWithUsage(run, msg, { type: 'run.aborted' });
-      else if (run.outcome === 'failed') this.finishWithUsage(run, msg, { type: 'run.failed', error: 'échec du run OpenClaw' });
+      else if (run.outcome === 'failed') this.finishWithUsage(run, msg, { type: 'run.failed', error: 'OpenClaw run failed' });
       else this.finishWithUsage(run, msg, { type: 'run.completed' });
     } catch (e) {
       if (run.abort.signal.aborted) this.finishWithUsage(run, msg, { type: 'run.aborted' });
@@ -142,7 +142,7 @@ export class AgentUIBridge implements RunHost {
     }
   }
 
-  /** Un tour de canal OpenClaw (même séquence que le canal Telegram : route → contexte → inbound.run). */
+  /** An OpenClaw channel turn (same sequence as the Telegram channel: route → context → inbound.run). */
   private async dispatch(params: {
     conversationId: string;
     messageId: string;
@@ -150,13 +150,13 @@ export class AgentUIBridge implements RunHost {
     subAgentId?: string;
     media: Array<{ path: string; contentType?: string }>;
     run?: Run;
-    /** Commande de contrôle (/model…) : les réponses livrées sont recueillies ici au lieu d'être affichées. */
+    /** Control command (/model…): delivered replies are collected here instead of being displayed. */
     capture?: string[];
   }) {
     const rt = getAgentUIRuntime();
     const { cfg, accountId } = this.p;
     const { conversationId, messageId, text, run, capture } = params;
-    // Une discussion AgentUI = un pair direct = une session (dmScope forcé : sinon tous les DM partagent « main »).
+    // One AgentUI chat = one direct peer = one session (dmScope forced: otherwise all DMs share "main").
     const route = rt.channel.routing.resolveAgentRoute({
       cfg,
       channel: CHANNEL,
@@ -207,7 +207,7 @@ export class AgentUIBridge implements RunHost {
               }
               if (run) await this.deliver(run, payload);
             },
-            onError: (err, info) => this.p.log(`livraison ${info.kind} en échec : ${String(err)}`),
+            onError: (err, info) => this.p.log(`delivery ${info.kind} failed: ${String(err)}`),
           },
           replyOptions: run
             ? {
@@ -222,7 +222,7 @@ export class AgentUIBridge implements RunHost {
                 onPartialReply: (p: { text?: string; delta?: string; replace?: true }) => this.onPartial(run, p),
                 onAssistantMessageStart: () => this.segmentBreak(run),
                 onApprovalEvent: (p: Json) => this.onApprovalEvent(run, p),
-                // Les cartes d'outils viennent des événements d'agent : pas de messages de progression textuels.
+                // Tool cards come from agent events: no textual progress messages.
                 suppressDefaultToolProgressMessages: true,
                 suppressToolProgressMessages: true,
               }
@@ -236,17 +236,17 @@ export class AgentUIBridge implements RunHost {
     const run = this.runs.get(runId);
     if (!run || run.terminal) return;
     run.abort.abort();
-    // Le run se termine normalement via son abortSignal ; filet de sécurité si le cœur ne rend pas la main.
+    // The run ends normally via its abortSignal; safety net if the core does not hand control back.
     setTimeout(() => this.finish(run, { type: 'run.aborted' }), ABORT_GRACE_MS).unref?.();
   }
 
   /**
-   * Réponse à une question de l'agent (`ask_user`) en plein run. Le cœur enregistre la question comme cible du prochain
-   * message texte de la session : on l'injecte comme n'importe quel message, il la capte et le run reprend (pas de nouveau tour).
+   * Answer to an agent question (`ask_user`) mid-run. The core records the question as the target of the next
+   * text message of the session: we inject it like any message, it picks it up and the run resumes (no new turn).
    */
   private async onReply(msg: Extract<GatewayMessage, { type: 'reply' }>): Promise<void> {
     const run = this.runs.get(msg.runId);
-    if (!run || run.terminal) return this.p.log(`réponse sans run en cours (${msg.runId})`);
+    if (!run || run.terminal) return this.p.log(`answer without a running run (${msg.runId})`);
     if (run.toolAsk) return run.toolAsk.answer(msg.text);
     const text = run.askQuestions ? askReplyText(run.askQuestions, msg.text) : msg.text;
     if (run.askQuestionId) {
@@ -255,7 +255,7 @@ export class AgentUIBridge implements RunHost {
         await resolveQuestion(id, text, `${CHANNEL}:${msg.conversationId}`);
         this.closeQuestion(run, id);
       } catch (e) {
-        this.p.log(`réponse à la question ${id} en échec : ${e instanceof Error ? e.message : String(e)}`);
+        this.p.log(`answer to question ${id} failed: ${e instanceof Error ? e.message : String(e)}`);
       }
       return;
     }
@@ -267,23 +267,23 @@ export class AgentUIBridge implements RunHost {
       subAgentId: run.subAgentId,
       media: [],
       capture,
-    }).catch((e) => this.p.log(`réponse ${msg.runId} en échec : ${String(e)}`));
-    if (result && capture.length) this.p.log(`réponse ${msg.runId} : le cœur a répondu « ${capture.join(' ').slice(0, 200)} »`);
+    }).catch((e) => this.p.log(`answer ${msg.runId} failed: ${String(e)}`));
+    if (result && capture.length) this.p.log(`answer ${msg.runId}: the core replied "${capture.join(' ').slice(0, 200)}"`);
   }
 
   /**
-   * Outil interactif : affiche le widget `key` puis attend la réponse de l'utilisateur. La question est annoncée avant le
-   * widget (AgentUI sait alors qu'une réponse est attendue) et fermée à la réponse, à l'arrêt, à la fin du run ou au délai.
+   * Interactive tool: displays the `key` widget then waits for the user's answer. The question is announced before the
+   * widget (AgentUI then knows an answer is expected) and closed on the answer, on stop, at the end of the run or on timeout.
    */
   askBlocking(conversationId: string, key: string, args: Json, signal?: AbortSignal): Promise<AskResult> | undefined {
     const run = [...this.runs.values()].find((r) => r.conversationId === conversationId && !r.terminal);
     if (!run) return undefined;
-    if (run.toolAsk) return Promise.resolve({ error: "Une question est déjà en attente de réponse : attends-la avant d'en poser une autre." });
+    if (run.toolAsk) return Promise.resolve({ error: "A question is already awaiting an answer: wait for it before asking another one." });
     return new Promise<AskResult>((resolve) => {
       const id = `ui_${randomBytes(6).toString('hex')}`;
-      const timer = setTimeout(() => settle({ error: "Pas de réponse de l'utilisateur (délai dépassé)." }), ASK_TIMEOUT_MS);
+      const timer = setTimeout(() => settle({ error: "No answer from the user (timed out)." }), ASK_TIMEOUT_MS);
       timer.unref?.();
-      const onAbort = () => settle({ error: 'Échange interrompu.' });
+      const onAbort = () => settle({ error: 'Exchange interrupted.' });
       const settle = (res: AskResult) => {
         if (run.toolAsk?.id !== id) return;
         clearTimeout(timer);
@@ -292,7 +292,7 @@ export class AgentUIBridge implements RunHost {
         this.emit(run, { type: 'question.resolved', id });
         resolve(res);
       };
-      run.toolAsk = { id, answer: (answer) => settle({ answer }), cancel: () => settle({ error: 'Échange interrompu.' }) };
+      run.toolAsk = { id, answer: (answer) => settle({ answer }), cancel: () => settle({ error: 'Exchange interrupted.' }) };
       signal?.addEventListener('abort', onAbort, { once: true });
       this.emit(run, { type: 'question.requested', id });
       this.appendBlock(run, '```widget\n' + JSON.stringify({ type: key, arguments: args }) + '\n```');
@@ -306,7 +306,7 @@ export class AgentUIBridge implements RunHost {
     return true;
   }
 
-  /** Ajoute un bloc de texte à la réponse en cours, après ce qui a déjà été écrit. */
+  /** Appends a text block to the current reply, after what was already written. */
   private appendBlock(run: Run, block: string): void {
     const flushed = !!run.partial;
     if (flushed) {
@@ -322,7 +322,7 @@ export class AgentUIBridge implements RunHost {
     }
   }
 
-  /** La question n'attend plus de réponse : AgentUI rend la main au composer. */
+  /** The question no longer awaits an answer: AgentUI hands control back to the composer. */
   private closeQuestion(run: Run, id: string): void {
     if (run.askQuestionId !== id) return;
     run.askQuestionId = undefined;
@@ -331,30 +331,30 @@ export class AgentUIBridge implements RunHost {
 
   private async onApproval(msg: Extract<GatewayMessage, { type: 'approval' }>): Promise<void> {
     const decision = !msg.approve ? 'deny' : msg.scope === 'always' ? 'allow-always' : 'allow-once';
-    // Résolution « même chat » documentée par OpenClaw : /approve <id> <décision>. Réponse du cœur ignorée.
+    // "Same chat" resolution documented by OpenClaw: /approve <id> <decision>. Core reply ignored.
     await this.dispatch({
       conversationId: msg.conversationId,
       messageId: `approve-${msg.id}-${Date.now()}`,
       text: `/approve ${msg.id} ${decision}`,
       media: [],
-    }).catch((e) => this.p.log(`approbation ${msg.id} en échec : ${String(e)}`));
+    }).catch((e) => this.p.log(`approval ${msg.id} failed: ${String(e)}`));
   }
 
   /**
-   * Supprime les sessions OpenClaw d'une discussion AgentUI (rpc deleteSession). Une discussion = un pair
-   * direct = une entrée de session par agent : un tour lancé avec un sous-agent vit sous la clé de cet agent,
-   * on efface donc toutes les clés candidates. Idempotent : une discussion inconnue n'est pas une erreur.
+   * Deletes the OpenClaw sessions of an AgentUI chat (rpc deleteSession). One chat = one direct peer
+   * = one session entry per agent: a turn started with a sub-agent lives under that agent's key,
+   * so all candidate keys are erased. Idempotent: an unknown chat is not an error.
    */
   private async deleteSession(conversationId: string): Promise<void> {
     if (!conversationId) throw new Error('conversationId manquant');
     if ([...this.runs.values()].some((r) => !r.terminal && r.conversationId === conversationId)) {
-      throw new Error('un run est en cours dans cette discussion');
+      throw new Error('a run is in progress in this chat');
     }
     const rt = getAgentUIRuntime();
     const { cfg, accountId } = this.p;
     const keys = new Set<string>();
     for (const agentId of listSubAgents(cfg).map((a) => a.id)) {
-      // Même résolution de route que `dispatch` : c'est elle qui fixe la clé de session de la discussion.
+      // Same route resolution as `dispatch`: it is what sets the session key of the chat.
       const route = rt.channel.routing.resolveAgentRoute({
         cfg,
         channel: CHANNEL,
@@ -368,9 +368,9 @@ export class AgentUIBridge implements RunHost {
     for (const sessionKey of keys) await deleteSessionEntry({ sessionKey });
   }
 
-  // ── Modèle d'une discussion ──────────────────────────────────────────────
+  // ── Model of a chat ──────────────────────────────────────────────
 
-  /** Route d'une discussion pour un agent : même résolution que `dispatch`, elle fixe la clé de session. */
+  /** Route of a chat for an agent: same resolution as `dispatch`, it sets the session key. */
   private routeOf(conversationId: string, agentId?: string) {
     const rt = getAgentUIRuntime();
     const { cfg, accountId } = this.p;
@@ -384,7 +384,7 @@ export class AgentUIBridge implements RunHost {
     });
   }
 
-  /** Session d'une discussion : celle du sous-agent demandé, sinon la plus récemment utilisée parmi les agents. */
+  /** Session of a chat: that of the requested sub-agent, otherwise the most recently used among the agents. */
   private sessionOf(conversationId: string, subAgentId?: string): { agentId: string; entry?: Json } {
     const agents = subAgentId ? [subAgentId] : listSubAgents(this.p.cfg).map((a) => a.id);
     let best: { agentId: string; entry?: Json; at: number } | undefined;
@@ -397,7 +397,7 @@ export class AgentUIBridge implements RunHost {
     return best ?? { agentId: agents[0] ?? 'main' };
   }
 
-  /** Modèle par défaut d'un agent : sa configuration, sinon celle de `agents.defaults`. */
+  /** Default model of an agent: its configuration, otherwise that of `agents.defaults`. */
   private defaultModelOf(agentId: string): { provider?: string; id?: string } {
     const cfg = this.p.cfg as Json;
     const primary = (m: unknown) => (typeof m === 'string' ? m : typeof (m as Json)?.primary === 'string' ? (m as Json).primary : undefined);
@@ -405,7 +405,7 @@ export class AgentUIBridge implements RunHost {
     return ref ? splitRef(ref) : {};
   }
 
-  /** Modèle courant (choix de la session, sinon dernier utilisé, sinon défaut de l'agent) et tokens d'une discussion. */
+  /** Current model (session choice, otherwise last used, otherwise agent default) and tokens of a chat. */
   usageOf(conversationId: string, subAgentId?: string): Usage | undefined {
     if (!conversationId) throw new Error('conversationId manquant');
     const { agentId, entry } = this.sessionOf(conversationId, subAgentId);
@@ -421,7 +421,7 @@ export class AgentUIBridge implements RunHost {
     };
   }
 
-  /** Modèles proposés : ceux déclarés par les fournisseurs, la liste d'autorisation des agents et les modèles par défaut. */
+  /** Models offered: those declared by providers, the agents' allow list and the default models. */
   listModels(): Array<{ provider: string; providerName: string; id: string }> {
     const cfg = this.p.cfg as Json;
     const out = new Map<string, { provider: string; providerName: string; id: string }>();
@@ -445,13 +445,13 @@ export class AgentUIBridge implements RunHost {
   }
 
   /**
-   * Fixe le modèle de la session d'une discussion avec la commande /model … -s d'OpenClaw (limitée à la session),
-   * dont la réponse est recueillie. Le succès est vérifié sur l'état réel de la session, pas sur le texte.
+   * Sets the model of a chat's session with OpenClaw's /model … -s command (limited to the session),
+   * whose reply is collected. Success is verified on the real session state, not on the text.
    */
   async setModel(conversationId: string, model: string, provider: string | undefined, subAgentId?: string) {
-    if (!conversationId || !model.trim()) throw new Error('conversationId et model sont requis');
+    if (!conversationId || !model.trim()) throw new Error('conversationId and model are required');
     if ([...this.runs.values()].some((r) => !r.terminal && r.conversationId === conversationId)) {
-      throw new Error('un run est en cours dans cette discussion');
+      throw new Error('a run is in progress in this chat');
     }
     const { agentId } = this.sessionOf(conversationId, subAgentId);
     const ref = provider ? `${provider}/${model}` : model;
@@ -465,15 +465,15 @@ export class AgentUIBridge implements RunHost {
       capture,
     });
     const reply = capture.join('\n\n').trim();
-    if (!result.dispatched) throw new Error(reply || 'commande /model non admise par OpenClaw');
+    if (!result.dispatched) throw new Error(reply || '/model command not admitted by OpenClaw');
     const now = this.usageOf(conversationId, subAgentId ?? agentId);
     if (!now || now.model !== model || (provider && now.provider && now.provider !== provider)) {
-      throw new Error(reply || `le modèle ${ref} n'a pas été retenu`);
+      throw new Error(reply || `model ${ref} was not retained`);
     }
     return { model: now.model, ...(now.provider ? { provider: now.provider } : {}), message: reply };
   }
 
-  /** Termine le run en joignant la consommation de la session (même interrompu, des tokens ont pu être utilisés). */
+  /** Ends the run attaching the session's consumption (even interrupted, tokens may have been used). */
   private finishWithUsage(run: Run, msg: Extract<GatewayMessage, { type: 'inbound' }>, event: AgentEvent): void {
     try {
       const usage = this.usageOf(msg.conversationId, msg.subAgentId);
@@ -529,7 +529,7 @@ export class AgentUIBridge implements RunHost {
         client?.send({ type: 'rpc.result', id: msg.id, error: e instanceof Error ? e.message : String(e) });
       }
     } else {
-      client?.send({ type: 'rpc.result', id: msg.id, error: `méthode non supportée : ${msg.method}` });
+      client?.send({ type: 'rpc.result', id: msg.id, error: `unsupported method: ${msg.method}` });
     }
   }
 
@@ -542,7 +542,7 @@ export class AgentUIBridge implements RunHost {
 
   private finish(run: Run, event: AgentEvent): void {
     if (run.terminal) return;
-    run.toolAsk?.cancel(); // l'outil interactif en attente rend la main sans réponse
+    run.toolAsk?.cancel(); // the waiting interactive tool hands control back without an answer
     if (!run.delivered.length && (run.segments.length || run.partial)) {
       this.emit(run, { type: 'message.final', text: [...run.segments, run.partial].filter(Boolean).join('\n\n') });
     }
@@ -559,7 +559,7 @@ export class AgentUIBridge implements RunHost {
         const delta = p.text.slice(run.partial.length);
         if (delta) this.emit(run, { type: 'message.delta', text: delta });
       } else {
-        // Réécriture du segment : AgentUI remplace le texte accumulé.
+        // Segment rewrite: AgentUI replaces the accumulated text.
         this.emit(run, { type: 'message.final', text: [...run.segments, p.text].join('\n\n') });
       }
       run.partial = p.text;
@@ -588,7 +588,7 @@ export class AgentUIBridge implements RunHost {
         }
         this.emit(run, { type: 'tool.started', id, name: String(d.name ?? 'tool'), args: d.args });
       } else if (d.phase === 'result') {
-        if (id === run.askToolId && run.askQuestionId) this.closeQuestion(run, run.askQuestionId); // répondue, annulée ou expirée
+        if (id === run.askToolId && run.askQuestionId) this.closeQuestion(run, run.askQuestionId); // answered, cancelled or expired
         const txt = textOf(d.result?.content) || (d.result === undefined ? '' : JSON.stringify(d.result));
         this.emit(run, {
           type: 'tool.completed',
@@ -609,7 +609,7 @@ export class AgentUIBridge implements RunHost {
     const id = typeof p.approvalId === 'string' ? p.approvalId : undefined;
     if (!id || run.approvals.has(id) || /approved|denied|resolved|expired|allow|deny/i.test(String(p.status ?? ''))) return true;
     run.approvals.add(id);
-    const head = p.title || p.reason || 'Approbation requise';
+    const head = p.title || p.reason || 'Approval required';
     this.emit(run, {
       type: 'approval.request',
       id,
@@ -625,18 +625,18 @@ export class AgentUIBridge implements RunHost {
       return;
     }
     let text: string = typeof payload.text === 'string' ? payload.text : '';
-    // Repli « même chat » du cœur : la consigne /approve devient une demande d'approbation AgentUI.
+    // "Same chat" fallback of the core: the /approve instruction becomes an AgentUI approval request.
     const approve = APPROVE_RE.exec(text);
     if (approve?.[1]) {
       this.onApprovalEvent(run, { approvalId: approve[1], title: text.split('\n')[0] });
       text = '';
     }
-    // Prompt d'une question de l'agent (ask_user) : un widget à la place du texte « Reply with the number… ».
+    // Prompt of an agent question (ask_user): a widget in place of the "Reply with the number…" text.
     const askUser = payload.channelData?.askUser as { questionId?: unknown } | undefined;
     if (askUser) {
       if (typeof askUser.questionId === 'string' && askUser.questionId !== run.askQuestionId) {
         run.askQuestionId = askUser.questionId;
-        // Avant le prompt : au moment où le widget arrive, AgentUI sait déjà que la réponse est attendue.
+        // Before the prompt: when the widget arrives, AgentUI already knows the answer is expected.
         this.emit(run, { type: 'question.requested', id: askUser.questionId });
       }
       if (run.askQuestions) text = askWidget(run.askQuestions) ?? text;
@@ -659,7 +659,7 @@ export class AgentUIBridge implements RunHost {
   }
 }
 
-/** Médias d'un payload de réponse (chemins locaux ou URL) encodés pour le protocole. */
+/** Media of a reply payload (local paths or URLs) encoded for the protocol. */
 export async function readPayloadMedia(payload: Json, readLocal?: (path: string) => Promise<Buffer>): Promise<Media[]> {
   const urls: string[] = [...(Array.isArray(payload.mediaUrls) ? payload.mediaUrls : []), ...(payload.mediaUrl ? [payload.mediaUrl] : [])];
   const out: Media[] = [];
@@ -667,7 +667,7 @@ export async function readPayloadMedia(payload: Json, readLocal?: (path: string)
     try {
       out.push(await readMedia(url, readLocal));
     } catch {
-      /* média inaccessible : ignoré */
+      /* inaccessible media: ignored */
     }
   }
   return out;
@@ -678,13 +678,13 @@ export async function readMedia(url: string, readLocal?: (path: string) => Promi
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = Buffer.from(await res.arrayBuffer());
-    if (data.length > MAX_MEDIA) throw new Error('média trop volumineux');
+    if (data.length > MAX_MEDIA) throw new Error('media too large');
     const mimeType = res.headers.get('content-type')?.split(';')[0] ?? 'application/octet-stream';
     return { name: basename(new URL(url).pathname) || 'media', mimeType, data: data.toString('base64') };
   }
   const path = url.startsWith('file://') ? new URL(url).pathname : url;
   const data = readLocal ? await readLocal(path) : await readFile(path);
-  if (data.length > MAX_MEDIA) throw new Error('média trop volumineux');
+  if (data.length > MAX_MEDIA) throw new Error('media too large');
   return { name: basename(path), mimeType: mimeOf(path), data: data.toString('base64') };
 }
 

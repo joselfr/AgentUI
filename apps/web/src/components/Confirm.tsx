@@ -8,14 +8,14 @@ import HelpOutline from '@mui/icons-material/HelpOutline';
 
 export interface ConfirmOptions {
   title: string;
-  /** Détail de la conséquence (affiché sous le titre). */
+  /** Detail of the consequence (shown under the title). */
   text?: ReactNode;
   confirmLabel?: string;
-  /** Action destructive : bouton et icône en rouge. */
+  /** Destructive action: red button and icon. */
   danger?: boolean;
 }
 
-/** Remplace `window.confirm` : `if (await ask({ … })) …` + `{dialog}` à rendre dans le composant. */
+/** Replaces `window.confirm`: `if (await ask({ … })) …` + `{dialog}` to render in the component. */
 export function useConfirm() {
   const [opts, setOpts] = useState<ConfirmOptions>();
   const resolver = useRef<(ok: boolean) => void>();
@@ -26,7 +26,7 @@ export function useConfirm() {
   }), []);
   const close = (ok: boolean) => { resolver.current?.(ok); resolver.current = undefined; setOpts(undefined); };
   useBackClose(!!opts, () => close(false));
-  // Le contenu est gardé pendant l'animation de fermeture (opts devient undefined aussitôt)
+  // The content is kept during the closing animation (opts becomes undefined right away)
   const last = useRef<ConfirmOptions>();
   if (opts) last.current = opts;
   const o = opts ?? last.current;

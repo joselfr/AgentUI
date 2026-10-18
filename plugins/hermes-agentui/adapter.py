@@ -1,17 +1,17 @@
 """
-Canal AgentUI pour Hermes Agent (AgentUI Channel Protocol v1, voir plugins/protocol/PROTOCOL.md).
+AgentUI channel for Hermes Agent (AgentUI Channel Protocol v1, see plugins/protocol/PROTOCOL.md).
 
-Le gateway Hermes ouvre une WebSocket vers AgentUI, comme un bot Telegram ouvre son long-polling :
-- ``inbound``  → ``MessageEvent`` (un ``conversationId`` AgentUI = un ``chat_id`` = une session Hermes) ;
-- streaming   → aperçus du stream consumer (``send`` puis ``edit_message``) traduits en deltas ;
-- outils, sous-agents, raisonnement → hooks de plugin (``pre_tool_call``, ``post_tool_call``, ``subagent_*``,
-  ``post_llm_call``), rattachés à la discussion par les ContextVars de session du gateway ;
-- approbations → ``send_exec_approval`` / ``resolve_gateway_approval`` ;
-- fin de run → ``on_processing_complete`` ; arrêt → commande ``/stop`` ;
-- ``send()`` hors run (crons, send_message) → message proactif ``outbound``.
+The Hermes gateway opens a WebSocket to AgentUI, the way a Telegram bot opens its long-polling:
+- ``inbound``  → ``MessageEvent`` (one AgentUI ``conversationId`` = one ``chat_id`` = one Hermes session);
+- streaming   → stream consumer previews (``send`` then ``edit_message``) translated into deltas;
+- tools, sub-agents, reasoning → plugin hooks (``pre_tool_call``, ``post_tool_call``, ``subagent_*``,
+  ``post_llm_call``), attached to the chat through the gateway's session ContextVars;
+- approvals → ``send_exec_approval`` / ``resolve_gateway_approval``;
+- end of run → ``on_processing_complete``; stop → ``/stop`` command;
+- ``send()`` outside a run (crons, send_message) → proactive ``outbound`` message.
 
-Configuration (``~/.hermes/.env``) : ``AGENTUI_URL``, ``AGENTUI_TOKEN``. Par défaut la plateforme streame et n'affiche
-pas de bulles de progression d'outils (surcharge possible via ``display.platforms.agentui.*``).
+Configuration (``~/.hermes/.env``): ``AGENTUI_URL``, ``AGENTUI_TOKEN``. By default the platform streams and shows
+no tool progress bubbles (can be overridden via ``display.platforms.agentui.*``).
 """
 
 from __future__ import annotations
@@ -47,12 +47,12 @@ logger = logging.getLogger(__name__)
 
 PLATFORM = "agentui"
 PROTOCOL = 1
-HOME_CHAT = "home"  # chat_id des messages proactifs sans discussion : AgentUI les range dans sa discussion « maison »
-OWNER_ID = "agentui-owner"  # l'utilisateur est authentifié par AgentUI, pas par Hermes
+HOME_CHAT = "home"  # chat_id of proactive messages without a chat: AgentUI files them in its "home" chat
+OWNER_ID = "agentui-owner"  # the user is authenticated by AgentUI, not by Hermes
 MAX_RESULT = 20_000
 MAX_MEDIA = 20 * 1024 * 1024
 OUTBOX_LIMIT = 2_000
-ASK_TIMEOUT = 1800.0  # secondes d'attente de la réponse à un widget interactif (agentui_ask / confirm / form)
+ASK_TIMEOUT = 1800.0  # seconds to wait for the answer to an interactive widget (agentui_ask / confirm / form)
 
 CAPABILITIES = {
     "sessions": True,
@@ -69,7 +69,7 @@ CAPABILITIES = {
     "attachments": {"images": True, "files": True, "maxBytes": MAX_MEDIA},
 }
 
-# Adapter vivant (un seul par gateway/profil) : les hooks s'exécutent dans le thread de l'agent et le retrouvent ici.
+# Live adapter (only one per gateway/profile): hooks run in the agent's thread and find it here.
 _ACTIVE: Optional["AgentUIAdapter"] = None
 
 
@@ -91,7 +91,7 @@ def _settings(config=None) -> tuple[str, str, str]:
 
 
 def _sub_agents() -> List[dict]:
-    """Profil servi par cette gateway (un profil Hermes = une gateway = une connexion), comme l'adapter api_server."""
+    """Profile served by this gateway (one Hermes profile = one gateway = one connection), like the api_server adapter."""
     profile = os.getenv("HERMES_PROFILE", "").strip()
     if not profile:
         try:
@@ -115,7 +115,7 @@ def _iso_ms(v: Any) -> Optional[int]:
 
 
 def _list_jobs() -> List[dict]:
-    """Tâches cron, au format Job d'AgentUI (comme GET /api/jobs de l'api_server)."""
+    """Cron tasks, in AgentUI's Job format (like GET /api/jobs of the api_server)."""
     from cron.jobs import list_jobs
 
     out = []
@@ -137,7 +137,7 @@ def _list_jobs() -> List[dict]:
             "nextRunAt": _iso_ms(j.get("next_run_at")),
             "lastRunAt": _iso_ms(j.get("last_run_at")),
             "lastStatus": j.get("last_status") or None,
-            # « Exécuter maintenant » pose manual_run_at ; le planificateur le prend au tick suivant (≤ 1 min).
+            # "Run now" sets manual_run_at; the scheduler picks it up at the next tick (≤ 1 min).
             "queued": bool(j.get("manual_run_at")) and not running,
             "running": running,
             "lastError": ex.get("error") or j.get("last_error") or None,
@@ -152,14 +152,14 @@ def _job_action(job_id: str, action: str) -> dict:
     ops = {"pause": cron_jobs.pause_job, "resume": cron_jobs.resume_job, "run": cron_jobs.trigger_job, "delete": cron_jobs.remove_job}
     op = ops.get(action)
     if op is None:
-        raise ValueError(f"action inconnue : {action}")
+        raise ValueError(f"unknown action: {action}")
     if not op(job_id):
-        raise ValueError(f"tâche introuvable : {job_id}")
+        raise ValueError(f"task not found: {job_id}")
     return {"ok": True}
 
 
 def _list_skills() -> List[dict]:
-    """Skills installés (même liste que /skills list), avec leur état activé/désactivé."""
+    """Installed skills (same list as /skills list), with their enabled/disabled state."""
     from tools.skills_tool import _find_all_skills, _sort_skills
 
     enabled = {s.get("name") for s in _find_all_skills(skip_disabled=True)}
@@ -170,7 +170,7 @@ def _list_skills() -> List[dict]:
 
 
 def _read_skill(skill_id: str) -> dict:
-    """Contenu de SKILL.md (comme l'outil skill_view de l'agent)."""
+    """Content of SKILL.md (like the agent's skill_view tool)."""
     import json
     from tools.skills_tool import skill_view
 
@@ -200,8 +200,8 @@ CRON_PREFIX = "cron-"
 
 
 def _cron_title(chat_id: str, job_id: Optional[str] = None) -> Optional[str]:
-    """Titre de la discussion AgentUI d'une tâche cron (« ⏰ nom ») : nom de la tâche si connue, sinon déduit
-    d'une cible ``agentui:cron-<nom>``. None pour une discussion ordinaire."""
+    """Title of the AgentUI chat of a cron task ("⏰ name"): the task name if known, otherwise derived
+    from an ``agentui:cron-<name>`` target. None for an ordinary chat."""
     if job_id:
         try:
             from cron.jobs import get_job
@@ -222,14 +222,14 @@ def _media(name: str, data: bytes, mime: Optional[str] = None) -> dict:
 
 
 def _read_source(src: str) -> tuple[str, bytes, Optional[str]]:
-    """Lit un média désigné par chemin, file://, data: ou http(s):// (appel bloquant)."""
+    """Reads a media designated by path, file://, data: or http(s):// (blocking call)."""
     if src.startswith("data:"):
         head, _, payload = src.partition(",")
         mime = head[5:].split(";")[0] or None
         ext = mimetypes.guess_extension(mime or "") or ""
         return f"image{ext}", base64.b64decode(payload), mime
     if src.startswith(("http://", "https://")):
-        with urllib.request.urlopen(src, timeout=30) as resp:  # noqa: S310 (URL fournie par l'agent)
+        with urllib.request.urlopen(src, timeout=30) as resp:  # noqa: S310 (URL provided by the agent)
             data = resp.read(MAX_MEDIA + 1)
             mime = resp.headers.get_content_type()
         return Path(src.split("?")[0]).name or "media", data, mime
@@ -238,7 +238,7 @@ def _read_source(src: str) -> tuple[str, bytes, Optional[str]]:
 
 
 def _strip_cursor(text: str) -> str:
-    """Retire le curseur de streaming (« ▉ ») ajouté aux aperçus par le stream consumer."""
+    """Removes the streaming cursor ("▉") added to previews by the stream consumer."""
     try:
         from gateway.stream_consumer import StreamConsumerConfig
 
@@ -256,7 +256,7 @@ _FAILURE_MARKERS = ("❌", "✗", "🟡", "⚠")
 
 
 def _session_usage(conversation_id: str) -> Optional[dict]:
-    """Modèle et consommation cumulée de la session Hermes d'une discussion, lus dans sa base (None si inconnue)."""
+    """Model and accumulated consumption of the Hermes session of a chat, read from its database (None if unknown)."""
     import sqlite3
 
     from hermes_state import SessionDB
@@ -295,7 +295,7 @@ def _session_usage(conversation_id: str) -> Optional[dict]:
 
 
 def _default_model() -> Optional[str]:
-    """Modèle par défaut de la configuration Hermes (pour une session qui n'en a pas encore enregistré)."""
+    """Default model of the Hermes configuration (for a session that has not recorded one yet)."""
     try:
         from hermes_cli.config import load_config
 
@@ -306,7 +306,7 @@ def _default_model() -> Optional[str]:
 
 
 def _list_models() -> List[dict]:
-    """Modèles des fournisseurs authentifiés, à plat : [{provider, providerName, id}]."""
+    """Models of authenticated providers, flattened: [{provider, providerName, id}]."""
     from hermes_cli.model_switch import list_authenticated_providers
 
     cfg_model: Any = {}
@@ -326,10 +326,10 @@ def _list_models() -> List[dict]:
 
 @dataclass
 class _Ask:
-    """Question posée par un outil interactif (`agentui_ask`…) : le thread de l'agent attend `event`."""
+    """Question asked by an interactive tool (`agentui_ask`…): the agent's thread waits on `event`."""
     id: str
     event: threading.Event = field(default_factory=threading.Event)
-    answer: Optional[str] = None  # None à la fin de l'attente = annulée (run terminé) ou expirée
+    answer: Optional[str] = None  # None at the end of the wait = cancelled (run finished) or expired
 
 
 @dataclass
@@ -337,20 +337,20 @@ class _Run:
     run_id: str
     conversation_id: str
     message_id: str
-    # Messages « posés » par la gateway pendant le run (aperçus streamés, édités en place, puis réponse finale),
-    # dans l'ordre : le texte AgentUI est leur concaténation.
+    # Messages "posted" by the gateway during the run (streamed previews, edited in place, then final reply),
+    # in order: the AgentUI text is their concatenation.
     bubbles: Dict[str, str] = field(default_factory=dict)
-    emitted: str = ""  # texte déjà transmis à AgentUI (deltas cumulés)
-    settled: bool = False  # le dernier envoi était un message.final complet
-    # Sérialise `_sync` : appelé depuis la boucle asyncio et le thread de l'agent, deux appels simultanés
-    # partiraient du même `emitted` et enverraient des deltas qui se chevauchent (texte répété à l'écran).
+    emitted: str = ""  # text already sent to AgentUI (accumulated deltas)
+    settled: bool = False  # the last send was a complete message.final
+    # Serializes `_sync`: called from the asyncio loop and the agent's thread, two simultaneous calls
+    # would start from the same `emitted` and send overlapping deltas (repeated text on screen).
     sync_lock: threading.RLock = field(default_factory=threading.RLock)
     aborted: bool = False
 
 
 class AgentUIAdapter(BasePlatformAdapter):
-    supports_code_blocks = True  # AgentUI rend le Markdown
-    splits_long_messages = True  # pas de découpage côté gateway : AgentUI accepte les longs messages
+    supports_code_blocks = True  # AgentUI renders Markdown
+    splits_long_messages = True  # no splitting on the gateway side: AgentUI accepts long messages
     interactive_resume = True
 
     def __init__(self, config, **kwargs):
@@ -363,15 +363,15 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._outbox: Optional[asyncio.Queue] = None
         self._unsent: Optional[dict] = None
         self._welcomed: Optional[asyncio.Event] = None
-        self._captures: Dict[str, asyncio.Future] = {}  # réponses de commandes de contrôle (/model) à renvoyer en rpc
-        self._muted_until: Dict[str, float] = {}  # discussions arrêtées : on ignore la confirmation de /stop
-        self._lock = threading.Lock()  # protège les tables ci-dessous (thread de l'agent + boucle asyncio)
+        self._captures: Dict[str, asyncio.Future] = {}  # replies to control commands (/model) to send back as rpc
+        self._muted_until: Dict[str, float] = {}  # stopped chats: the /stop confirmation is ignored
+        self._lock = threading.Lock()  # protects the tables below (agent thread + asyncio loop)
         self._runs: Dict[str, _Run] = {}  # conversationId → run en cours
-        self._approvals: Dict[str, str] = {}  # id d'approbation → session_key Hermes
-        self._clarifies: Dict[str, Tuple[str, str]] = {}  # discussion → (session_key, clarify_id) de la question en attente
-        self._asks: Dict[str, _Ask] = {}  # discussion → question d'un outil interactif en attente
-        self._session_chat: Dict[str, str] = {}  # session_id Hermes (agent ou sous-agent) → conversationId
-        self._session_subagent: Dict[str, str] = {}  # session_id d'un sous-agent → id de sous-agent AgentUI
+        self._approvals: Dict[str, str] = {}  # approval id → Hermes session_key
+        self._clarifies: Dict[str, Tuple[str, str]] = {}  # chat → (session_key, clarify_id) of the pending question
+        self._asks: Dict[str, _Ask] = {}  # chat → question of a pending interactive tool
+        self._session_chat: Dict[str, str] = {}  # Hermes session_id (agent or sub-agent) → conversationId
+        self._session_subagent: Dict[str, str] = {}  # session_id of a sub-agent → AgentUI sub-agent id
         self._closing = False
 
     @property
@@ -380,19 +380,19 @@ class AgentUIAdapter(BasePlatformAdapter):
 
     @property
     def authorization_is_upstream(self) -> bool:
-        # L'utilisateur est authentifié par AgentUI et le transport par le token : pas d'allowlist Hermes à appliquer.
+        # The user is authenticated by AgentUI and the transport by the token: no Hermes allowlist to apply.
         return True
 
-    # ── Connexion ────────────────────────────────────────────────────────────
+    # ── Connection ────────────────────────────────────────────────────────────
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         global _ACTIVE
         if not self.url or not self.token:
-            self._set_fatal_error("config_missing", "AGENTUI_URL et AGENTUI_TOKEN sont requis", retryable=False)
+            self._set_fatal_error("config_missing", "AGENTUI_URL and AGENTUI_TOKEN are required", retryable=False)
             return False
         self._loop = asyncio.get_running_loop()
         self._closing = False
-        if self._outbox is None:  # conservée entre reconnexions : rien n'est perdu pendant une coupure
+        if self._outbox is None:  # kept across reconnections: nothing is lost during a cut
             self._outbox = asyncio.Queue()
         self._welcomed = asyncio.Event()
         _ACTIVE = self
@@ -400,8 +400,8 @@ class AgentUIAdapter(BasePlatformAdapter):
         try:
             await asyncio.wait_for(self._welcomed.wait(), timeout=15)
         except asyncio.TimeoutError:
-            logger.warning("AgentUI: pas de réponse de %s, nouvel essai en arrière-plan", self.url)
-        return True  # la boucle se reconnecte seule ; l'état réel passe par _mark_connected/_mark_disconnected
+            logger.warning("AgentUI: no response from %s, retrying in the background", self.url)
+        return True  # the loop reconnects by itself; the real state goes through _mark_connected/_mark_disconnected
 
     async def disconnect(self) -> None:
         global _ACTIVE
@@ -431,26 +431,26 @@ class AgentUIAdapter(BasePlatformAdapter):
                     await ws.send(json.dumps(_hello(self.token, self.display_name, active_runs=active)))
                     welcome = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
                     if welcome.get("type") != "welcome":
-                        raise ConnectionError(f"réponse inattendue : {welcome.get('type')}")
+                        raise ConnectionError(f"unexpected response: {welcome.get('type')}")
                     self._ws = ws
                     self._mark_connected()
                     self._welcomed.set()
                     delay = 1.0
-                    logger.info("AgentUI: connecté à %s", self.url)
+                    logger.info("AgentUI: connected to %s", self.url)
                     self._writer_task = asyncio.create_task(self._writer(ws))
                     async for raw in ws:
                         try:
                             await self._on_frame(json.loads(raw))
                         except Exception:
-                            logger.exception("AgentUI: trame ignorée")
+                            logger.exception("AgentUI: frame ignored")
             except asyncio.CancelledError:
                 raise
             except Exception as e:
                 code = getattr(getattr(e, "rcvd", None), "code", None)
                 if code in (4001, 4002):
-                    self._set_fatal_error("auth", f"AgentUI a refusé la connexion ({code})", retryable=False)
+                    self._set_fatal_error("auth", f"AgentUI refused the connection ({code})", retryable=False)
                     return
-                logger.warning("AgentUI: connexion perdue (%s), reconnexion dans %.0f s", e, delay)
+                logger.warning("AgentUI: connection lost (%s), reconnecting in %.0f s", e, delay)
             finally:
                 self._ws = None
                 if self._writer_task:
@@ -463,15 +463,15 @@ class AgentUIAdapter(BasePlatformAdapter):
             delay = min(delay * 2, 30.0)
 
     async def _writer(self, ws) -> None:
-        """Vide la file d'envoi dans l'ordre ; les trames restent en file pendant une coupure."""
+        """Flushes the send queue in order; frames stay queued during a cut."""
         while True:
             msg = self._unsent or await self._outbox.get()
-            self._unsent = msg  # renvoyée en premier après reconnexion si l'envoi échoue
+            self._unsent = msg  # sent back first after reconnection if the send fails
             await ws.send(json.dumps(msg, ensure_ascii=False, default=str))
             self._unsent = None
 
     def _post(self, msg: dict) -> None:
-        """Envoi thread-safe (boucle asyncio ou thread de l'agent)."""
+        """Thread-safe send (asyncio loop or agent thread)."""
         if self._loop is None or self._outbox is None:
             return
         def put():
@@ -479,7 +479,7 @@ class AgentUIAdapter(BasePlatformAdapter):
                 self._outbox.put_nowait(msg)
         try:
             in_loop = asyncio.get_running_loop() is self._loop
-        except RuntimeError:  # thread de l'agent : pas de boucle courante
+        except RuntimeError:  # agent thread: no current loop
             in_loop = False
         if in_loop:
             put()
@@ -500,7 +500,7 @@ class AgentUIAdapter(BasePlatformAdapter):
             self._clarifies.pop(conversation_id, None)
             ask = self._asks.pop(conversation_id, None)
         if ask is not None:
-            ask.event.set()  # run terminé ou arrêté : l'outil en attente rend la main sans réponse
+            ask.event.set()  # run finished or stopped: the waiting tool hands control back without an answer
         if run is not None:
             self._post({"type": "event", "conversationId": conversation_id, "runId": run.run_id, "event": event})
 
@@ -533,7 +533,7 @@ class AgentUIAdapter(BasePlatformAdapter):
                 media_urls.append(cache_image_from_bytes(data, mimetypes.guess_extension(mime) or ".jpg"))
                 message_type = MessageType.PHOTO
             else:
-                media_urls.append(cache_document_from_bytes(data, att.get("name") or "fichier"))
+                media_urls.append(cache_document_from_bytes(data, att.get("name") or "file"))
                 if message_type is MessageType.TEXT:
                     message_type = MessageType.DOCUMENT
             media_types.append(mime)
@@ -551,7 +551,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         try:
             await self.handle_message(event)
         except Exception as e:
-            logger.exception("AgentUI: échec de dispatch")
+            logger.exception("AgentUI: dispatch failed")
             self._finish(conv, {"type": "run.failed", "error": str(e)})
 
     async def _on_abort(self, msg: dict) -> None:
@@ -563,7 +563,7 @@ class AgentUIAdapter(BasePlatformAdapter):
             run.aborted = True
             self._muted_until[conv] = time.monotonic() + 10
         source = self.build_source(chat_id=conv, chat_name=conv, chat_type="dm", user_id=OWNER_ID, user_name="AgentUI")
-        # /stop interrompt immédiatement l'agent et libère la session (gateway/run.py, _interrupt_and_clear_session)
+        # /stop interrupts the agent immediately and frees the session (gateway/run.py, _interrupt_and_clear_session)
         await self.handle_message(MessageEvent(text="/stop", message_type=MessageType.COMMAND, source=source, message_id=f"stop-{uuid.uuid4().hex[:8]}"))
         self._finish(conv, {"type": "run.aborted"})
 
@@ -578,47 +578,47 @@ class AgentUIAdapter(BasePlatformAdapter):
 
             resolve_gateway_approval(session_key, choice)
         except Exception:
-            logger.exception("AgentUI: échec de résolution de l'approbation")
+            logger.exception("AgentUI: approval resolution failed")
 
     def _on_reply(self, msg: dict) -> None:
-        """Réponse à une question `clarify` en attente : elle débloque l'outil, le run en cours reprend."""
+        """Answer to a pending `clarify` question: it unblocks the tool, the current run resumes."""
         conv, text = msg.get("conversationId", ""), msg.get("text", "")
         with self._lock:
             ask = self._asks.get(conv)
             if ask is not None and not ask.event.is_set():
                 ask.answer = text
-                ask.event.set()  # débloque l'outil interactif, qui émet lui-même `question.resolved`
+                ask.event.set()  # unblocks the interactive tool, which emits `question.resolved` itself
                 return
             pending = self._clarifies.pop(conv, None)
         if pending is None:
-            logger.warning("AgentUI: réponse sans question en attente (discussion %s)", conv)
+            logger.warning("AgentUI: answer without a pending question (chat %s)", conv)
             return
         session_key, clarify_id = pending
         try:
             from tools import clarify_gateway as cg
 
-            # « 2 » ou le libellé d'une option → l'option ; une sélection invalide ou une réponse libre → le texte tel quel
+            # "2" or an option label → the option; an invalid selection or a free answer → the text as is
             if cg.attempt_text_response_for_session(session_key, text) != cg.TEXT_RESOLVED:
                 cg.resolve_gateway_clarify(clarify_id, text)
         except Exception:
-            logger.exception("AgentUI: échec de résolution de la question")
+            logger.exception("AgentUI: question resolution failed")
             with self._lock:
-                self._clarifies.setdefault(conv, pending)  # toujours en attente : l'utilisateur peut réessayer
+                self._clarifies.setdefault(conv, pending)  # still pending: the user can retry
             return
         self._emit(conv, {"type": "question.resolved", "id": clarify_id})
 
     def _delete_session(self, conversation_id: str) -> dict:
-        """Supprime la session Hermes d'une discussion AgentUI (une discussion = un chat_id = une session).
+        """Deletes the Hermes session of an AgentUI chat (one chat = one chat_id = one session).
 
-        Même séquence que le RPC officiel ``session.delete`` : une session vivante est refusée (l'agent
-        tripperait sur la clé étrangère à son prochain flush), sinon on efface la ligne, ses messages et les
-        fichiers de transcription. Discussion inconnue : succès (idempotent).
+        Same sequence as the official ``session.delete`` RPC: a live session is refused (the agent
+        would trip over the foreign key at its next flush), otherwise the row, its messages and the
+        transcript files are erased. Unknown chat: success (idempotent).
         """
         if not conversation_id:
             raise ValueError("conversationId manquant")
         with self._lock:
             if conversation_id in self._runs:
-                raise RuntimeError("un run est en cours dans cette discussion")
+                raise RuntimeError("a run is in progress in this chat")
         from hermes_constants import get_hermes_home
         from hermes_state import SessionDB
 
@@ -629,41 +629,41 @@ class AgentUIAdapter(BasePlatformAdapter):
                 return {"ok": True, "deleted": False}
             deleted = db.delete_session(session_id, sessions_dir=get_hermes_home() / "sessions")
         finally:
-            db.close()  # 0.19 n'a pas de gestionnaire de contexte sur SessionDB
+            db.close()  # 0.19 has no context manager on SessionDB
         return {"ok": True, "deleted": bool(deleted)}
 
     async def _control(self, conversation_id: str, text: str, timeout: float = 20.0) -> str:
-        """Passe une commande de contrôle (/model…) à la gateway comme si l'utilisateur l'avait tapée, et renvoie sa
-        réponse au lieu de l'afficher dans la discussion."""
+        """Passes a control command (/model…) to the gateway as if the user had typed it, and returns its
+        reply instead of displaying it in the chat."""
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
         with self._lock:
             if conversation_id in self._captures:
-                raise RuntimeError("une commande est déjà en cours dans cette discussion")
+                raise RuntimeError("a command is already in progress in this chat")
             self._captures[conversation_id] = fut
         source = self.build_source(chat_id=conversation_id, chat_name=conversation_id, chat_type="dm", user_id=OWNER_ID, user_name="AgentUI")
         try:
             await self.handle_message(MessageEvent(text=text, message_type=MessageType.COMMAND, source=source, message_id=f"ctl-{uuid.uuid4().hex[:8]}"))
             return await asyncio.wait_for(fut, timeout)
         except asyncio.TimeoutError:
-            raise RuntimeError("Hermes n'a pas répondu à temps")
+            raise RuntimeError("Hermes did not respond in time")
         finally:
             with self._lock:
                 self._captures.pop(conversation_id, None)
 
     async def _set_model(self, params: dict) -> dict:
-        """Fixe le modèle de la session d'une discussion (commande /model de la gateway, limitée à la session)."""
+        """Sets the model of a chat's session (the gateway's /model command, limited to the session)."""
         conv, model, provider = str(params.get("conversationId", "")), str(params.get("model", "")).strip(), str(params.get("provider", "")).strip()
         if not conv or not model:
-            raise ValueError("conversationId et model sont requis")
+            raise ValueError("conversationId and model are required")
         with self._lock:
             if conv in self._runs:
-                raise RuntimeError("un run est en cours dans cette discussion")
+                raise RuntimeError("a run is in progress in this chat")
         reply = await self._control(conv, f"/model {model}" + (f" --provider {provider}" if provider else "") + " --session")
         text = reply.strip()
-        # La gateway répond « Model switched to `x` … » en cas de succès ; un refus commence par une pastille d'erreur
-        # (❌ modèle inconnu, 🟡 changement annulé…). Un avertissement en cours de texte n'est pas un échec.
+        # The gateway replies "Model switched to `x` …" on success; a refusal starts with an error marker
+        # (❌ unknown model, 🟡 change cancelled…). A warning in the middle of the text is not a failure.
         if text.startswith(_FAILURE_MARKERS):
-            raise RuntimeError(text.lstrip("".join(_FAILURE_MARKERS) + "\ufe0f \n").strip() or "changement de modèle refusé")
+            raise RuntimeError(text.lstrip("".join(_FAILURE_MARKERS) + "\ufe0f \n").strip() or "model change refused")
         usage = await asyncio.to_thread(_session_usage, conv)
         return {"model": (usage or {}).get("model") or model, **({"provider": provider} if provider else {}), "message": text}
 
@@ -673,7 +673,7 @@ class AgentUIAdapter(BasePlatformAdapter):
             try:
                 self._post({"type": "rpc.result", "id": msg.get("id"), "result": await self._set_model(params)})
             except Exception as e:
-                logger.warning("AgentUI: rpc setModel en échec : %s", e)
+                logger.warning("AgentUI: rpc setModel failed: %s", e)
                 self._post({"type": "rpc.result", "id": msg.get("id"), "error": str(e) or type(e).__name__})
             return
         handlers = {
@@ -688,42 +688,42 @@ class AgentUIAdapter(BasePlatformAdapter):
         }
         handler = handlers.get(str(method))
         if handler is None:
-            self._post({"type": "rpc.result", "id": msg.get("id"), "error": f"méthode non supportée : {method}"})
+            self._post({"type": "rpc.result", "id": msg.get("id"), "error": f"unsupported method: {method}"})
             return
         try:
-            result = await asyncio.to_thread(handler)  # lecture disque / fichiers d'état : hors de la boucle
+            result = await asyncio.to_thread(handler)  # disk read / state files: off the loop
             self._post({"type": "rpc.result", "id": msg.get("id"), "result": result})
         except Exception as e:
-            logger.warning("AgentUI: rpc %s en échec : %s", method, e)
+            logger.warning("AgentUI: rpc %s failed: %s", method, e)
             self._post({"type": "rpc.result", "id": msg.get("id"), "error": str(e) or type(e).__name__})
 
-    # ── Hermes → AgentUI : cycle de vie ──────────────────────────────────────
+    # ── Hermes → AgentUI: lifecycle ──────────────────────────────────────
 
     async def on_processing_complete(self, event: MessageEvent, outcome: ProcessingOutcome) -> None:
         conv = event.source.chat_id
         with self._lock:
             run = self._runs.get(conv)
         if run is None or run.message_id != event.message_id:
-            return  # /stop ou message déjà terminé
+            return  # /stop or message already finished
         if run.emitted and not run.settled:
-            self._emit(conv, {"type": "message.final", "text": run.emitted})  # fige le texte (sans curseur)
-        try:  # consommation cumulée de la session (même interrompue, les tokens sont consommés) : AgentUI l'affiche
+            self._emit(conv, {"type": "message.final", "text": run.emitted})  # freezes the text (without cursor)
+        try:  # accumulated consumption of the session (even interrupted, tokens are consumed): AgentUI shows it
             usage = await asyncio.to_thread(_session_usage, conv)
             if usage:
                 self._emit(conv, {"type": "usage", "usage": usage})
         except Exception:
-            logger.debug("AgentUI: lecture de la consommation impossible", exc_info=True)
+            logger.debug("AgentUI: cannot read the consumption", exc_info=True)
         if outcome is ProcessingOutcome.SUCCESS:
             self._finish(conv, {"type": "run.completed"})
         elif outcome is ProcessingOutcome.CANCELLED or run.aborted:
             self._finish(conv, {"type": "run.aborted"})
         else:
-            self._finish(conv, {"type": "run.failed", "error": "échec du traitement par Hermes"})
+            self._finish(conv, {"type": "run.failed", "error": "Hermes processing failed"})
 
     # ── Hermes → AgentUI : streaming ─────────────────────────────────────────
-    # Contrat standard des adaptateurs : le stream consumer de la gateway pose un message (send) puis l'édite
-    # (edit_message) au fil des tokens. On traduit ces éditions en deltas AgentUI ; ça marche quelle que soit la
-    # mécanique interne de streaming de la version de Hermes.
+    # Standard adapter contract: the gateway's stream consumer posts a message (send) then edits it
+    # (edit_message) as tokens arrive. We translate these edits into AgentUI deltas; this works whatever the
+    # internal streaming mechanics of the Hermes version.
 
     def _sync(self, run: "_Run") -> None:
         with run.sync_lock:
@@ -735,13 +735,13 @@ class AgentUIAdapter(BasePlatformAdapter):
             if full.startswith(run.emitted):
                 self._emit(run.conversation_id, {"type": "message.delta", "text": full[len(run.emitted):]})
                 run.settled = False
-            else:  # réécriture (fin de curseur, aperçu supprimé…) : AgentUI remplace le texte accumulé
+            else:  # rewrite (cursor end, preview removed…): AgentUI replaces the accumulated text
                 self._emit(run.conversation_id, {"type": "message.final", "text": full})
                 run.settled = True
             run.emitted = full
 
     def format_tool_event(self, event: Any, *, mode: str = "all", preview_max_len: int = 40) -> Optional[str]:
-        return None  # pas de « bulles » d'outils : les cartes viennent des hooks pre/post_tool_call
+        return None  # no tool "bubbles": cards come from the pre/post_tool_call hooks
 
     # ── Hermes → AgentUI : messages ──────────────────────────────────────────
 
@@ -749,20 +749,20 @@ class AgentUIAdapter(BasePlatformAdapter):
         message_id = uuid.uuid4().hex
         with self._lock:
             capture = self._captures.get(chat_id)
-        if capture is not None:  # réponse d'une commande de contrôle (rpc setModel), pas un message de la discussion
+        if capture is not None:  # reply to a control command (rpc setModel), not a message of the chat
             if not capture.done():
                 self._loop.call_soon_threadsafe(lambda: capture.done() or capture.set_result(content))
             return SendResult(success=True, message_id=message_id)
         job_id = (metadata or {}).get("job_id")
         if job_id:
-            # Livraison d'une tâche cron : toujours un message à part, jamais mêlé à une réponse en cours.
+            # Cron task delivery: always a separate message, never mixed with a reply in progress.
             self._outbound(chat_id, content, [], title=_cron_title(chat_id, str(job_id)))
             return SendResult(success=True, message_id=message_id)
         with self._lock:
             run = self._runs.get(chat_id)
             muted = self._muted_until.get(chat_id, 0) > time.monotonic()
         if muted or (run is not None and run.aborted):
-            return SendResult(success=True, message_id=message_id)  # confirmation « stopped » de /stop
+            return SendResult(success=True, message_id=message_id)  # "stopped" confirmation of /stop
         if run is not None:
             with self._lock:
                 run.bubbles[message_id] = _strip_cursor(content)
@@ -788,9 +788,9 @@ class AgentUIAdapter(BasePlatformAdapter):
         try:
             src_name, data, mime = await asyncio.to_thread(_read_source, src)
         except Exception as e:
-            return SendResult(success=False, error=f"média illisible : {e}")
+            return SendResult(success=False, error=f"unreadable media: {e}")
         if len(data) > MAX_MEDIA:
-            return SendResult(success=False, error="média trop volumineux")
+            return SendResult(success=False, error="media too large")
         media = _media(name or src_name, data, mime)
         if not self._emit(chat_id, {"type": "message.media", **media}):
             self._outbound(chat_id, caption, [media])
@@ -819,7 +819,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         return await self._send_media(chat_id, video_path, caption)
 
     async def send_exec_approval(self, chat_id: str, command: str, session_key: str, description: str = "dangerous command", metadata: Optional[Dict[str, Any]] = None, allow_permanent: bool = True, smart_denied: bool = False, **flags: Any) -> SendResult:
-        # **flags : options ajoutées par les versions récentes (allow_session en 0.21…), transmises telles quelles.
+        # **flags: options added by recent versions (allow_session in 0.21…), passed through as is.
         approval_id = uuid.uuid4().hex[:12]
         with self._lock:
             self._approvals[approval_id] = session_key
@@ -832,21 +832,21 @@ class AgentUIAdapter(BasePlatformAdapter):
         if not sent:
             with self._lock:
                 self._approvals.pop(approval_id, None)
-            return SendResult(success=False, error="aucun run AgentUI pour cette discussion")
+            return SendResult(success=False, error="no AgentUI run for this chat")
         return SendResult(success=True, message_id=approval_id)
 
     async def send_clarify(self, chat_id: str, question: str, choices: Optional[list], clarify_id: str, session_key: str, metadata: Optional[Dict[str, Any]] = None) -> SendResult:
-        """Question de l'agent en plein run (outil `clarify`). Avec des choix : widget `ask` (boutons) ; la réponse revient
-        par la trame `reply` et débloque l'outil, au lieu de passer pour un nouveau message (le run est toujours en cours)."""
+        """Agent question mid-run (`clarify` tool). With choices: `ask` widget (buttons); the answer comes back
+        through the `reply` frame and unblocks the tool, instead of passing for a new message (the run is still going)."""
         from tools import clarify_gateway as cg
 
         with self._lock:
             self._clarifies[chat_id] = (session_key, clarify_id)
-        # Avant le prompt : au moment où le widget arrive, AgentUI sait déjà que la réponse est attendue.
+        # Before the prompt: when the widget arrives, AgentUI already knows the answer is expected.
         self._emit(chat_id, {"type": "question.requested", "id": clarify_id})
         if choices:
-            multi = bool(getattr(cg._entries.get(clarify_id), "multi_select", False))  # même lecture que l'adaptateur de base
-            cg.mark_awaiting_text(clarify_id)  # les réponses par texte (« 2 », libellé, texte libre) sont aussi acceptées
+            multi = bool(getattr(cg._entries.get(clarify_id), "multi_select", False))  # same reading as the base adapter
+            cg.mark_awaiting_text(clarify_id)  # answers by text ("2", label, free text) are also accepted
             widget = {"type": "ask", "arguments": {"question": question, "options": [str(c) for c in choices], **({"multiple": True} if multi else {})}}
             content = "```widget\n" + json.dumps(widget, ensure_ascii=False) + "\n```"
         else:
@@ -854,18 +854,18 @@ class AgentUIAdapter(BasePlatformAdapter):
         return await self.send(chat_id=chat_id, content=content, metadata=metadata)
 
     def ask_blocking(self, chat: str, key: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Outil interactif (thread de l'agent) : affiche le widget `key` puis attend la réponse de l'utilisateur,
-        qui arrive par la trame `reply` comme pour `clarify`. Renvoie `{"answer": …}` ou `{"error": …}`."""
+        """Interactive tool (agent thread): displays the `key` widget then waits for the user's answer,
+        which arrives through the `reply` frame as for `clarify`. Returns `{"answer": …}` or `{"error": …}`."""
         ask = _Ask(id=uuid.uuid4().hex[:12])
         with self._lock:
             run = self._runs.get(chat)
             if run is None:
-                return {"error": "Aucun échange AgentUI en cours pour cette discussion."}
+                return {"error": "No AgentUI exchange in progress for this chat."}
             if chat in self._asks:
-                return {"error": "Une question est déjà en attente de réponse : attends-la avant d'en poser une autre."}
+                return {"error": "A question is already awaiting an answer: wait for it before asking another one."}
             self._asks[chat] = ask
             run.bubbles[uuid.uuid4().hex] = "```widget\n" + json.dumps({"type": key, "arguments": args}, ensure_ascii=False) + "\n```"
-        # Avant le widget : au moment où il arrive, AgentUI sait déjà que la réponse est attendue.
+        # Before the widget: when it arrives, AgentUI already knows the answer is expected.
         self._emit(chat, {"type": "question.requested", "id": ask.id})
         self._sync(run)
         ask.event.wait(ASK_TIMEOUT)
@@ -874,17 +874,17 @@ class AgentUIAdapter(BasePlatformAdapter):
                 del self._asks[chat]
         self._emit(chat, {"type": "question.resolved", "id": ask.id})
         if ask.answer is None:
-            return {"error": "Pas de réponse de l'utilisateur (échange interrompu ou délai dépassé)."}
+            return {"error": "No answer from the user (exchange interrupted or timed out)."}
         return {"answer": ask.answer}
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
-        pass  # AgentUI affiche déjà l'état du run
+        pass  # AgentUI already shows the run state
 
     async def edit_message(self, chat_id: str, message_id: str, content: str, *, finalize: bool = False, **kwargs) -> SendResult:
         with self._lock:
             run = self._runs.get(chat_id)
             if run is None or message_id not in run.bubbles:
-                return SendResult(success=False, error="message inconnu")
+                return SendResult(success=False, error="unknown message")
             run.bubbles[message_id] = _strip_cursor(content)
         self._sync(run)
         return SendResult(success=True, message_id=message_id)
@@ -900,10 +900,10 @@ class AgentUIAdapter(BasePlatformAdapter):
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
         return {"name": chat_id, "type": "dm"}
 
-    # ── Hooks (thread de l'agent) ────────────────────────────────────────────
+    # ── Hooks (agent thread) ────────────────────────────────────────────
 
     def _chat_for(self, session_id: Optional[str]) -> Optional[str]:
-        """Discussion AgentUI du contexte courant : ContextVars du gateway, sinon table des sessions (sous-agents)."""
+        """AgentUI chat of the current context: gateway ContextVars, otherwise the sessions table (sub-agents)."""
         try:
             from gateway.session_context import get_session_env
 
@@ -940,7 +940,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         chat = self._chat_for(kw.get("session_id"))
         if not chat or not kw.get("tool_call_id"):
             return
-        if kw.get("tool_name") == "clarify":  # répondue, annulée ou expirée : plus rien n'est attendu
+        if kw.get("tool_name") == "clarify":  # answered, cancelled or expired: nothing is awaited anymore
             with self._lock:
                 pending = self._clarifies.pop(chat, None)
             if pending:
@@ -1001,7 +1001,7 @@ def _hook(name: str):
             try:
                 getattr(adapter, f"hook_{name}")(**kw)
             except Exception:
-                logger.debug("AgentUI: hook %s en échec", name, exc_info=True)
+                logger.debug("AgentUI: hook %s failed", name, exc_info=True)
     return call
 
 
@@ -1033,19 +1033,19 @@ def _env_enablement() -> dict | None:
 
 
 async def _standalone_send(pconfig, chat_id: str, message: str, *, thread_id: Optional[str] = None, media_files: Optional[List[str]] = None, force_document: bool = False) -> Dict[str, Any]:
-    """Livraison d'un cron exécuté hors du gateway : connexion éphémère « send-only »."""
+    """Delivery of a cron run outside the gateway: ephemeral "send-only" connection."""
     import websockets
 
     url, token, name = _settings(pconfig)
     if not (url and token):
-        return {"error": "AgentUI : AGENTUI_URL et AGENTUI_TOKEN sont requis"}
+        return {"error": "AgentUI: AGENTUI_URL and AGENTUI_TOKEN are required"}
     media = []
     for path in media_files or []:
         try:
             src_name, data, mime = await asyncio.to_thread(_read_source, path)
             media.append(_media(src_name, data, mime))
         except Exception as e:
-            logger.warning("AgentUI: média ignoré (%s) : %s", path, e)
+            logger.warning("AgentUI: media ignored (%s): %s", path, e)
     msg_id = uuid.uuid4().hex
     out: Dict[str, Any] = {"type": "outbound", "id": msg_id, "text": message}
     if chat_id and chat_id != HOME_CHAT:
@@ -1060,75 +1060,75 @@ async def _standalone_send(pconfig, chat_id: str, message: str, *, thread_id: Op
             await ws.send(json.dumps(_hello(token, name, mode="send-only")))
             welcome = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
             if welcome.get("type") != "welcome":
-                return {"error": f"AgentUI : réponse inattendue {welcome.get('type')}"}
+                return {"error": f"AgentUI: unexpected response {welcome.get('type')}"}
             await ws.send(json.dumps(out, ensure_ascii=False))
         return {"success": True, "message_id": msg_id}
     except Exception as e:
-        return {"error": f"AgentUI : envoi impossible ({e})"}
+        return {"error": f"AgentUI: send failed ({e})"}
 
 
 def _set_display_defaults() -> None:
-    """Valeurs par défaut d'affichage pour « agentui » (surchargées par display.platforms.agentui.* du config.yaml) :
-    streaming activé, et pas de bulles de progression d'outils (les cartes viennent des hooks)."""
+    """Default display values for "agentui" (overridden by display.platforms.agentui.* of config.yaml):
+    streaming enabled, and no tool progress bubbles (cards come from the hooks)."""
     try:
         from gateway.display_config import _PLATFORM_DEFAULTS
 
         _PLATFORM_DEFAULTS.setdefault(PLATFORM, {}).update({"streaming": True, "tool_progress": "off"})
     except Exception:
-        logger.debug("AgentUI: valeurs d'affichage par défaut non appliquées", exc_info=True)
+        logger.debug("AgentUI: default display values not applied", exc_info=True)
 
 
 def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
-    """Contrôles que le schéma JSON ne sait pas exprimer : le modèle corrige et réessaie d'après ce message."""
+    """Checks the JSON schema cannot express: the model corrects and retries based on this message."""
     if key == "chart":
         x, series = args.get("x") or [], args.get("series") or []
         for s in series:
             if len(s.get("y") or []) != len(x):
-                return f"La série « {s.get('name')} » doit avoir {len(x)} valeurs (autant que x), elle en a {len(s.get('y') or [])}."
+                return f"Series \"{s.get('name')}\" must have {len(x)} values (as many as x), it has {len(s.get('y') or [])}."
         if args.get("kind") == "pie" and len(series) != 1:
-            return "Un camembert (pie) n'a qu'une seule série."
+            return "A pie chart has only one series."
     elif key == "table":
         n = len(args.get("columns") or [])
         for i, row in enumerate(args.get("rows") or []):
             if len(row) != n:
-                return f"La ligne {i + 1} a {len(row)} valeurs, il en faut {n} (une par colonne)."
+                return f"Row {i + 1} has {len(row)} values, {n} are needed (one per column)."
             if any(isinstance(v, (dict, list)) for v in row):
-                return f"La ligne {i + 1} contient une valeur qui n'est ni texte, ni nombre, ni booléen, ni null."
+                return f"Row {i + 1} contains a value that is neither text, number, boolean nor null."
     elif key == "progress":
         update = args.get("update")
         if update is not None and not re.fullmatch(r"\[\[agentui:[0-9a-f]+\]\]", str(update)):
-            return "`update` doit être le jeton [[agentui:…]] renvoyé par le premier appel."
+            return "`update` must be the [[agentui:…]] token returned by the first call."
     elif key == "map" and not args.get("points"):
-        return "Il faut au moins un point."
+        return "At least one point is required."
     elif key == "code" and not str(args.get("code") or "").strip():
-        return "Le code est vide."
+        return "The code is empty."
     return None
 
 
 def _ask_error(key: str, args: Dict[str, Any]) -> Optional[str]:
-    """Contrôles sémantiques des outils interactifs (le schéma JSON ne les exprime pas)."""
+    """Semantic checks of the interactive tools (the JSON schema cannot express them)."""
     if key == "ask" and not str(args.get("question") or "").strip():
-        return "La question est vide."
+        return "The question is empty."
     if key == "confirm" and not str(args.get("title") or "").strip():
-        return "Le titre est vide."
+        return "The title is empty."
     if key == "form":
         names = set()
         for f in args.get("fields") or []:
             name = f.get("name")
             if name in names:
-                return f"Le champ « {name} » apparaît deux fois : les noms doivent être uniques."
+                return f"Field \"{name}\" appears twice: names must be unique."
             names.add(name)
             if f.get("kind") == "select" and not f.get("options"):
-                return f"Le champ « {name} » est de type select : il lui faut des options."
+                return f"Field \"{name}\" is of type select: it needs options."
     return None
 
 
-IMAGE_PREFIX = "agentui-img-"  # pièces jointes copiées pour un widget image : le front ne les affiche pas en plus du widget
+IMAGE_PREFIX = "agentui-img-"  # attachments copied for an image widget: the front does not display them on top of the widget
 MAX_IMAGES = 12
 
 
 def _sniff_image(b: bytes) -> Optional[str]:
-    """Type réel d'une image d'après ses premiers octets (pas l'extension) : ce que l'endpoint des pièces jointes affiche en ligne."""
+    """Real type of an image from its first bytes (not the extension): what the attachments endpoint displays inline."""
     if b[:8] == b"\x89PNG\r\n\x1a\n":
         return "image/png"
     if b[:3] == b"\xff\xd8\xff":
@@ -1141,47 +1141,47 @@ def _sniff_image(b: bytes) -> Optional[str]:
 
 
 def _images_error(args: Dict[str, Any]) -> Optional[str]:
-    """Contrôle de forme des sources d'`agentui_image` (avant toute lecture de fichier)."""
+    """Shape check of the `agentui_image` sources (before any file read)."""
     images = args.get("images") or []
     if not images or len(images) > MAX_IMAGES:
-        return f"Il faut entre 1 et {MAX_IMAGES} images."
+        return f"Between 1 and {MAX_IMAGES} images are required."
     for i, im in enumerate(images):
         src = str(im.get("src") or "")
         if not (re.match(r"https?://", src, re.I) or src.startswith("/")):
-            return f"Image {i + 1} : src doit être une URL https://… ou un chemin absolu (pas de data:, file: ni chemin relatif)."
+            return f"Image {i + 1}: src must be an https://… URL or an absolute path (no data:, file: or relative path)."
     return None
 
 
 def _read_local_image(path: str) -> dict:
-    """Lit une image locale (appel bloquant) ; ValueError lisible par l'agent si introuvable, trop grosse ou pas une image."""
+    """Reads a local image (blocking call); ValueError readable by the agent if missing, too large or not an image."""
     try:
         data = Path(path).read_bytes()
     except OSError:
-        raise ValueError(f"Fichier introuvable ou illisible : {path}")
+        raise ValueError(f"File not found or unreadable: {path}")
     if len(data) > MAX_MEDIA:
-        raise ValueError(f"{path} dépasse {MAX_MEDIA // 1024 // 1024} Mo.")
+        raise ValueError(f"{path} exceeds {MAX_MEDIA // 1024 // 1024} MB.")
     mime = _sniff_image(data)
     if not mime:
-        raise ValueError(f"{path} n'est pas une image png, jpeg, gif ou webp.")
+        raise ValueError(f"{path} is not a png, jpeg, gif or webp image.")
     name = f"{IMAGE_PREFIX}{hashlib.sha1(data).hexdigest()[:8]}-{re.sub(r'[^A-Za-z0-9_.-]+', '_', Path(path).name)}"
     return _media(name, data, mime)
 
 
 def _register_widget_tools(ctx) -> None:
-    """Un outil par widget (`agentui_chart`, `agentui_map`, `agentui_code`, `agentui_table`) : le modèle valide ses arguments par le schéma
-    de l'outil au lieu d'écrire un bloc ```widget. L'outil renvoie un jeton `[[agentui:<id>]]` que l'agent place dans son
-    texte ; AgentUI le remplace par le widget (arguments de `tool.started`, jeton dans le résultat de `tool.completed`)."""
+    """One tool per widget (`agentui_chart`, `agentui_map`, `agentui_code`, `agentui_table`): the model validates its arguments with the tool's
+    schema instead of writing a ```widget block. The tool returns a `[[agentui:<id>]]` token that the agent places in its
+    text; AgentUI replaces it with the widget (arguments of `tool.started`, token in the result of `tool.completed`)."""
     spec = json.loads((Path(__file__).parent / "widget_tools.json").read_text(encoding="utf-8"))
 
     def make_handler(key: str):
         def handler(args: Dict[str, Any], **_kw: Any) -> str:
-            # Hermes expose les outils d'un plugin sur toutes les plateformes (le `check_fn` est mis en cache 30 s, donc
-            # inutilisable pour filtrer par session) : hors AgentUI, l'appel est refusé avec une consigne de repli.
+            # Hermes exposes a plugin's tools on all platforms (the `check_fn` is cached for 30 s, so
+            # unusable to filter by session): outside AgentUI, the call is refused with a fallback instruction.
             try:
                 from gateway.session_context import get_session_env
 
                 if get_session_env("HERMES_SESSION_PLATFORM") != PLATFORM:
-                    return json.dumps({"error": "Ce composant n'existe que dans AgentUI ; présente le contenu en Markdown."}, ensure_ascii=False)
+                    return json.dumps({"error": "This component only exists in AgentUI; present the content in Markdown."}, ensure_ascii=False)
             except Exception:
                 pass
             problem = _widget_error(key, args) or (_images_error(args) if key == "image" else None)
@@ -1189,7 +1189,7 @@ def _register_widget_tools(ctx) -> None:
                 return json.dumps({"error": problem}, ensure_ascii=False)
             files: Dict[str, str] = {}
             if key == "image":
-                # Images locales : copiées dans la discussion (message.media) ; le résultat dit quelle pièce jointe correspond à quel chemin.
+                # Local images: copied into the chat (message.media); the result says which attachment matches which path.
                 try:
                     from gateway.session_context import get_session_env
 
@@ -1205,10 +1205,10 @@ def _register_widget_tools(ctx) -> None:
                     except ValueError as e:
                         return json.dumps({"error": str(e)}, ensure_ascii=False)
                     if not chat or _ACTIVE is None or not _ACTIVE._emit(chat, {"type": "message.media", **media}):
-                        return json.dumps({"error": "Aucun échange AgentUI en cours : impossible de copier l'image."}, ensure_ascii=False)
+                        return json.dumps({"error": "No AgentUI exchange in progress: cannot copy the image."}, ensure_ascii=False)
                     files[src] = media["name"]
             update = args.get("update") if key == "progress" else None
-            if update:  # mise à jour : même jeton, le front affiche l'état du dernier appel
+            if update:  # update: same token, the front shows the state of the latest call
                 return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
             instruction = spec["progressInstruction"] if key == "progress" else spec["tokenInstruction"]
             return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction, **({"files": files} if key == "image" else {})}, ensure_ascii=False)
@@ -1225,7 +1225,7 @@ def _register_widget_tools(ctx) -> None:
                 chat = None
             adapter = _ACTIVE
             if not chat or adapter is None:
-                return json.dumps({"error": "Ce composant n'existe que dans AgentUI ; pose ta question dans ta réponse."}, ensure_ascii=False)
+                return json.dumps({"error": "This component only exists in AgentUI; ask your question in your reply."}, ensure_ascii=False)
             problem = _ask_error(key, args)
             if problem:
                 return json.dumps({"error": problem}, ensure_ascii=False)
@@ -1247,7 +1247,7 @@ def _register_widget_tools(ctx) -> None:
 
 
 def register(ctx):
-    """Point d'entrée du plugin Hermes."""
+    """Entry point of the Hermes plugin."""
     _set_display_defaults()
     _register_widget_tools(ctx)
     ctx.register_platform(
@@ -1258,7 +1258,7 @@ def register(ctx):
         validate_config=validate_config,
         is_connected=is_connected,
         required_env=["AGENTUI_URL", "AGENTUI_TOKEN"],
-        install_hint="Aucune dépendance supplémentaire (websockets est fourni par Hermes)",
+        install_hint="No additional dependency (websockets is provided by Hermes)",
         env_enablement_fn=_env_enablement,
         cron_deliver_env_var="AGENTUI_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send,

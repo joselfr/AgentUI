@@ -3,25 +3,25 @@ label: AgentUI
 kind: platform
 version: 0.1.0
 description: >
-  Canal AgentUI pour Hermes Agent : le gateway Hermes se connecte à AgentUI
-  (WebSocket sortante) et relaie messages, streaming, outils, approbations
-  et messages proactifs (crons) selon l'AgentUI Channel Protocol v1.
+  AgentUI channel for Hermes Agent: the Hermes gateway connects to AgentUI
+  (outgoing WebSocket) and relays messages, streaming, tools, approvals
+  and proactive messages (crons) using the AgentUI Channel Protocol v1.
 author: AgentUI
 requires_env:
   - name: AGENTUI_URL
-    description: "URL WebSocket de la gateway AgentUI (ex. wss://agentui.example.com/gateway)"
+    description: "WebSocket URL of the AgentUI gateway (e.g. wss://agentui.example.com/gateway)"
     prompt: "URL AgentUI"
     password: false
   - name: AGENTUI_TOKEN
-    description: "Token de l'agent déclaré dans agents.config.yaml d'AgentUI"
+    description: "Agent token declared in AgentUI's agents.config.yaml"
     prompt: "Token AgentUI"
     password: true
 optional_env:
   - name: AGENTUI_NAME
-    description: "Nom affiché dans AgentUI (défaut : Hermes)"
-    prompt: "Nom affiché"
+    description: "Name displayed in AgentUI (default: Hermes)"
+    prompt: "Display name"
     password: false
   - name: AGENTUI_HOME_CHANNEL
-    description: "Discussion qui reçoit les crons deliver=agentui (défaut : home = discussion « maison » d'AgentUI)"
-    prompt: "Discussion maison"
+    description: "Chat that receives the deliver=agentui crons (default: home = AgentUI's \"home\" chat)"
+    prompt: "Home chat"
     password: false

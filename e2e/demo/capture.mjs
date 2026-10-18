@@ -1,5 +1,5 @@
-// Captures du site de présentation (docs/img) à partir d'une instance AgentUI branchée sur e2e/demo/fake-agent.mjs.
-//   node e2e/demo/capture.mjs <baseUrl> <utilisateur> <mot-de-passe> <dossier-sortie>
+// Captures for the presentation site (docs/img) from an AgentUI instance wired to e2e/demo/fake-agent.mjs.
+//   node e2e/demo/capture.mjs <baseUrl> <user> <password> <output-folder>
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 
@@ -7,7 +7,7 @@ const [base, user, pass, out] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 const AGENT = 'Atlas';
 
-// Chaque scénario : message envoyé, nom de la capture, attente de fin.
+// Each scenario: message sent, capture name, wait for completion.
 const SCENARIOS = [
   { id: 'chart', prompt: 'Montre-moi l’évolution des ventes de cette année', ready: 'canvas', blocking: false },
   { id: 'table', prompt: 'Fais-moi un comparatif des offres', ready: 'table', blocking: false },
@@ -18,7 +18,7 @@ const SCENARIOS = [
   { id: 'form', prompt: 'Organise mon voyage à Lyon', ready: 'text=Lancer la recherche', blocking: true },
 ];
 
-// Hors scénarios joués : discussion d'une tâche cron (créée par le message proactif) et page « Tâches ».
+// Outside the played scenarios: chat of a cron task (created by the proactive message) and the "Tasks" page.
 const EXTRA = [
   { id: 'cron', ready: 'table' },
   { id: 'jobs', ready: 'text=Sauvegarde nocturne', path: '/jobs' },
@@ -43,14 +43,14 @@ const ctxOpts = (name) => ({
 });
 const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStorage.setItem('themeMode', JSON.stringify(t)), theme); return ctx; };
 
-// 1. Desktop sombre (thème par défaut) : on joue chaque scénario (crée les discussions) et on capture
+// 1. Dark desktop (default theme): each scenario is played (creates the chats) and captured
 {
   const ctx = await themed(await browser.newContext(ctxOpts('desktop')), 'dark');
   const page = await ctx.newPage();
   await login(page);
   for (const s of SCENARIOS) {
     await page.getByRole('button', { name: 'Nouvelle conversation', exact: true }).click();
-    await page.getByRole('button', { name: 'Démarrer' }).click({ timeout: 3000 }).catch(() => {}); // choix de l'agent
+    await page.getByRole('button', { name: 'Démarrer' }).click({ timeout: 3000 }).catch(() => {}); // agent choice
     const box = page.getByPlaceholder(`Message à ${AGENT}`);
     await box.fill(s.prompt);
     await box.press('Enter');
@@ -58,11 +58,11 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
     if (!s.blocking) await page.locator('[aria-label="Arrêter"]').waitFor({ state: 'detached', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(s.settle ?? 2500);
     ids[s.id] = idOf(page);
-    if (s.blocking) { await page.reload(); await page.locator(s.ready).first().waitFor({ timeout: 30000 }); await page.waitForTimeout(1500); } // titres de la liste à jour
+    if (s.blocking) { await page.reload(); await page.locator(s.ready).first().waitFor({ timeout: 30000 }); await page.waitForTimeout(1500); } // up-to-date list titles
     await page.screenshot({ path: `${out}/desktop-dark-${s.id}.png` });
     console.log('desktop-dark', s.id, ids[s.id]);
   }
-  // Discussion de cron : section « Tâches cron » de la liste, puis page « Tâches »
+  // Cron chat: "Cron tasks" section of the list, then the "Tasks" page
   await page.getByRole('button', { name: /^Tâches cron/ }).click();
   await page.getByText('⏰ Résumé du matin').first().click();
   await page.locator('table').first().waitFor({ timeout: 15000 });
@@ -71,14 +71,14 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
   await page.screenshot({ path: `${out}/desktop-dark-cron.png` });
   await page.getByRole('button', { name: /^Tâches/ }).first().click();
   await page.getByText('Sauvegarde nocturne').first().waitFor({ timeout: 15000 });
-  await page.mouse.move(900, 900); // l'info-bulle du menu ne doit pas apparaître
+  await page.mouse.move(900, 900); // the menu tooltip must not appear
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${out}/desktop-dark-jobs.png` });
   console.log('desktop-dark cron/jobs', ids.cron);
   await ctx.close();
 }
 
-// 2. Autres variantes : on rouvre les discussions existantes
+// 2. Other variants: reopen the existing chats
 for (const [name, theme, only] of [
   ['desktop-light', 'light', ['chart', 'table', 'map', 'code', 'confirm', 'form', 'progress', 'cron', 'jobs']],
   ['mobile-dark', 'dark', ['chart', 'table', 'map', 'progress', 'code', 'confirm', 'form', 'cron', 'jobs']],
@@ -94,7 +94,7 @@ for (const [name, theme, only] of [
     await page.screenshot({ path: `${out}/${name}-${s.id}.png` });
     console.log(name, s.id);
   }
-  if (name === 'mobile-dark') { // liste des discussions en tiroir
+  if (name === 'mobile-dark') { // chat list in a drawer
     await page.goto(`${base}/c/${ids.chart}`);
     await page.getByRole('button', { name: /discussions|menu/i }).first().click().catch(() => {});
     await page.waitForTimeout(800);

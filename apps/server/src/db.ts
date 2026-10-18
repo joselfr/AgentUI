@@ -3,7 +3,7 @@ import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-// createRequire : évite que Vite/vitest ne retire le préfixe `node:` de node:sqlite
+// createRequire: prevents Vite/vitest from stripping the `node:` prefix from node:sqlite
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as typeof import('node:sqlite');
 
 export type DB = DatabaseSyncType;
@@ -92,16 +92,16 @@ export function openDb(dataDir: string): DB {
     CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `);
   try {
-    // Dernière lecture de la discussion (ms) : les messages d'agent plus récents sont « non lus ».
+    // Last read of the chat (ms): agent messages more recent than this are "unread".
     db.exec('ALTER TABLE conversations ADD COLUMN last_read_at INTEGER');
-    db.exec('UPDATE conversations SET last_read_at = updated_at'); // migration : l'existant est considéré comme lu
-  } catch { /* colonne déjà présente */ }
-  try { db.exec('ALTER TABLE conversations ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0'); } catch { /* colonne déjà présente */ }
-  try { db.exec('ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch { /* colonne déjà présente */ }
-  try { db.exec('ALTER TABLE conversations ADD COLUMN usage TEXT'); } catch { /* colonne déjà présente */ }
-  try { db.exec('ALTER TABLE messages ADD COLUMN pending_question TEXT'); } catch { /* colonne déjà présente */ }
+    db.exec('UPDATE conversations SET last_read_at = updated_at'); // migration: existing rows are considered read
+  } catch { /* column already present */ }
+  try { db.exec('ALTER TABLE conversations ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0'); } catch { /* column already present */ }
+  try { db.exec('ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch { /* column already present */ }
+  try { db.exec('ALTER TABLE conversations ADD COLUMN usage TEXT'); } catch { /* column already present */ }
+  try { db.exec('ALTER TABLE messages ADD COLUMN pending_question TEXT'); } catch { /* column already present */ }
   for (const col of ['reasoning TEXT', 'summary TEXT', 'session_id TEXT']) {
-    try { db.exec(`ALTER TABLE subagent_runs ADD COLUMN ${col}`); } catch { /* colonne déjà présente */ }
+    try { db.exec(`ALTER TABLE subagent_runs ADD COLUMN ${col}`); } catch { /* column already present */ }
   }
   return db;
 }

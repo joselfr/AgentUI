@@ -1,7 +1,7 @@
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 
-// Typage minimal : ce fichier s'exécute dans un ServiceWorker (lib DOM utilisée pour le build du reste de l'app).
+// Minimal typing: this file runs in a ServiceWorker (DOM lib used for the build of the rest of the app).
 declare const self: any;
 
 precacheAndRoute(self.__WB_MANIFEST);
@@ -27,12 +27,12 @@ self.addEventListener('push', (event: any) => {
   }
   event.waitUntil(
     (async () => {
-      // Pas de notification si l'application est déjà ouverte au premier plan : l'utilisateur voit la réponse arriver.
+      // No notification if the app is already open in the foreground: the user sees the reply arrive.
       const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       if (wins.some((w: any) => w.visibilityState === 'visible' && w.focused)) return;
       await self.registration.showNotification(data.title, {
         body: data.body,
-        tag: data.tag, // une seule notification par conversation
+        tag: data.tag, // a single notification per chat
         icon: '/icon.svg',
         badge: '/icon.svg',
         data: { url: data.url },

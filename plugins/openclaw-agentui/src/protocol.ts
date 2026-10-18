@@ -19,14 +19,14 @@ export interface Capabilities {
   skills: boolean;
   jobs: boolean;
   jobControl: boolean;
-  /** Suppression de la session de plateforme quand l'utilisateur supprime la discussion (rpc deleteSession). */
+  /** Deletion of the platform session when the user deletes the chat (rpc deleteSession). */
   sessionDelete?: boolean;
-  /** Modèle d'une discussion : rpc listModels / setModel / sessionUsage et événement `usage`. */
+  /** Model of a chat: rpc listModels / setModel / sessionUsage and `usage` event. */
   models?: boolean;
   attachments: { images: boolean; files: boolean; maxBytes: number };
 }
 
-/** Modèle et consommation cumulée d'une session. */
+/** Model and accumulated consumption of a session. */
 export interface Usage {
   model?: string;
   provider?: string;

@@ -8,7 +8,7 @@ import type { AgentAdapter } from './agents/types.js';
 import { RunManager } from './runs.js';
 import { hashPassword, verifyPassword } from './auth.js';
 
-test('run : persistance du texte et des outils, événements rejouables', async () => {
+test('run: persistence of text and tools, replayable events', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   async function* events() {
     yield { type: 'run.started' as const };
@@ -43,13 +43,13 @@ test('run : persistance du texte et des outils, événements rejouables', async 
   expect(runs.isRunning(conv.id)).toBe(false);
 });
 
-test('mots de passe scrypt', () => {
+test('scrypt passwords', () => {
   const h = hashPassword('secret123');
   expect(verifyPassword('secret123', h)).toBe(true);
   expect(verifyPassword('nope', h)).toBe(false);
 });
 
-test('recover : un run « streaming » est repris, ou marqué interrompu si la reprise est impossible', async () => {
+test('recover: a "streaming" run is resumed, or marked interrupted if resuming is impossible', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const mk = (resume: unknown) =>
     ({ id: 'a', name: 'A', type: 'fake', resume, abort: async () => {} }) as unknown as import('./agents/types.js').AgentAdapter;
@@ -59,7 +59,7 @@ test('recover : un run « streaming » est repris, ou marqué interrompu si la r
   };
   const seed = (runs: RunManager) => {
     const conv = runs.createConversation('a', undefined, 't', 'sess');
-    db.prepare("INSERT INTO messages (id, conversation_id, role, text, run_id, status, created_at) VALUES ('m-' || ?, ?, 'assistant', 'début', 'r', 'streaming', 1)").run(conv.id, conv.id);
+    db.prepare("INSERT INTO messages (id, conversation_id, role, text, run_id, status, created_at) VALUES ('m-' || ?, ?, 'assistant', 'start', 'r', 'streaming', 1)").run(conv.id, conv.id);
     return conv.id;
   };
 
@@ -74,10 +74,10 @@ test('recover : un run « streaming » est repris, ou marqué interrompu si la r
   const c2 = seed(ko);
   expect(await ko.recover()).toBe(0);
   expect(ko.getMessages(c2)[0]).toMatchObject({ status: 'failed' });
-  expect(ko.getMessages(c2)[0]!.text).toContain('interrompu');
+  expect(ko.getMessages(c2)[0]!.text).toContain('interrupted');
 });
 
-test('suppression : la session de plateforme est supprimée avant la discussion', async () => {
+test('deletion: the platform session is deleted before the chat', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const calls: string[] = [];
   const adapter = {
@@ -96,11 +96,11 @@ test('suppression : la session de plateforme est supprimée avant la discussion'
   expect(calls).toEqual(['delete:sess-1']);
   expect(runs.getConversation(conv.id)).toBeUndefined();
   expect(runs.getMessages(conv.id)).toEqual([]);
-  await runs.deleteConversation(conv.id); // discussion déjà absente : sans effet, sans nouvel appel
+  await runs.deleteConversation(conv.id); // chat already absent: no effect, no new call
   expect(calls).toEqual(['delete:sess-1']);
 });
 
-test('suppression : refus du plugin ou agent sans suppression → la discussion est conservée', async () => {
+test('deletion: plugin refusal or agent without deletion → the chat is kept', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const keep = (runs: RunManager, conv: string) => {
     expect(runs.getConversation(conv)).toBeTruthy();
@@ -128,11 +128,11 @@ test('suppression : refus du plugin ou agent sans suppression → la discussion 
   const silent = { id: 'a', name: 'Agent', type: 'fake' } as unknown as AgentAdapter;
   const runs2 = new RunManager(db, new Map([['a', silent]]));
   const c2 = seed(runs2);
-  await expect(runs2.deleteConversation(c2)).rejects.toThrow(/n’est pas supportée/);
+  await expect(runs2.deleteConversation(c2)).rejects.toThrow(/is not supported/);
   keep(runs2, c2);
 });
 
-test('suppression : discussion « maison » ou sans session distante → suppression locale seule', async () => {
+test('deletion: "home" chat or chat without remote session → local deletion only', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const calls: string[] = [];
   const adapter = {
@@ -145,18 +145,18 @@ test('suppression : discussion « maison » ou sans session distante → suppres
   } as unknown as AgentAdapter;
   const runs = new RunManager(db, new Map([['a', adapter]]));
 
-  const home = runs.deliver('a', undefined, 'Rappel', [], 'A'); // messages proactifs : session « home »
+  const home = runs.deliver('a', undefined, 'Reminder', [], 'A'); // proactive messages: "home" session
   expect(home.remote_session_id).toBe('home');
   await runs.deleteConversation(home.id);
   expect(runs.getConversation(home.id)).toBeUndefined();
 
-  const bare = runs.createConversation('a'); // jamais utilisée : aucune session côté agent
+  const bare = runs.createConversation('a'); // never used: no session on the agent side
   await runs.deleteConversation(bare.id);
   expect(runs.getConversation(bare.id)).toBeUndefined();
   expect(calls).toEqual([]);
 });
 
-test('suppression : un run en cours est arrêté avant la suppression', async () => {
+test('deletion: a running run is stopped before the deletion', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const ctrl = new AbortController();
   const calls: string[] = [];
@@ -191,19 +191,19 @@ test('suppression : un run en cours est arrêté avant la suppression', async ()
   expect(runs.isRunning(conv.id)).toBe(false);
 });
 
-test('non lu : un message d’agent terminé plus récent que la dernière lecture', () => {
+test('unread: a finished agent message more recent than the last read', () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const runs = new RunManager(db, new Map());
   const unread = (id: string) => !!runs.getConversation(id)!.unread;
   const pushes: string[] = [];
   runs.subscribe((p) => p.type === 'conversation.read' && pushes.push(p.conversationId));
 
-  // Une discussion que l'utilisateur vient de créer n'est pas non lue
+  // A chat the user has just created is not unread
   const mine = runs.createConversation('a');
   expect(unread(mine.id)).toBe(false);
-  db.prepare('UPDATE conversations SET last_read_at = 1000 WHERE id = ?').run(mine.id); // lue il y a longtemps
+  db.prepare('UPDATE conversations SET last_read_at = 1000 WHERE id = ?').run(mine.id); // read a long time ago
 
-  // Réponse en cours de streaming : pas encore non lue ; terminée : non lue
+  // Reply being streamed: not unread yet; finished: unread
   const add = (conv: string, role: string, status: string, at: number) =>
     db.prepare('INSERT INTO messages (id, conversation_id, role, text, status, created_at) VALUES (?,?,?,?,?,?)').run(`m${at}${role}`, conv, role, 'x', status, at);
   const t = 2000;
@@ -214,55 +214,55 @@ test('non lu : un message d’agent terminé plus récent que la dernière lectu
   expect(unread(mine.id)).toBe(true);
   expect(runs.listConversations('a').find((c) => c.id === mine.id)!.unread).toBe(1);
 
-  // Les messages de l'utilisateur ne comptent pas
+  // User messages do not count
   const other = runs.createConversation('a');
   db.prepare('UPDATE conversations SET last_read_at = 1000 WHERE id = ?').run(other.id);
   add(other.id, 'user', 'done', t + 5);
   expect(unread(other.id)).toBe(false);
 
-  // Marquer lu : plus de non lu, et les autres appareils sont prévenus
+  // Mark read: no more unread, and the other devices are notified
   runs.markRead(mine.id);
   expect(unread(mine.id)).toBe(false);
   expect(pushes).toEqual([mine.id]);
 });
 
-test('non lu : message proactif dans une discussion existante ou créée par l’agent', async () => {
+test('unread: proactive message in an existing chat or one created by the agent', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const runs = new RunManager(db, new Map());
-  const first = runs.deliver('a', 'cron-x', 'Résultat 1', [], 'A', '⏰ x');
-  expect(!!runs.getConversation(first.id)!.unread).toBe(true); // créée par l'agent : non lue d'emblée
+  const first = runs.deliver('a', 'cron-x', 'Result 1', [], 'A', '⏰ x');
+  expect(!!runs.getConversation(first.id)!.unread).toBe(true); // created by the agent: unread from the start
   runs.markRead(first.id);
   expect(!!runs.getConversation(first.id)!.unread).toBe(false);
   await new Promise((r) => setTimeout(r, 5));
-  runs.deliver('a', 'cron-x', 'Résultat 2', [], 'A', '⏰ x');
-  expect(!!runs.getConversation(first.id)!.unread).toBe(true); // nouveau message après la lecture
+  runs.deliver('a', 'cron-x', 'Result 2', [], 'A', '⏰ x');
+  expect(!!runs.getConversation(first.id)!.unread).toBe(true); // new message after the read
   expect(runs.listConversations('a')).toHaveLength(1);
 });
 
-test('recherche : titres et messages, sans casse ni accents, tous les mots requis, extrait surligné', () => {
+test('search: titles and messages, case- and accent-insensitive, all words required, highlighted excerpt', () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const runs = new RunManager(db, new Map());
   const a = runs.deliver('a', 's1', 'On se voit cet été à Lisbonne pour le déjeuner', [], 'A', 'Vacances');
   const b = runs.deliver('a', 's2', 'Rien à voir avec le sujet', [], 'A', 'Été au Portugal');
   runs.deliver('a', 's3', 'Un sujet sans rapport', [], 'A', 'Autre');
-  // accents et casse ignorés ; le titre passe avant les messages
+  // accents and case ignored; the title comes before the messages
   expect(runs.search('ETE').map((h) => h.id)).toEqual([b.id, a.id]);
   const inTitle = runs.search('ete')[0]!;
   expect(inTitle.inTitle).toBe(true);
-  // tous les mots doivent figurer (dans le titre, ou dans un même message)
+  // all words must appear (in the title, or in a single message)
   expect(runs.search('ete lisbonne').map((h) => h.id)).toEqual([a.id]);
   expect(runs.search('lisbonne portugal')).toEqual([]);
-  // extrait autour du mot trouvé, plages à surligner dans l'extrait
+  // excerpt around the word found, ranges to highlight in the excerpt
   const hit = runs.search('lisbonne')[0]!;
   expect(hit.inTitle).toBe(false);
   expect(hit.snippet).toContain('Lisbonne');
   expect(hit.marks!.map(([i, n]) => hit.snippet!.slice(i, i + n))).toEqual(['Lisbonne']);
-  // requête trop courte ou vide
+  // query too short or empty
   expect(runs.search('e')).toEqual([]);
   expect(runs.search('   ')).toEqual([]);
 });
 
-test('archivage : le drapeau est enregistré, conservé et restitué avec les discussions', () => {
+test('archiving: the flag is stored, kept and returned with the chats', () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const runs = new RunManager(db, new Map());
   const c = runs.deliver('a', 's1', 'Bonjour archive', [], 'A', 'À ranger');
@@ -270,12 +270,12 @@ test('archivage : le drapeau est enregistré, conservé et restitué avec les di
   runs.setArchived(c.id, true);
   expect(!!runs.getConversation(c.id)!.archived).toBe(true);
   expect(runs.listConversations('a').find((x) => x.id === c.id)!.archived).toBe(1);
-  expect(runs.search('archive')[0]!.archived).toBe(true); // retrouvée par la recherche, signalée archivée
+  expect(runs.search('archive')[0]!.archived).toBe(true); // found by the search, flagged archived
   runs.setArchived(c.id, false);
   expect(!!runs.getConversation(c.id)!.archived).toBe(false);
 });
 
-test('consommation : l’événement usage est mémorisé, rediffusé et ne perturbe pas le message', async () => {
+test('consumption: the usage event is stored, rebroadcast and does not disturb the message', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const usage = { model: 'deepseek-flash', provider: 'deepseek', inputTokens: 1200, outputTokens: 340, costUsd: 0.0123, costEstimated: true };
   const adapter = {
@@ -299,14 +299,14 @@ test('consommation : l’événement usage est mémorisé, rediffusé et ne pert
   expect(JSON.parse(runs.getConversation(conv.id)!.usage!)).toEqual(usage);
   expect(runs.getMessages(conv.id).at(-1)).toMatchObject({ role: 'assistant', text: 'Bonjour', status: 'done' });
   expect(pushes.filter((p) => p.type === 'event').map((p) => p.event.type)).toEqual(['message.final', 'usage', 'run.completed']);
-  // identifiant de session distante créé à la demande (choix du modèle avant le premier message), puis conservé
+  // remote session identifier created on demand (model choice before the first message), then kept
   const fresh = runs.createConversation('a');
   const sid = runs.ensureRemoteSession(fresh.id);
   expect(sid).toBeTruthy();
   expect(runs.ensureRemoteSession(fresh.id)).toBe(sid);
 });
 
-test('question de l\'agent : la réponse reprend le run en cours, sans en ouvrir un autre', async () => {
+test('agent question: the answer resumes the current run, without opening another one', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const replies: string[] = [];
   let push!: (e: AgentEvent) => void;
@@ -333,15 +333,15 @@ test('question de l\'agent : la réponse reprend le run en cours, sans en ouvrir
   const runs = new RunManager(db, new Map([['a', adapter]]));
   const finished = new Promise<string>((r) => (runs.onRunFinished = (_c, o) => r(o)));
   const conv = runs.createConversation('a');
-  await runs.start(conv.id, 'refais un form');
+  await runs.start(conv.id, 'redo a form');
   expect(runs.awaitingReply(conv.id)).toBe(false);
-  await expect(runs.reply(conv.id, 'x')).rejects.toThrow(); // pas de question en attente → pas de réponse
+  await expect(runs.reply(conv.id, 'x')).rejects.toThrow(); // no pending question → no answer
   push({ type: 'question.requested', id: 'q1' });
   await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(true));
-  expect(runs.getMessages(conv.id).at(-1)!.pendingQuestion).toBe('q1'); // persistée : un rechargement de la page la retrouve
+  expect(runs.getMessages(conv.id).at(-1)!.pendingQuestion).toBe('q1'); // persisted: a page reload finds it again
 
-  await runs.reply(conv.id, 'Un autre thème');
-  expect(replies).toEqual(['Un autre thème']);
+  await runs.reply(conv.id, 'Another theme');
+  expect(replies).toEqual(['Another theme']);
   push({ type: 'question.resolved', id: 'q1' });
   await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(false));
   expect(runs.getMessages(conv.id).at(-1)!.pendingQuestion).toBeUndefined();
@@ -349,7 +349,7 @@ test('question de l\'agent : la réponse reprend le run en cours, sans en ouvrir
   end();
   expect(await finished).toBe('completed');
   const msgs = runs.getMessages(conv.id);
-  expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user']); // un seul run, la réponse est enregistrée
+  expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user']); // a single run, the answer is recorded
   expect(msgs[1]!.text).toBe('Voici');
-  expect(msgs[2]!.text).toBe('Un autre thème');
+  expect(msgs[2]!.text).toBe('Another theme');
 });

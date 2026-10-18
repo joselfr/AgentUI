@@ -28,7 +28,7 @@ export function ensureAdmin(db: DB, user?: string, password?: string): void {
   const count = (db.prepare('SELECT COUNT(*) AS c FROM users').get() as { c: number }).c;
   if (count > 0) return;
   if (!user || !password) {
-    throw new Error('Aucun utilisateur : définir ADMIN_USER et ADMIN_PASSWORD au premier démarrage.');
+    throw new Error('No user: set ADMIN_USER and ADMIN_PASSWORD on first start.');
   }
   db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)').run(
     user,
@@ -41,7 +41,7 @@ export function login(db: DB, username: string, password: string): { token: stri
   const row = db.prepare('SELECT id, username, password_hash FROM users WHERE username = ?').get(username) as
     | { id: number; username: string; password_hash: string }
     | undefined;
-  // Coût constant même si l'utilisateur n'existe pas
+  // Constant cost even if the user does not exist
   const ok = verifyPassword(password, row?.password_hash ?? 'scrypt$00$00');
   if (!row || !ok) return null;
   const token = randomBytes(32).toString('base64url');
@@ -77,7 +77,7 @@ export function changePassword(db: DB, userId: number, oldPw: string, newPw: str
   return true;
 }
 
-/** Limiteur simple en mémoire : max `limit` échecs par clé sur `windowMs`. */
+/** Simple in-memory limiter: at most `limit` failures per key over `windowMs`. */
 export class RateLimiter {
   private hits = new Map<string, number[]>();
   constructor(private limit = 8, private windowMs = 10 * 60 * 1000) {}

@@ -8,10 +8,10 @@ interface Table { title?: string; caption?: string; columns: Column[]; rows: Cel
 
 const MAX_COLUMNS = 12;
 const MAX_ROWS = 200;
-const FOLD_ROWS = 10; // au-delà, les PEEK_ROWS premières lignes seulement
+const FOLD_ROWS = 10; // beyond that, only the first PEEK_ROWS rows
 const PEEK_ROWS = 8;
 
-/** Arguments du widget `table` : `{ title?, caption?, columns: [{ label, kind?: text|number, unit? }], rows: [[cellule, …], …] }`. `undefined` si invalide. */
+/** Arguments of the `table` widget: `{ title?, caption?, columns: [{ label, kind?: text|number, unit? }], rows: [[cell, …], …] }`. `undefined` if invalid. */
 export function parseTable(a: Record<string, unknown>): Table | undefined {
   const { columns, rows } = a as { columns?: unknown; rows?: unknown };
   if (!Array.isArray(columns) || !columns.length || columns.length > MAX_COLUMNS || !Array.isArray(rows) || rows.length > MAX_ROWS) return undefined;
@@ -51,7 +51,7 @@ export default function TableCard({ table: t }: { table: Table }) {
     if (!sort) return t.rows;
     const { col, dir } = sort;
     const num = t.columns[col]!.kind === 'number';
-    // Les cellules vides restent en fin de tableau, quel que soit le sens.
+    // Empty cells stay at the end of the table, whichever the direction.
     return [...t.rows].sort((x, y) => {
       const u = x[col], v = y[col];
       if (u === null) return v === null ? 0 : 1;
@@ -64,7 +64,7 @@ export default function TableCard({ table: t }: { table: Table }) {
   const visible = folded ? sorted.slice(0, PEEK_ROWS) : sorted;
 
   const clickHeader = (col: number) => {
-    const first = t.columns[col]!.kind === 'number' ? -1 : 1; // nombres : du plus grand au plus petit d'abord
+    const first = t.columns[col]!.kind === 'number' ? -1 : 1; // numbers: largest to smallest first
     setSort((s) => (!s || s.col !== col ? { col, dir: first } : s.dir === first ? { col, dir: (-first) as 1 | -1 } : null));
   };
   const copy = () => void navigator.clipboard?.writeText(csv(t)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });

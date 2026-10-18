@@ -5,7 +5,7 @@ import type { AgentInfo } from '@agentui/shared';
 import StatusDot from './StatusDot';
 import { t } from '../i18n';
 
-/** Barre du haut du chat : bouton d'affichage de la liste, titre de la discussion, agent et son état de connexion. */
+/** Chat top bar: list toggle button, chat title, agent and its connection status. */
 export default function ChatHeader({ title, agent, showListButton, onShowList }: { title: string; agent?: AgentInfo; showListButton: boolean; onShowList: () => void }) {
   return (
     <AppBar position="static" color="transparent" elevation={0}

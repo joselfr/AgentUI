@@ -25,7 +25,7 @@ import { toOutgoing, type AttachmentView } from './attachments';
 import { t, useLang } from './i18n';
 
 export default function App() {
-  useLang(); // redessine tout l'arbre au changement de langue : les composants appellent `t()` directement
+  useLang(); // re-renders the whole tree on language change: components call `t()` directly
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
   const [themeMode, setThemeMode] = usePersisted<ThemeMode>('themeMode', 'dark');
   const [expandTools, setExpandTools] = usePersisted<boolean>('expandTools', false);
@@ -35,19 +35,19 @@ export default function App() {
   const [auth, setAuth] = useState<'loading' | 'out' | 'in'>('loading');
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [convs, setConvs] = useState<Conversation[]>([]);
-  // La route est la source de vérité : `/` nouvelle conversation, `/c/:id` une discussion, `/agents` `/skills` `/jobs` les autres pages.
+  // The route is the source of truth: `/` new conversation, `/c/:id` a chat, `/agents` `/skills` `/jobs` the other pages.
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const currentId = matchPath('/c/:id', pathname)?.params.id;
   const view: View = (['agents', 'skills', 'jobs'] as const).find((v) => pathname === `/${v}`) ?? 'chats';
   const setCurrentId = useCallback((id: string | undefined, replace = false) => navigate(id ? `/c/${id}` : '/', { replace }), [navigate]);
-  const chatPath = useRef('/'); // dernière route Discussions, rouverte en revenant d'une autre page
+  const chatPath = useRef('/'); // last Chats route, reopened when coming back from another page
   if (view === 'chats') chatPath.current = pathname;
-  const [savedId] = useState(() => load<string | null>('currentId', null)); // discussion ouverte à la dernière visite, rouverte si l'app démarre sur `/`
+  const [savedId] = useState(() => load<string | null>('currentId', null)); // chat open at the last visit, reopened if the app starts on `/`
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
-  const msgCache = useRef(new Map<string, Message[]>()); // dernier état connu de chaque conversation (affiché hors ligne)
-  const createdRef = useRef<string>(); // conversation créée par l'envoi en cours : ses messages optimistes sont déjà affichés
+  const msgCache = useRef(new Map<string, Message[]>()); // last known state of each conversation (shown offline)
+  const createdRef = useRef<string>(); // conversation created by the send in progress: its optimistic messages are already displayed
   const [running, setRunning] = useState(false);
   const [approval, setApproval] = useState<{ id: string; description: string }>();
   const [error, setError] = useState<string>();
@@ -61,13 +61,13 @@ export default function App() {
   const [convsLoaded, setConvsLoaded] = useState(false);
   const currentRef = useRef<string>();
   currentRef.current = currentId;
-  // « Lu » = discussion ouverte, page Discussions affichée et onglet visible ; sinon les nouveaux messages restent non lus.
+  // "Read" = chat open, Chats page shown and tab visible; otherwise new messages stay unread.
   const [pageVisible, setPageVisible] = useState(() => document.visibilityState === 'visible');
   const viewing = view === 'chats' && pageVisible;
   const viewingRef = useRef(viewing);
   viewingRef.current = viewing;
-  const openedRef = useRef<string>(); // discussion dont le repère « non lus » a déjà été calculé pour cette ouverture
-  const [unreadMark, setUnreadMark] = useState<{ id: string; count: number }>(); // premier message non lu à l'ouverture
+  const openedRef = useRef<string>(); // chat whose "unread" marker was already computed for this opening
+  const [unreadMark, setUnreadMark] = useState<{ id: string; count: number }>(); // first unread message at opening
   useEffect(() => {
     const onVis = () => setPageVisible(document.visibilityState === 'visible');
     document.addEventListener('visibilitychange', onVis);
@@ -83,7 +83,7 @@ export default function App() {
 
   const setConvUsage = useCallback((id: string, usage: Usage) => setConvs((cs) => cs.map((c) => (c.id === id ? { ...c, usage } : c))), []);
 
-  /** Rafraîchit la liste ; si la discussion est en cours de lecture, la marque lue d'abord (pas de flash « non lu »). */
+  /** Refreshes the list; if the chat is being read, marks it read first (no "unread" flash). */
   const syncConvs = useCallback((id?: string) => {
     const refresh = () => api.conversations().then(setConvs).catch(() => {});
     if (id && id === currentRef.current && viewingRef.current) {
@@ -104,7 +104,7 @@ export default function App() {
       setMessages(r.messages);
       setRunning(r.conversation.running);
       setLoadingMsgs(false);
-      if (openedRef.current !== id) { // première lecture de cette ouverture : repère du premier message non lu
+      if (openedRef.current !== id) { // first read of this opening: marker of the first unread message
         openedRef.current = id;
         const fresh = r.messages.filter((m) => m.role === 'assistant' && m.status !== 'streaming' && m.createdAt > r.conversation.lastReadAt);
         setUnreadMark(fresh.length ? { id: fresh[0]!.id, count: fresh.length } : undefined);
@@ -115,7 +115,7 @@ export default function App() {
 
   useEffect(() => { api.me().then((r) => setAuth(r.user ? 'in' : 'out')).catch(() => setAuth('out')); }, []);
   useEffect(() => { if (auth === 'in') refreshLists(); }, [auth, refreshLists]);
-  // Lien de notification : l'ancien `/?c=<id>` devient `/c/<id>`, et le service worker demande d'ouvrir une route d'une fenêtre déjà ouverte
+  // Notification link: the old `/?c=<id>` becomes `/c/<id>`, and the service worker asks to open a route in an already open window
   const restored = useRef(false);
   useEffect(() => {
     if (auth !== 'in') return;
@@ -124,7 +124,7 @@ export default function App() {
     else if (!restored.current && pathname === '/' && savedId) navigate(`/c/${savedId}`, { replace: true });
     restored.current = true;
   }, [auth, pathname, search, savedId, navigate]);
-  // Route inconnue : retour à l'accueil
+  // Unknown route: back to home
   useEffect(() => {
     if (auth === 'in' && !currentId && !['/', '/agents', '/skills', '/jobs'].includes(pathname)) navigate('/', { replace: true });
   }, [auth, currentId, pathname, navigate]);
@@ -135,7 +135,7 @@ export default function App() {
       const u = new URL(e.data.url, location.origin);
       const id = u.searchParams.get('c');
       const to = id ? `/c/${id}` : u.pathname + u.search;
-      // Liste à jour d'abord : une discussion créée par un cron n'y figure pas encore, et serait écartée comme inconnue
+      // Refresh the list first: a chat created by a cron is not in it yet, and would be dropped as unknown
       void Promise.resolve(refreshLists()).then(() => navigate(to));
     };
     navigator.serviceWorker?.addEventListener('message', onMsg);
@@ -144,7 +144,7 @@ export default function App() {
   useEffect(() => {
     if (agents.length && !agents.some((a) => a.id === newAgent)) setNewAgent(agents[0]!.id);
   }, [agents, newAgent]);
-  // Reprise de l'état au rechargement : page, conversation ouverte, agent de la prochaine conversation
+  // Restore state on reload: page, open chat, agent of the next conversation
   useEffect(() => { save('listOpen', listOpen); }, [listOpen]);
   useEffect(() => { save('currentId', currentId ?? null); }, [currentId]);
   useEffect(() => { save('newAgent', newAgent ?? null); save('newSub', sub ?? null); }, [newAgent, sub]);
@@ -153,17 +153,17 @@ export default function App() {
     setApproval(undefined); setError(undefined);
     openedRef.current = undefined; setUnreadMark(undefined);
     if (auth !== 'in') return;
-    // Jamais les messages de la conversation précédente : cache local ou vide, le temps du chargement
+    // Never the previous conversation's messages: local cache or empty, while loading
     if (currentId && currentId === createdRef.current) { createdRef.current = undefined; openedRef.current = currentId; return; }
     setRunning(false);
     if (currentId) {
       setMessages(msgCache.current.get(currentId) ?? []); setLoadingMsgs(true); loadMessages(currentId);
-      api.usage(currentId).then((u) => { if (u) setConvUsage(currentId, u); }).catch(() => {}); // modèle et coût même pour une ancienne discussion
+      api.usage(currentId).then((u) => { if (u) setConvUsage(currentId, u); }).catch(() => {}); // model and cost even for an old chat
     }
     else { setMessages([]); setLoadingMsgs(false); }
   }, [auth, currentId, loadMessages, setConvUsage]);
 
-  // Retour sur la page Discussions / l'onglet : ce qui est arrivé entre-temps est repéré comme non lu, puis marqué lu
+  // Back on the Chats page / tab: what arrived in the meantime is flagged as unread, then marked read
   const wasViewing = useRef(viewing);
   useEffect(() => {
     if (viewing && !wasViewing.current && currentId && auth === 'in') { openedRef.current = undefined; loadMessages(currentId); }
@@ -171,8 +171,8 @@ export default function App() {
   }, [viewing, currentId, auth, loadMessages]);
 
   const onEvent = useCallback((e: LiveEvent) => {
-    if (e.event.type === 'usage') { setConvUsage(e.sessionId, e.event.usage); return; } // consommation de la session : pas un message
-    if (e.event.type === 'message.added') { // message proactif (cron, envoi spontané) : hors de tout run
+    if (e.event.type === 'usage') { setConvUsage(e.sessionId, e.event.usage); return; } // session consumption: not a message
+    if (e.event.type === 'message.added') { // proactive message (cron, spontaneous send): outside any run
       syncConvs(e.sessionId);
       if (e.sessionId === currentRef.current) loadMessages(e.sessionId);
       return;
@@ -181,11 +181,11 @@ export default function App() {
     const terminal = ['run.completed', 'run.failed', 'run.aborted'].includes(e.event.type);
     if (terminal) { setApproval(undefined); syncConvs(e.sessionId); }
     if (e.sessionId !== currentRef.current) return;
-    if (e.event.type === 'subagent.sync' || e.event.type === 'attachment.added') { loadMessages(e.sessionId); return; } // mise à jour hors flux (sous-agent suivi, média tardif) : pas de run en cours
+    if (e.event.type === 'subagent.sync' || e.event.type === 'attachment.added') { loadMessages(e.sessionId); return; } // out-of-stream update (tracked sub-agent, late media): no run in progress
     if (terminal) setRunning(false);
     setMessages((prev) => {
       const next = applyEvent(prev, e.event);
-      if (next === null) { loadMessages(e.sessionId); return prev; } // run lancé depuis un autre appareil
+      if (next === null) { loadMessages(e.sessionId); return prev; } // run started from another device
       return next;
     });
     if (!terminal) setRunning(true);
@@ -212,7 +212,7 @@ export default function App() {
         currentRef.current = createdRef.current = id = c.id;
         setCurrentId(id, true);
       }
-      const answering = running && awaitingReply(messages); // réponse à une question de l'agent : le run en cours se poursuit
+      const answering = running && awaitingReply(messages); // reply to an agent question: the current run continues
       const attachments = await toOutgoing(files);
       const views: AttachmentView[] = files.map((f, i) => ({ id: `local-${Date.now()}-${i}`, name: f.name, mimeType: f.type, size: f.size, url: URL.createObjectURL(f) }));
       setMessages((m) => [...m,
@@ -232,7 +232,7 @@ export default function App() {
 
   const agentId = agent?.id;
   const loadModels = useCallback(() => api.models(agentId!), [agentId]);
-  /** Change le modèle de la discussion ouverte ; sans discussion, on en crée une (vide) pour y rattacher le choix. */
+  /** Changes the model of the open chat; without a chat, creates an empty one to attach the choice to. */
   const pickModel = async (o: ModelOption) => {
     let id = currentId;
     if (!id) {
@@ -247,8 +247,8 @@ export default function App() {
   };
   const closeDrawer = () => { if (!wide) setDrawer(false); };
   const { toggleFavorite, renameConv, archiveConv, archiveMany, deleteConv, deleteMany } = useConversationActions({ setConvs, setCurrentId, currentRef, guard, ask: askConfirm });
-  // Sur mobile, la barre de navigation vit dans le tiroir des discussions : fermer la liste libère toute la largeur.
-  // La discussion qu'on est en train de lire n'est jamais « non lue » à l'écran (le marquage côté serveur suit)
+  // On mobile, the navigation bar lives in the chats drawer: closing the list frees the full width.
+  // The chat being read is never "unread" on screen (the server-side marking follows)
   const shownConvs = useMemo(() => convs.map((c) => (c.unread && viewing && c.id === currentId ? { ...c, unread: false } : c)), [convs, viewing, currentId]);
   const unreadCount = shownConvs.filter((c) => c.unread && !c.archived).length;
   const nav = <NavRail unread={unreadCount} view={view} onView={(v) => { navigate(v === 'chats' ? chatPath.current : `/${v}`, { replace: !wide && drawer && v !== 'chats' }); if (v === 'chats') setDrawer(true); else closeDrawer(); }} onSettings={() => { setSettings(true); closeDrawer(); }} settingsOpen={settings} />;

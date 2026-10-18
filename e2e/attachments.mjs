@@ -1,4 +1,4 @@
-// E2E pièces jointes. Usage : node e2e/attachments.mjs <baseUrl> <DATA_DIR du serveur> <dossier-captures>
+// Attachments E2E. Usage: node e2e/attachments.mjs <baseUrl> <server DATA_DIR> <screenshots-folder>
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { deflateSync, crc32 } from 'node:zlib';
@@ -21,34 +21,34 @@ const page = await (await browser.newContext({ viewport: { width: 1280, height: 
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(base);
-await page.getByLabel('Utilisateur').fill(env.ADMIN_USER);
-await page.getByLabel('Mot de passe').fill(env.ADMIN_PASSWORD);
+await page.getByLabel('Username').fill(env.ADMIN_USER);
+await page.getByLabel('Password').fill(env.ADMIN_PASSWORD);
 await page.getByRole('button', { name: 'Se connecter' }).click();
 await page.getByText('Nouvelle conversation').first().waitFor();
 await page.getByRole('button', { name: /^Hermes/ }).first().click();
 await page.getByRole('button', { name: 'Nouvelle conversation' }).click();
 const input = page.getByTestId('file-input');
-const box = page.getByPlaceholder('Message à Hermes');
+const box = page.getByPlaceholder('Message Hermes');
 const waitIdle = async (ms = 120000) => {
-  await page.locator('[aria-label="Arrêter"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
-  const stop = page.locator('[aria-label="Arrêter"]');
+  await page.locator('[aria-label="Stop"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+  const stop = page.locator('[aria-label="Stop"]');
   await stop.waitFor({ state: 'detached', timeout: ms }).catch(async () => { await stop.click().catch(() => {}); });
 };
 
-// 1. PDF refusé sur Hermes (images + texte seulement)
+// 1. PDF refused on Hermes (images + text only)
 await input.setInputFiles({ name: 'doc.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n\0binaire') });
-check('PDF refusé côté client avec message clair', await page.getByText(/n'accepte que les images et les fichiers texte/).isVisible());
-check('PDF : aucune pastille ajoutée', (await page.locator('.MuiChip-deletable').count()) === 0);
+check('PDF refused client-side with a clear message', await page.getByText(/only accepts images and text files/).isVisible());
+check('PDF: no chip added', (await page.locator('.MuiChip-deletable').count()) === 0);
 
-// 2. image par le bouton → pastille avec aperçu
+// 2. image via the button → chip with preview
 await input.setInputFiles({ name: 'rouge.png', mimeType: 'image/png', buffer: RED });
-check('image : pastille avec aperçu', (await page.locator('.MuiChip-deletable img').count()) === 1);
+check('image: chip with preview', (await page.locator('.MuiChip-deletable img').count()) === 1);
 await page.screenshot({ path: `${shots}/a1-pastille.png` });
 // retrait
 await page.locator('.MuiChip-deletable .MuiChip-deleteIcon').click();
 check('pastille retirable', (await page.locator('.MuiChip-deletable').count()) === 0);
 
-// 3. collage d'une image (Ctrl+V) + glisser-déposer d'un fichier texte
+// 3. pasting an image (Ctrl+V) + drag-and-drop of a text file
 await box.click();
 await page.evaluate(async ([b64]) => {
   const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -57,57 +57,57 @@ await page.evaluate(async ([b64]) => {
 }, [RED.toString('base64')]);
 check('collage d\'image', (await page.locator('.MuiChip-deletable img').count()) === 1);
 await page.evaluate(() => {
-  const dt = new DataTransfer(); dt.items.add(new File(['Le code secret est ZEBRE-4242.\n'], 'secret.txt', { type: 'text/plain' }));
+  const dt = new DataTransfer(); dt.items.add(new File(['The secret code is ZEBRA-4242.\n'], 'secret.txt', { type: 'text/plain' }));
   const root = document.querySelector('textarea').closest('.MuiBox-root').parentElement;
   root.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
 });
-check('survol glisser-déposer : zone de dépôt visible', await page.getByText('Déposez vos fichiers ici').isVisible());
+check('drag hover: drop zone visible', await page.getByText('Drop your files here').isVisible());
 await page.screenshot({ path: `${shots}/a2-depot.png` });
 await page.evaluate(() => {
-  const dt = new DataTransfer(); dt.items.add(new File(['Le code secret est ZEBRE-4242.\n'], 'secret.txt', { type: 'text/plain' }));
+  const dt = new DataTransfer(); dt.items.add(new File(['The secret code is ZEBRA-4242.\n'], 'secret.txt', { type: 'text/plain' }));
   document.querySelector('textarea').closest('.MuiBox-root').parentElement.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
 });
-check('dépôt d\'un fichier texte', (await page.locator('.MuiChip-deletable').count()) === 2);
-// on retire l'image collée pour que la réponse porte sur le texte (plus déterministe)
+check('text file drop', (await page.locator('.MuiChip-deletable').count()) === 2);
+// we remove the pasted image so that the answer is about the text (more deterministic)
 await page.locator('.MuiChip-deletable').first().locator('.MuiChip-deleteIcon').click();
 
-// 4. envoi : texte + fichier → l'agent lit le fichier
-await box.fill('Quel est le code secret du fichier joint ? Réponds seulement par le code.');
+// 4. send: text + file → the agent reads the file
+await box.fill('What is the secret code in the attached file? Answer only with the code.');
 await box.press('Enter');
-check('bulle utilisateur : pièce jointe affichée', await page.locator('[data-role=user] a[download]').first().waitFor({ timeout: 10000 }).then(() => true, () => false));
+check('user bubble: attachment displayed', await page.locator('[data-role=user] a[download]').first().waitFor({ timeout: 10000 }).then(() => true, () => false));
 await waitIdle();
 const ans = await page.locator('[data-role=assistant]').last().innerText();
-check('l\'agent a lu le fichier texte', /ZEBRE-4242/.test(ans), JSON.stringify(ans.slice(-40)));
-await page.screenshot({ path: `${shots}/a3-fichier.png` });
+check('the agent read the text file', /ZEBRA-4242/.test(ans), JSON.stringify(ans.slice(-40)));
+await page.screenshot({ path: `${shots}/a3-file.png` });
 
-// 5. image seule (sans texte) → bulle avec miniature, run lancé
+// 5. image alone (no text) → bubble with thumbnail, run started
 await input.setInputFiles({ name: 'rouge.png', mimeType: 'image/png', buffer: RED });
 await page.getByRole('button', { name: 'Envoyer' }).click();
 const img = page.locator('[data-role=user] img').first();
 await img.waitFor({ timeout: 10000 });
 await img.evaluate((i) => i.decode().catch(() => {}));
-check('image envoyée sans texte : miniature dans la bulle', await img.evaluate((i) => i.complete && i.naturalWidth === 64));
+check('image sent without text: thumbnail in the bubble', await img.evaluate((i) => i.complete && i.naturalWidth === 64));
 await waitIdle(90000);
 await page.screenshot({ path: `${shots}/a4-image.png` });
 
-// 6. rechargement : les pièces jointes viennent du serveur
+// 6. reload: attachments come from the server
 await page.reload();
-await page.getByText('Quel est le code secret').first().click();
+await page.getByText('What is the secret code').first().click();
 await page.locator('[data-role=user] img').first().waitFor({ timeout: 10000 });
 const ok = await page.locator('[data-role=user] img').first().evaluate((i) => i.complete && i.naturalWidth === 64 && i.src.includes('/api/attachments/'));
-check('après rechargement : image servie par /api/attachments', ok);
-check('après rechargement : fichier texte téléchargeable', (await page.locator('[data-role=user] a[download]').count()) >= 1);
+check('after reload: image served by /api/attachments', ok);
+check('after reload: text file downloadable', (await page.locator('[data-role=user] a[download]').count()) >= 1);
 const dl = await page.evaluate(async () => { const a = document.querySelector('[data-role=user] a[download]'); const r = await fetch(a.href); return { s: r.status, ct: r.headers.get('content-type'), cd: r.headers.get('content-disposition'), t: await r.text() }; });
-check('téléchargement : octet-stream + attachment + contenu intact', dl.s === 200 && dl.ct === 'application/octet-stream' && /attachment/.test(dl.cd) && dl.t.includes('ZEBRE-4242'), `${dl.ct} ${dl.cd}`);
+check('download: octet-stream + attachment + content intact', dl.s === 200 && dl.ct === 'application/octet-stream' && /attachment/.test(dl.cd) && dl.t.includes('ZEBRA-4242'), `${dl.ct} ${dl.cd}`);
 
-// 7. suppression de la conversation → fichiers supprimés du disque
+// 7. conversation deletion → files deleted from disk
 const upl = () => (existsSync(`${dataDir}/uploads`) ? readdirSync(`${dataDir}/uploads`).length : 0);
-const avant = upl();
+const before = upl();
 page.once('dialog', (d) => d.accept());
 await page.getByRole('button', { name: 'Supprimer', exact: true }).first().click();
 await page.waitForTimeout(1500);
-check('suppression conversation : dossier d\'uploads supprimé', avant >= 1 && upl() === avant - 1, `${avant} → ${upl()}`);
-check('aucune erreur JS', errors.length === 0, errors.join(' | ').slice(0, 200));
+check('conversation deletion: uploads folder removed', before >= 1 && upl() === before - 1, `${before} → ${upl()}`);
+check('no JS error', errors.length === 0, errors.join(' | ').slice(0, 200));
 await browser.close();
-console.log(`\n${results.filter(Boolean).length}/${results.length} vérifications OK`);
+console.log(`\n${results.filter(Boolean).length}/${results.length} checks OK`);
 process.exit(results.every(Boolean) ? 0 : 1);

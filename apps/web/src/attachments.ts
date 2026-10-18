@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import type { AttachmentMeta, Capabilities, OutgoingAttachment } from '@agentui/shared';
 
-/** Pièce jointe affichée : celles qui viennent d'être envoyées gardent une URL locale (blob:) en attendant le rechargement. */
+/** Displayed attachment: those just sent keep a local URL (blob:) until the reload. */
 export type AttachmentView = AttachmentMeta & { url?: string };
 
 export const MAX_FILES = 8;
@@ -18,7 +18,7 @@ const isTextLike = (f: File) =>
 
 export const formatSize = (n: number) => (n < 1024 ? `${n} ${t('size.b')}` : n < 1048576 ? `${Math.round(n / 1024)} ${t('size.kb')}` : `${(n / 1048576).toFixed(1)} ${t('size.mb')}`);
 
-/** Contrôle côté client (confort) ; le serveur revalide tout. Retourne un message d'erreur ou null. */
+/** Client-side check (convenience); the server revalidates everything. Returns an error message or null. */
 export function checkFile(f: File, current: File[], caps: Capabilities['attachments']): string | null {
   if (current.length >= MAX_FILES) return t('file.maxFiles', { max: MAX_FILES });
   if (f.size === 0) return t('file.empty', { name: f.name });

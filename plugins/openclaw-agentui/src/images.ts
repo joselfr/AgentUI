@@ -1,5 +1,5 @@
-// Widget `agentui_image` : une source est une URL https ou un chemin absolu d'un fichier de la machine de l'agent, que le
-// plugin copie dans la discussion (message.media) pour que l'utilisateur puisse le voir.
+// `agentui_image` widget: a source is an https URL or an absolute path of a file on the agent's machine, which the
+// plugin copies into the chat (message.media) so that the user can see it.
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
@@ -7,11 +7,11 @@ import { MAX_MEDIA } from './bridge.js';
 import type { Media } from './protocol.js';
 
 export const MAX_IMAGES = 12;
-/** Préfixe des pièces jointes copiées pour un widget : le front ne les affiche pas en plus du widget. */
+/** Prefix of attachments copied for a widget: the front does not display them on top of the widget. */
 export const IMAGE_PREFIX = 'agentui-img-';
 const HTTP = /^https?:\/\//i;
 
-/** Type réel d'une image d'après ses premiers octets (pas l'extension). Ce que l'endpoint des pièces jointes affiche en ligne. */
+/** Real type of an image from its first bytes (not the extension). What the attachments endpoint displays inline. */
 export function sniffImage(b: Buffer): string | undefined {
   if (b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
@@ -20,28 +20,28 @@ export function sniffImage(b: Buffer): string | undefined {
   return undefined;
 }
 
-/** Contrôle de forme des sources (avant toute lecture de fichier). */
+/** Shape check of the sources (before any file read). */
 export function imagesError(args: { images?: Array<{ src?: unknown }> }): string | undefined {
   const images = args.images ?? [];
-  if (!images.length || images.length > MAX_IMAGES) return `Il faut entre 1 et ${MAX_IMAGES} images.`;
+  if (!images.length || images.length > MAX_IMAGES) return `Between 1 and ${MAX_IMAGES} images are required.`;
   for (const [i, im] of images.entries()) {
     const src = String(im.src ?? '');
-    if (!(HTTP.test(src) || src.startsWith('/'))) return `Image ${i + 1} : src doit être une URL https://… ou un chemin absolu (pas de data:, file: ni chemin relatif).`;
+    if (!(HTTP.test(src) || src.startsWith('/'))) return `Image ${i + 1}: src must be an https://… URL or an absolute path (no data:, file: or relative path).`;
   }
   return undefined;
 }
 
-/** Lit une image locale : lève une erreur lisible par l'agent si le fichier est introuvable, trop gros ou n'est pas une image. */
+/** Reads a local image: throws an agent-readable error if the file is missing, too big or not an image. */
 export async function readLocalImage(path: string, read: (p: string) => Promise<Buffer> = readFile): Promise<Media> {
   let data: Buffer;
   try {
     data = await read(path);
   } catch {
-    throw new Error(`Fichier introuvable ou illisible : ${path}`);
+    throw new Error(`File not found or unreadable: ${path}`);
   }
-  if (data.length > MAX_MEDIA) throw new Error(`${path} dépasse ${MAX_MEDIA / 1024 / 1024} Mo.`);
+  if (data.length > MAX_MEDIA) throw new Error(`${path} exceeds ${MAX_MEDIA / 1024 / 1024} MB.`);
   const mimeType = sniffImage(data);
-  if (!mimeType) throw new Error(`${path} n'est pas une image png, jpeg, gif ou webp.`);
+  if (!mimeType) throw new Error(`${path} is not a png, jpeg, gif or webp image.`);
   const name = `${IMAGE_PREFIX}${createHash('sha1').update(data).digest('hex').slice(0, 8)}-${basename(path).replace(/[^\w.-]+/g, '_')}`;
   return { name, mimeType, data: data.toString('base64') };
 }

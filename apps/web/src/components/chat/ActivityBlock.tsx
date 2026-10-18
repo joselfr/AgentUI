@@ -11,18 +11,18 @@ import { fmtDecimal, t } from '../../i18n';
 const rotate = keyframes`to { transform: rotate(360deg) }`;
 const pulse = keyframes`0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--pulse) } 50% { opacity: .6; box-shadow: 0 0 0 4px transparent }`;
 
-/** Anneau de chargement discret (activité en cours). */
+/** Discreet loading ring (activity in progress). */
 const Spin = () => (
   <Box component="span" role="progressbar" aria-label={t('activity.running')}
     sx={{ width: 12, height: 12, border: 2, borderColor: 'text.disabled', borderTopColor: 'primary.main', borderRadius: '50%', animation: `${rotate} .8s linear infinite`, flexShrink: 0 }} />
 );
 
-/** Durée selon la langue : « 0,1 s » / « 0.1 s ». */
+/** Duration according to the language: "0,1 s" / "0.1 s". */
 const dur = (a: number, b?: number) => (b ? `${fmtDecimal(Math.max(0, b - a) / 1000)} s` : '');
 const pretty = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2));
 const statusLabel = (s: ToolCall['status']) => t(`activity.${s}`);
 
-/** Pastille d'état : vert = réussi, orange animé = en cours, rouge = échec, violet = sous-agent terminé. */
+/** Status dot: green = succeeded, animated orange = running, red = failed, purple = finished sub-agent. */
 function Dot({ status, sub = false }: { status: ToolCall['status']; sub?: boolean }) {
   const color = status === 'running' ? 'warning.main' : status === 'failed' ? 'error.main' : sub ? 'secondary.main' : 'success.main';
   return (
@@ -40,7 +40,7 @@ const Chevron = ({ open }: { open: boolean }) => (
   <ExpandMore sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
 );
 
-/** Un outil : une ligne (état, nom, durée) qui se déplie pour montrer ses arguments et son résultat. */
+/** A tool: one line (status, name, duration) that expands to show its arguments and result. */
 function ToolRow({ tool }: { tool: ToolCall }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
@@ -67,7 +67,7 @@ function ToolRow({ tool }: { tool: ToolCall }) {
   );
 }
 
-/** Un sous-agent : sa ligne se déplie pour montrer son raisonnement, son résumé et ses outils. */
+/** A sub-agent: its line expands to show its reasoning, summary and tools. */
 function SubRunRow({ run, tools, expandAll }: { run: SubAgentRun; tools: ToolCall[]; expandAll: boolean }) {
   const [manual, setManual] = useState<boolean>();
   const open = manual ?? (expandAll || run.status === 'running');
@@ -92,9 +92,9 @@ function SubRunRow({ run, tools, expandAll }: { run: SubAgentRun; tools: ToolCal
 const sep: ReactNode = <Box component="span" aria-hidden sx={{ opacity: 0.5 }}>·</Box>;
 
 /**
- * Activité de l'agent sur un message : une ligne discrète « ✦ Raisonnement · 🔧 2 outils 0,1 s ⌄ » qui se déplie en
- * une liste sobre (raisonnement, sous-agents, outils avec leurs arguments et résultats). Un outil en cours reste
- * visible même ligne repliée ; « Déplier les outils par défaut » (Réglages) ouvre tout.
+   * Agent activity on a message: a discreet line "✦ Reasoning · 🔧 2 tools 0.1 s ⌄" that expands into
+   * a plain list (reasoning, sub-agents, tools with their arguments and results). A running tool stays
+   * visible even when the line is collapsed; "Expand tools by default" (Settings) opens everything.
  */
 export default function ActivityBlock({ reasoning, tools, subRuns, expandAll }: { reasoning?: string; tools: ToolCall[]; subRuns: SubAgentRun[]; expandAll: boolean }) {
   const [open, setOpen] = useState(false);
@@ -102,7 +102,7 @@ export default function ActivityBlock({ reasoning, tools, subRuns, expandAll }: 
   const runningTool = tools.find((t) => t.status === 'running');
   const running = !!runningTool || subRuns.some((s) => s.status === 'running');
   const showAll = open || expandAll;
-  // Hors dépliage, seul ce qui est en cours d'exécution est affiché
+  // Unless expanded, only what is currently running is shown
   const visible = showAll ? tools : tools.filter((t) => t.status === 'running');
   const runs = showAll ? subRuns : subRuns.filter((s) => s.status === 'running' || visible.some((t) => t.parentSubAgentRunId === s.id));
   const top = visible.filter((t) => !t.parentSubAgentRunId);

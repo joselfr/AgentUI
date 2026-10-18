@@ -1,5 +1,5 @@
-// Copie plugins/protocol/widget-tools.json (source unique des schémas d'outils-widgets) dans chaque plugin :
-// l'installation d'un plugin n'emporte que son propre dossier.
+// Copies plugins/protocol/widget-tools.json (single source of the widget-tool schemas) into each plugin:
+// installing a plugin only carries its own folder.
 import { copyFileSync } from 'node:fs';
 const here = new URL('.', import.meta.url);
 for (const dest of ['hermes-agentui/widget_tools.json', 'openclaw-agentui/src/widget-tools.json'])

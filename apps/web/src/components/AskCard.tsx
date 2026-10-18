@@ -6,13 +6,13 @@ import { t } from '../i18n';
 
 export interface Parsed { question: string; choices: string[]; multiple: boolean }
 
-/** Arguments du widget `ask` : `{ question, options?: [...], multiple?: bool }`. Sans `options` : réponse libre. */
+/** Arguments of the `ask` widget: `{ question, options?: [...], multiple?: bool }`. Without `options`: free answer. */
 export function parseAsk(args: Record<string, unknown>): Parsed | undefined {
   if (typeof args.question !== 'string') return undefined;
   return { question: args.question.trim(), choices: Array.isArray(args.options) ? args.options.map(String) : [], multiple: args.multiple === true };
 }
 
-/** Ancien bloc ```ask en Markdown (`- choix`, `- [ ] choix`), conservé pour les discussions déjà enregistrées. */
+/** Legacy ```ask Markdown block (`- choice`, `- [ ] choice`), kept for already saved chats. */
 export function parseLegacyAsk(raw: string): Parsed {
   const question: string[] = [];
   const choices: string[] = [];
@@ -24,7 +24,7 @@ export function parseLegacyAsk(raw: string): Parsed {
   return { question: question.join('\n').trim(), choices, multiple };
 }
 
-/** `answer` : réponse déjà envoyée (message utilisateur suivant), `onAnswer` absent : question plus répondable. */
+/** `answer`: answer already sent (next user message), `onAnswer` absent: question can no longer be answered. */
 export default function AskCard({ ask: { question, choices, multiple }, answer, onAnswer }: { ask: Parsed; answer?: string; onAnswer?: (text: string) => void }) {
   const [picked, setPicked] = useState<string[]>([]);
   const live = !!onAnswer;

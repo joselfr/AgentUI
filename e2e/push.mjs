@@ -1,7 +1,7 @@
-// E2E push. Le navigateur automatisé n'a pas accès au service push de Google : on simule
-//  (1) le service push par un serveur HTTPS local qui reçoit la VRAIE requête de web-push,
-//  (2) la livraison au service worker via CDP (ServiceWorker.deliverPushMessage).
-// Usage : PUSH_CERT=c.pem PUSH_KEY=k.pem node e2e/push.mjs <baseUrl>   (serveur lancé avec NODE_TLS_REJECT_UNAUTHORIZED=0)
+// Push E2E. The automated browser has no access to Google's push service: we simulate
+//  (1) the push service by a local HTTPS server that receives the REAL web-push request,
+//  (2) delivery to the service worker via CDP (ServiceWorker.deliverPushMessage).
+// Usage: PUSH_CERT=c.pem PUSH_KEY=k.pem node e2e/push.mjs <baseUrl>   (server started with NODE_TLS_REJECT_UNAUTHORIZED=0)
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:https';
@@ -24,8 +24,8 @@ const ecdh = crypto.createECDH('prime256v1'); ecdh.generateKeys();
 const sub = { endpoint, keys: { p256dh: b64u(ecdh.getPublicKey()), auth: b64u(crypto.randomBytes(16)) } };
 
 const browser = await chromium.launch({ executablePath: process.env.BROWSER ?? '/usr/bin/chromium', args: ['--no-sandbox'] });
-const ctx = await browser.newContext({ permissions: ['notifications'], baseURL: base, locale: 'fr-FR' });
-// Le navigateur de test ne peut pas créer d'abonnement réel : on fournit un abonnement vers le faux service.
+const ctx = await browser.newContext({ permissions: ['notifications'], baseURL: base, locale: 'en-US' });
+// The test browser cannot create a real subscription: we provide a subscription to the fake service.
 await ctx.addInitScript((s) => {
   let current = null;
   PushManager.prototype.subscribe = async () => (current = { endpoint: s.endpoint, toJSON: () => s, unsubscribe: async () => ((current = null), true) });
@@ -33,69 +33,69 @@ await ctx.addInitScript((s) => {
 }, sub);
 const page = await ctx.newPage();
 await page.goto('/');
-await page.getByLabel('Utilisateur').fill(env.ADMIN_USER);
-await page.getByLabel('Mot de passe').fill(env.ADMIN_PASSWORD);
+await page.getByLabel('Username').fill(env.ADMIN_USER);
+await page.getByLabel('Password').fill(env.ADMIN_PASSWORD);
 await page.getByRole('button', { name: 'Se connecter' }).click();
 await page.getByText('Nouvelle conversation').first().waitFor();
 
-await page.getByRole('button', { name: 'Réglages' }).click();
-await page.getByLabel('Notifications quand un agent répond').click();
+await page.getByRole('button', { name: 'Settings' }).click();
+await page.getByLabel('Notify me when an agent replies').click();
 await page.waitForFunction(() => [...document.querySelectorAll('.MuiSwitch-input')].some((i) => i.checked), null, { timeout: 15000 })
-  .then(() => check('interrupteur de notifications activé (abonnement enregistré)', true), () => check('interrupteur de notifications activé (abonnement enregistré)', false));
+  .then(() => check('notifications switch on (subscription recorded)', true), () => check('notifications switch on (subscription recorded)', false));
 await page.keyboard.press('Escape');
 
-// (1) un run termine → le serveur envoie une vraie requête Web Push au faux service
+// (1) a run ends → the server sends a real Web Push request to the fake service
 const api = ctx.request, H = { 'X-Requested-With': 'agentui' };
 await api.post('/api/auth/login', { headers: H, data: { username: env.ADMIN_USER, password: env.ADMIN_PASSWORD } });
 const conv = await (await api.post('/api/conversations', { headers: H, data: { agentId: 'hermes' } })).json();
-await api.post(`/api/conversations/${conv.id}/send`, { headers: H, data: { text: 'Réponds uniquement le mot: NOTIFIE' } });
+await api.post(`/api/conversations/${conv.id}/send`, { headers: H, data: { text: 'Answer only with the word: NOTIFIED' } });
 for (let i = 0; i < 90 && !received.length; i++) await new Promise((r) => setTimeout(r, 1000));
 const req = received[0];
-check('le serveur envoie une requête Web Push à la fin du run', !!req, req?.url);
-check('requête chiffrée (aes128gcm) et signée VAPID', req?.headers['content-encoding'] === 'aes128gcm' && /^vapid t=.+, k=.+/.test(req?.headers.authorization ?? ''), `${req?.headers['content-encoding']} / ${req?.headers.authorization?.slice(0, 12)}…`);
-check('TTL défini et corps non vide', Number(req?.headers.ttl) > 0 && req?.size > 40, `ttl=${req?.headers.ttl} taille=${req?.size}`);
+check('the server sends a Web Push request at the end of the run', !!req, req?.url);
+check('request encrypted (aes128gcm) and VAPID-signed', req?.headers['content-encoding'] === 'aes128gcm' && /^vapid t=.+, k=.+/.test(req?.headers.authorization ?? ''), `${req?.headers['content-encoding']} / ${req?.headers.authorization?.slice(0, 12)}…`);
+check('TTL set and body not empty', Number(req?.headers.ttl) > 0 && req?.size > 40, `ttl=${req?.headers.ttl} size=${req?.size}`);
 
-// (2) livraison au service worker
+// (2) delivery to the service worker
 const cdp = await ctx.newCDPSession(page);
 const regs = new Promise((res) => cdp.on('ServiceWorker.workerRegistrationUpdated', (e) => e.registrations.length && res(e.registrations[0])));
 await cdp.send('ServiceWorker.enable');
 const reg = await regs;
-const payload = { title: 'Hermes a répondu', body: 'test — NOTIFIE', url: `/c/${conv.id}`, tag: conv.id };
+const payload = { title: 'Hermes replied', body: 'test — NOTIFIED', url: `/c/${conv.id}`, tag: conv.id };
 const deliver = () => cdp.send('ServiceWorker.deliverPushMessage', { origin: new URL(base).origin, registrationId: reg.registrationId, data: JSON.stringify(payload) });
 const count = () => page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).length);
 
 await deliver(); await page.waitForTimeout(1500);
-check('app au premier plan → pas de notification (évite le doublon)', (await count()) === 0);
+check('app in the foreground → no notification (avoids the duplicate)', (await count()) === 0);
 
-await page.goto('about:blank'); // l'application n'est plus ouverte
+await page.goto('about:blank'); // the application is no longer open
 await deliver(); await page.waitForTimeout(1500);
 const p2 = await ctx.newPage(); await p2.goto('/');
 const notifs = await p2.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => ({ title: n.title, body: n.body, tag: n.tag, url: n.data?.url })));
-check('app fermée → notification affichée', notifs.length === 1 && notifs[0].title === 'Hermes a répondu', JSON.stringify(notifs[0]));
-check('lien de la notification = conversation', notifs[0]?.url === `/c/${conv.id}`);
+check('app closed → notification displayed', notifs.length === 1 && notifs[0].title === 'Hermes replied', JSON.stringify(notifs[0]));
+check('notification link = conversation', notifs[0]?.url === `/c/${conv.id}`);
 
-// clic : le lien ouvre la conversation (route /c/<id>) ; l'ancien lien /?c=<id> est redirigé vers elle
+// click: the link opens the conversation (route /c/<id>); the old /?c=<id> link is redirected to it
 await p2.goto(notifs[0].url);
 await p2.getByText('NOTIFIE').first().waitFor({ timeout: 15000 }).then(() => check('lien notification → conversation ouverte', true), () => check('lien notification → conversation ouverte', false));
 check('URL = /c/<id>', new URL(p2.url()).pathname === `/c/${conv.id}`);
 await p2.goto(`/?c=${conv.id}`);
 await p2.getByText('NOTIFIE').first().waitFor({ timeout: 15000 }).then(() => check('ancien lien ?c= → conversation ouverte', true), () => check('ancien lien ?c= → conversation ouverte', false));
-check('ancien lien ?c= redirigé vers /c/<id>', new URL(p2.url()).pathname === `/c/${conv.id}` && new URL(p2.url()).search === '');
+check('old ?c= link redirected to /c/<id>', new URL(p2.url()).pathname === `/c/${conv.id}` && new URL(p2.url()).search === '');
 await api.delete(`/api/conversations/${conv.id}`, { headers: H });
 
-// désactivation : (ré)activer sur cette page puis désactiver, plus aucun envoi ensuite
-await p2.getByRole('button', { name: 'Réglages' }).click();
-const sw = p2.getByLabel('Notifications quand un agent répond');
+// deactivation: (re)enable on this page then disable, no more sends afterwards
+await p2.getByRole('button', { name: 'Settings' }).click();
+const sw = p2.getByLabel('Notify me when an agent replies');
 const isOn = () => p2.evaluate(() => [...document.querySelectorAll('.MuiSwitch-input')].some((i) => i.checked));
 if (!(await isOn())) { await sw.click(); await p2.waitForFunction(() => [...document.querySelectorAll('.MuiSwitch-input')].some((i) => i.checked)); }
 await sw.click(); await p2.waitForTimeout(1500);
-check('désactivation depuis les réglages', !(await isOn()));
-const avant = received.length;
+check('deactivation from the settings', !(await isOn()));
+const before = received.length;
 const conv2 = await (await api.post('/api/conversations', { headers: H, data: { agentId: 'hermes' } })).json();
-await api.post(`/api/conversations/${conv2.id}/send`, { headers: H, data: { text: 'Réponds uniquement: FIN' } });
+await api.post(`/api/conversations/${conv2.id}/send`, { headers: H, data: { text: 'Answer only: END' } });
 await new Promise((r) => setTimeout(r, 20000));
-check('plus aucun envoi push après désactivation', received.length === avant, `${received.length - avant} requête(s)`);
+check('no more push sends after deactivation', received.length === before, `${received.length - before} request(s)`);
 await api.delete(`/api/conversations/${conv2.id}`, { headers: H });
 await browser.close(); fake.close();
-console.log(`\n${ok.filter(Boolean).length}/${ok.length} vérifications OK`);
+console.log(`\n${ok.filter(Boolean).length}/${ok.length} checks OK`);
 process.exit(ok.every(Boolean) ? 0 : 1);

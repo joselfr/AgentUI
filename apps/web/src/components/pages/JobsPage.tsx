@@ -18,7 +18,7 @@ const RUN_TIMEOUT_MS = 15 * 60_000;
 const timeOf = (ms: number) => fmtDateTime(ms, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 const nextRun = (j: Job) => (j.nextRunAt && j.enabled ? ` · ${t('jobs.next', { date: fmtDateTime(j.nextRunAt) })}` : '');
 
-/** Pastille d'état d'une tâche : en attente / en cours / résultat de la dernière exécution. */
+/** Task status chip: pending / running / result of the last run. */
 function RunState({ j, launched }: { j: Job; launched: boolean }) {
   if (j.running) return <Chip size="small" color="info" icon={<CircularProgress size={12} color="inherit" sx={{ ml: '6px !important' }} />} label={t('jobs.running')} />;
   if (j.queued || launched) return <Chip size="small" variant="outlined" color="warning" icon={<CircularProgress size={12} color="inherit" sx={{ ml: '6px !important' }} />} label={t('jobs.queued')} />;
@@ -28,7 +28,7 @@ function RunState({ j, launched }: { j: Job; launched: boolean }) {
   return j.lastError && !ok ? <Tooltip title={j.lastError}>{chip}</Tooltip> : chip;
 }
 
-/** Popup de détail d'une tâche : planification, dernière exécution, script exécuté et prompt confié à l'agent. */
+/** Task detail popup: schedule, last run, executed script and prompt given to the agent. */
 function JobDialog({ j, onClose }: { j?: Job; onClose: () => void }) {
   useBackClose(!!j, onClose);
   const field = (label: string, value: ReactNode) => (
@@ -64,7 +64,7 @@ export function JobsPage({ agents, onOpenConversation }: { agents: AgentInfo[]; 
   const { ask, dialog: confirmDialog } = useConfirm();
   const sc = useScope(agents, (a) => a.capabilities.jobs);
   const jobs = useLoad<Job[]>(() => (sc.agent ? api.jobs(sc.agent.id, sc.sub) : Promise.resolve([])), [sc.agent?.id, sc.sub]);
-  // Exécutions lancées depuis cette page, suivies jusqu'à leur fin (lastRunAt postérieur au lancement).
+  // Runs launched from this page, tracked until they end (lastRunAt later than the launch).
   const [launched, setLaunched] = useState<Record<string, number>>({});
   const [notice, setNotice] = useState<{ text: string; ok: boolean; conversationId?: string }>();
   const [detail, setDetail] = useState<string>();

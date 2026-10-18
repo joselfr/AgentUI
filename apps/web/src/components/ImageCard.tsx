@@ -6,14 +6,14 @@ import { t } from '../i18n';
 
 interface Img { src: string; caption?: string; alt?: string }
 interface Gallery { title?: string; images: Img[] }
-/** Résolution d'une source : URL à afficher, chargement en cours (fichier local pas encore copié), ou indisponible. */
+/** Resolution of a source: URL to display, loading in progress (local file not copied yet), or unavailable. */
 export type Resolved = { state: 'ok'; url: string } | { state: 'loading' } | { state: 'error' };
 
 const MAX_IMAGES = 12;
-const MAX_TILES = 6; // au-delà, la dernière vignette porte « +N »
+const MAX_TILES = 6; // beyond that, the last thumbnail shows "+N"
 export const isRemote = (src: string) => /^https?:\/\//i.test(src);
 
-/** Arguments du widget `image` : `{ title?, images: [{ src, caption?, alt? }] }` ; `src` : URL http(s) ou chemin absolu. `undefined` si invalide. */
+/** Arguments of the `image` widget: `{ title?, images: [{ src, caption?, alt? }] }`; `src`: http(s) URL or absolute path. `undefined` if invalid. */
 export function parseImage(a: Record<string, unknown>): Gallery | undefined {
   const { images } = a as { images?: unknown };
   if (!Array.isArray(images) || !images.length || images.length > MAX_IMAGES) return undefined;

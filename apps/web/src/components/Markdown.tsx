@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 
-/** Texte Markdown compact pour les textes des widgets (question, détail) : mêmes extensions que les messages, sans marges autour. */
+/** Compact Markdown text for widget texts (question, detail): same extensions as messages, without surrounding margins. */
 export default function Markdown({ children }: { children: string }) {
   return (
     <Box sx={{

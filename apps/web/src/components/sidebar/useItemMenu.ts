@@ -3,11 +3,11 @@ import { useRef, useState, type MouseEvent, type TouchEvent } from 'react';
 export interface ItemMenu<T> { item: T; x: number; y: number }
 
 /**
- * Menu contextuel d'une ligne de liste : clic droit, ou appui long (500 ms) au doigt.
+   * Context menu of a list row: right-click, or long press (500 ms) with a finger.
  *
- * Sur tablette Android, le long appui déclenche aussi l'événement natif `contextmenu` et le relâchement du doigt
- * (avec son clic fantôme) tombe sur le fond du menu : sans garde, il le refermerait aussitôt. `requestClose`
- * ignore donc toute fermeture tant que le doigt est posé et peu après.
+   * On Android tablets, a long press also fires the native `contextmenu` event and releasing the finger
+   * (with its ghost click) lands on the menu backdrop: without a guard, it would close it right away. `requestClose`
+   * therefore ignores any close while the finger is down and shortly after.
  */
 export function useItemMenu<T>(enabled: boolean) {
   const [menu, setMenu] = useState<ItemMenu<T>>();
@@ -17,7 +17,7 @@ export function useItemMenu<T>(enabled: boolean) {
   const open = (item: T, x: number, y: number) => { touch.current.lastEvent = Date.now(); setMenu({ item, x, y }); };
   const touchEnded = () => { touch.current = { down: false, lastEvent: Date.now() }; };
 
-  /** Gestionnaires à poser sur la ligne `item`. */
+  /** Handlers to set on the `item` row. */
   const bind = (item: T) => ({
     onContextMenu: (e: MouseEvent) => { e.preventDefault(); if (!enabled) return; cancelPress(); open(item, e.clientX, e.clientY); },
     onTouchStart: (e: TouchEvent) => {
@@ -34,11 +34,11 @@ export function useItemMenu<T>(enabled: boolean) {
   return {
     menu,
     bind,
-    /** À appeler au début d'un clic : vrai si ce clic termine un long appui (à ignorer). */
+    /** To call at the start of a click: true if this click ends a long press (to ignore). */
     consumeClick: () => { if (press.current.fired) { press.current.fired = false; return true; } return false; },
-    /** Fermeture demandée par le fond du menu (gardée, voir plus haut). */
+    /** Close requested by the menu backdrop (guarded, see above). */
     requestClose: () => { if (!touch.current.down && Date.now() - touch.current.lastEvent > 600) setMenu(undefined); },
-    /** Fermeture immédiate (après le choix d'une action). */
+    /** Immediate close (after choosing an action). */
     close: () => setMenu(undefined),
   };
 }

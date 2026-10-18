@@ -2,7 +2,7 @@ import { Box, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { t } from '../../i18n';
 
-/** Repère « non lus » : sépare ce qui a été lu de ce qui est arrivé depuis la dernière visite. */
+/** "Unread" marker: separates what was read from what arrived since the last visit. */
 export default function UnreadDivider({ count }: { count: number }) {
   return (
     <Box role="separator" aria-label={t('chat.unreadCount', { count })}

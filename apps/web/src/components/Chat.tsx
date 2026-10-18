@@ -11,9 +11,9 @@ import { t } from '../i18n';
 
 const alertSx = { mx: 'auto', mb: 1, width: 'min(836px, calc(100% - 24px))' } as const;
 
-/** Conversation : messages, demande d'autorisation, erreurs et zone de saisie ; dépôt de fichiers par glisser-déposer. */
+/** Conversation: messages, approval request, errors and input area; file drop by drag and drop. */
 export default function Chat(props: {
-  /** Sélecteur de modèle, affiché sous la saisie. */
+  /** Model picker, shown under the input. */
   modelPicker?: ReactNode;
   unreadMark?: { id: string; count: number };
   title: string; agentName: string; messages: Message[]; loading: boolean; isNew: boolean; running: boolean; awaiting: boolean; expandTools: boolean;
@@ -44,7 +44,7 @@ export default function Chat(props: {
             </Box>)}
           {props.messages.map((m, i) => {
             const last = i === props.messages.length - 1;
-            // Réponses déjà données : les messages utilisateur qui suivent (une question de l'agent en plein run en reçoit plusieurs)
+            // Answers already given: the user messages that follow (an agent question mid-run receives several)
             const answers: string[] = [];
             for (let j = i + 1; props.messages[j]?.role === 'user'; j++) answers.push(props.messages[j]!.text);
             const current = i === lastAssistant;

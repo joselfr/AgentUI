@@ -1,58 +1,59 @@
 ---
 name: design-widget
-description: Concevoir un nouveau widget AgentUI (composant rendu dans le chat, fourni à l'agent par un outil de plugin) — maquette HTML, validation par l'utilisateur, puis implémentation. À utiliser quand l'utilisateur veut créer, ajouter ou imaginer un widget pour les agents.
+description: Design a new AgentUI widget (a component rendered in the chat, provided to the agent by a plugin tool) — HTML mockup, user validation, then implementation. Use when the user wants to create, add or imagine a widget for the agents.
 ---
 
-# Concevoir un widget AgentUI
+# Design an AgentUI widget
 
-Un widget est un composant du chat, rendu par le front à partir d'un bloc de code Markdown de langage `widget`. L'agent ne l'écrit pas à la main : un outil de plugin `agentui_<type>` valide ses arguments (schéma JSON) et le fait apparaître. Le front reçoit :
+A widget is a chat component, rendered by the front end from a Markdown code block with the `widget` language. The agent does not write it by hand: a plugin tool `agentui_<type>` validates its arguments (JSON schema) and makes it appear. The front end receives:
 
 ```widget
-{"type": "<nom>", "arguments": { … }}
+{"type": "<name>", "arguments": { … }}
 ```
 
-Types existants : `chart`, `map`, `code` (outils d'affichage, qui renvoient un jeton) ; `ask`, `confirm`, `form` (outils **bloquants**, qui attendent la réponse de l'utilisateur). Tout le JSON suit ce même format : `type` + `arguments`, jamais de Markdown ni de clé/valeur libre.
+Existing types: `chart`, `map`, `code` (display tools, which return a token); `ask`, `confirm`, `form` (**blocking** tools, which wait for the user's answer). All the JSON follows this same format: `type` + `arguments`, never Markdown or free key/value.
 
-**Ordre obligatoire : maquette → validation de l'utilisateur → implémentation.** Ne pas écrire de code dans `apps/` avant un « oui » explicite sur la maquette.
+**Mandatory order: mockup → user validation → implementation.** Do not write code in `apps/` before an explicit "yes" on the mockup.
 
-## 1. Cadrer (court)
+## 1. Frame it (short)
 
-Si l'intention est floue, poser au plus une question groupée. Sinon, choisir et annoncer :
-- le `type` (un mot, minuscule, anglais comme les existants) ;
-- le rôle : affichage seul (comme `chart`) ou interactif avec réponse (comme `ask`, `confirm`) ;
-- les `arguments` : noms, types, obligatoires ou non, valeurs par défaut. Nommer les clés sans réutiliser `type` (conflit avec le widget ; ex. `kind` pour `chart`) ;
-- pour un widget interactif : ce que l'utilisateur renvoie. La réponse part comme un **message texte** (libellé du bouton, valeurs séparées par des virgules, ou une ligne `Libellé: valeur` par champ), car c'est ce que l'outil renvoie à l'agent en résultat `{"answer": …}` ; le widget se fige ensuite en lisant le message utilisateur suivant (`answer`).
+If the intent is vague, ask at most one grouped question. Otherwise, choose and announce:
+- the `type` (one word, lowercase, English like the existing ones);
+- the role: display only (like `chart`) or interactive with an answer (like `ask`, `confirm`);
+- the `arguments`: names, types, required or not, default values. Name the keys without reusing `type` (conflict with the widget; e.g. `kind` for `chart`);
+- for an interactive widget: what the user sends back. The answer goes out as a **text message** (button label, comma-separated values, or one `Label: value` line per field), because that is what the tool returns to the agent as the result `{"answer": …}`; the widget then freezes by reading the next user message (`answer`).
 
-## 2. Maquette
+## 2. Mockup
 
-Créer `mockups/<type>/<type>.html` (page autonome, un seul fichier, sans dépendance externe), en reprenant `mockups/confirm-chart/confirm-chart.html` comme modèle :
-- les tokens de `apps/web/src/theme.ts` (clair et sombre, `prefers-color-scheme` + bouton de bascule) ;
-- à gauche le bloc `widget` exact que l'agent écrirait, à droite le rendu dans une bulle de chat ;
-- tous les états : actif, répondu/figé, variante (ex. `danger`), cas limites (liste vide, valeurs longues, une seule série) ;
-- le repli : JSON invalide ou arguments manquants → bloc de code brut ;
-- rendu correct sur mobile (≈ 390 px).
+Create `mockups/<type>/<type>.html` (standalone page, a single file, no external dependency), using `mockups/confirm-chart/confirm-chart.html` as a model:
+- the tokens of `apps/web/src/theme.ts` (light and dark, `prefers-color-scheme` + toggle button);
+- on the left the exact `widget` block the agent would write, on the right the rendering in a chat bubble;
+- all states: active, answered/frozen, variant (e.g. `danger`), edge cases (empty list, long values, a single series);
+- the fallback: invalid JSON or missing arguments → raw code block;
+- correct rendering on mobile (≈ 390 px).
 
-Générer les captures avec le Chromium système et `playwright-core` (déjà dans `node_modules`, voir `e2e/front.mjs`) : `mockups/<type>/maquettes-clair.png` et `maquettes-sombre.png`. **Regarder les captures** (Read sur le PNG) et corriger avant de les présenter.
+Generate the captures with the system Chromium and `playwright-core` (already in `node_modules`, see `e2e/front.mjs`): `mockups/<type>/mockups-light.png` and `mockups-dark.png`. **Look at the captures** (Read on the PNG) and fix before presenting them.
 
-## 3. Confirmation par l'utilisateur
+## 3. User confirmation
 
-Présenter : le JSON des arguments, les états montrés, les choix faits (et ceux restant ouverts), les chemins des fichiers. Poser la question via AskUserQuestion avec les options *Valider et implémenter* / *Modifier la maquette* / *Abandonner*. Itérer sur la maquette tant que ce n'est pas validé. Ne jamais déduire un accord du silence.
+Present: the arguments JSON, the states shown, the choices made (and those left open), the file paths. Ask through AskUserQuestion with the options *Validate and implement* / *Edit the mockup* / *Abandon*. Iterate on the mockup until it is validated. Never infer agreement from silence.
 
-## 4. Implémentation (après validation seulement)
+## 4. Implementation (only after validation)
 
-1. **Composant** `apps/web/src/components/<Type>Card.tsx`, sur le modèle de `ConfirmCard.tsx` (interactif) ou `ChartCard.tsx` (affichage) :
-   - exporter `parse<Type>(args: Record<string, unknown>)` qui valide et renvoie `undefined` si invalide ;
-   - styles MUI et tokens du thème (`useTheme`, `primary`, `divider`…), pas de couleur en dur sauf palette de séries ;
-   - interactif : props `answer?` et `onAnswer?` ; sans `onAnswer` le widget est figé.
-2. **Branchement** dans `apps/web/src/components/chat/MessageBubble.tsx` : un `if (w?.type === '<type>')` à côté des autres. Le rendu n'a lieu que si `m.status !== 'streaming'`.
-3. **Outil de plugin, sans convention Markdown ni instructions** : l'agent connaît le widget par la description de l'outil (il n'existe plus d'instructions d'interface injectées). Ajouter une entrée dans `plugins/protocol/widget-tools.json` (description, schéma des `arguments`), puis lancer `node plugins/sync-widget-tools.mjs` :
-   - **widget d'affichage** → section `tools` ; ajouter le type à `DISPLAY_WIDGETS` (`apps/web/src/components/widget.ts`) ; contrôle sémantique éventuel dans `_widget_error` (Hermes, `adapter.py`) et `widgetError` (OpenClaw, `src/widget-tools.ts`). L'outil renvoie un jeton `[[agentui:<id>]]` que le front remplace par le widget ;
-   - **widget d'affichage qui évolue** (comme `progress`) : paramètre `update` = jeton du premier appel ; le plugin le renvoie tel quel (`widgetError` / `_widget_error` valident son format, `updateInstruction` dit à l'agent de ne pas réécrire le jeton). Le front retient le dernier appel par jeton (`expandWidgetTokens`) ; pour l'afficher pendant le streaming, l'autoriser dans la condition `live` de `MessageBubble.tsx` ;
-   - **widget interactif** → section `blockingTools`, avec la phrase « L'outil BLOQUE jusqu'à la réponse… » dans la description ; contrôle sémantique dans `_ask_error` (Hermes) et `askError` (OpenClaw). Aucun autre code plugin : l'outil émet `question.requested`, ajoute le bloc ```` ```widget ```` au texte, attend la trame `reply` et renvoie la réponse (voir `plugins/protocol/PROTOCOL.md`). Ne pas inscrire le type dans `DISPLAY_WIDGETS` : le bloc est dans le texte du message.
-4. **Tests des plugins** : OpenClaw (`cd plugins/openclaw-agentui && npm test`, étendre le test « outils-widgets » : la liste des noms d'outils change) ; Hermes (`plugins/hermes-agentui/tests/test_adapter.py`, avec le Python d'une installation Hermes ≥ 0.21).
-5. **Déploiement des plugins** : les schémas vivent dans les plugins, pas dans l'app. Sans réinstaller `hermes-agentui` (`adapter.py` + `widget_tools.json`) et `openclaw-agentui` (build, `plugins install --force`) sur le serveur, les agents n'ont pas l'outil (voir `deploy-jlfr`, avec accord de l'utilisateur pour toucher Hermes et OpenClaw).
-6. **Vérifier** : `npx tsc --noEmit -p apps/web`, `npx tsc --noEmit -p apps/server`, `npm test`, les tests des plugins, puis `npm run build`. Contrôler le rendu réel dans un navigateur si possible (serveur local sur le port 8080).
+1. **Component** `apps/web/src/components/<Type>Card.tsx`, modeled on `ConfirmCard.tsx` (interactive) or `ChartCard.tsx` (display):
+   - export `parse<Type>(args: Record<string, unknown>)` that validates and returns `undefined` if invalid;
+   - MUI styles and theme tokens (`useTheme`, `primary`, `divider`…), no hard-coded color except series palettes;
+   - interactive: props `answer?` and `onAnswer?`; without `onAnswer` the widget is frozen;
+   - texts: every visible string goes through `t()` with keys added to **both** `apps/web/src/i18n/fr.ts` and `en.ts` (the test checks they define the same keys).
+2. **Wiring** in `apps/web/src/components/chat/MessageBubble.tsx`: an `if (w?.type === '<type>')` next to the others. Rendering only happens if `m.status !== 'streaming'`.
+3. **Plugin tool, no Markdown convention or instructions**: the agent knows the widget through the tool's description (there are no more injected interface instructions). Add an entry in `plugins/protocol/widget-tools.json` (description, `arguments` schema), then run `node plugins/sync-widget-tools.mjs`:
+   - **display widget** → `tools` section; add the type to `DISPLAY_WIDGETS` (`apps/web/src/components/widget.ts`); optional semantic check in `_widget_error` (Hermes, `adapter.py`) and `widgetError` (OpenClaw, `src/widget-tools.ts`). The tool returns a `[[agentui:<id>]]` token that the front end replaces with the widget;
+   - **evolving display widget** (like `progress`): `update` parameter = token of the first call; the plugin returns it as is (`widgetError` / `_widget_error` validate its format, `updateInstruction` tells the agent not to write the token again). The front end keeps the latest call per token (`expandWidgetTokens`); to show it during streaming, allow it in the `live` condition of `MessageBubble.tsx`;
+   - **interactive widget** → `blockingTools` section, with the sentence "The tool BLOCKS until the answer…" in the description; semantic check in `_ask_error` (Hermes) and `askError` (OpenClaw). No other plugin code: the tool emits `question.requested`, adds the ```` ```widget ```` block to the text, waits for the `reply` frame and returns the answer (see `plugins/protocol/PROTOCOL.md`). Do not list the type in `DISPLAY_WIDGETS`: the block is in the message text.
+4. **Plugin tests**: OpenClaw (`cd plugins/openclaw-agentui && npm test`, extend the "widget tools" test: the list of tool names changes); Hermes (`plugins/hermes-agentui/tests/test_adapter.py`, with the Python of a Hermes ≥ 0.21 install).
+5. **Plugin deployment**: the schemas live in the plugins, not in the app. Without reinstalling `hermes-agentui` (`adapter.py` + `widget_tools.json`) and `openclaw-agentui` (build, `plugins install --force`) on the server, the agents do not have the tool (see `deploy-jlfr`, with the user's agreement to touch Hermes and OpenClaw).
+6. **Verify**: `npx tsc --noEmit -p apps/web`, `npx tsc --noEmit -p apps/server`, `npm test`, the plugin tests, then `npm run build`. Check the real rendering in a browser if possible (local server on port 8080).
 
-## 5. Fin
+## 5. Wrap-up
 
-Résumer ce qui a été fait et ce qui n'a **pas** été vérifié (notamment : un vrai modèle choisit-il l'outil ?). Ne commiter et ne déployer que sur demande (déploiement : skill `deploy-jlfr`, voir la mémoire du projet pour les pièges).
+Summarize what was done and what was **not** verified (notably: does a real model pick the tool?). Only commit and deploy on request (deployment: `deploy-jlfr` skill, see the project memory for the pitfalls).

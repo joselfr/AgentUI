@@ -9,7 +9,7 @@ import { formatSize } from '../../attachments';
 import type { useAttachments } from './useAttachments';
 import { t } from '../../i18n';
 
-/** Zone de saisie : texte (Entrée envoie, Maj+Entrée saute une ligne), fichiers joints (bouton, collage), envoi / arrêt. */
+/** Input area: text (Enter sends, Shift+Enter adds a line), attached files (button, paste), send / stop. */
 export default function Composer({ agentName, running, awaiting, canAbort, attachments, onSubmit, onAbort, modelPicker }: {
   modelPicker?: ReactNode; agentName: string; running: boolean; awaiting: boolean; canAbort: boolean; attachments: ReturnType<typeof useAttachments>;
   onSubmit: (text: string, files: File[]) => Promise<boolean>; onAbort: () => void;
@@ -17,13 +17,13 @@ export default function Composer({ agentName, running, awaiting, canAbort, attac
   const [text, setText] = useState('');
   const picker = useRef<HTMLInputElement>(null);
   const { files, previews } = attachments;
-  // Pendant une question de l'agent, le texte est la réponse (sans pièce jointe) ; sans texte, le bouton reste « Arrêter ».
+  // During an agent question, the text is the answer (without attachment); without text, the button stays "Stop".
   const canSend = awaiting ? !!text.trim() && !files.length : (text.trim() || files.length) && !running;
   const send = async () => {
     if (!canSend) return;
     const t = text, f = files;
     setText(''); attachments.clear();
-    if (!(await onSubmit(t.trim(), f))) { setText(t); attachments.restore(f); } // échec : on garde le brouillon
+    if (!(await onSubmit(t.trim(), f))) { setText(t); attachments.restore(f); } // failure: keep the draft
   };
   return (
     <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 'max(12px, env(safe-area-inset-bottom))', pt: 0.5 }}>

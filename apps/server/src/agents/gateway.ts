@@ -18,7 +18,7 @@ import type { AgentAdapter, RunHandle } from './types.js';
 type GatewayConfig = Extract<AgentConfig, { type: 'gateway' }>;
 type Json = Record<string, any>;
 
-/** Socket WebSocket côté serveur (sous-ensemble de `ws` utilisé ici). */
+/** Server-side WebSocket (subset of `ws` used here). */
 export interface GatewaySocket {
   readyState: number;
   send(data: string): void;
@@ -27,17 +27,17 @@ export interface GatewaySocket {
   on(event: 'close', cb: () => void): unknown;
 }
 
-/** Média poussé par un plugin (base64), stocké le temps que RunManager l'enregistre. */
+/** Media pushed by a plugin (base64), stored until RunManager records it. */
 export interface GatewayMedia {
   name: string;
   mimeType: string;
   data: Buffer;
 }
 
-/** Message proactif (cron, outil d'envoi…) reçu hors de tout run. */
+/** Proactive message (cron, send tool…) received outside any run. */
 export interface GatewayOutbound {
   conversationId?: string;
-  /** Titre proposé si la discussion doit être créée (ex. nom de la tâche cron). */
+  /** Proposed title if the chat has to be created (e.g. name of the cron task). */
   title?: string;
   text: string;
   media: GatewayMedia[];
@@ -61,7 +61,7 @@ const DEFAULT_CAPS: Capabilities = {
   attachments: { images: false, files: false, maxBytes: 0 },
 };
 
-/** File d'événements d'un run, consommée par RunManager (async iterable). */
+/** Event queue of a run, consumed by RunManager (async iterable). */
 class EventQueue {
   private items: AgentEvent[] = [];
   private waiter?: () => void;
@@ -90,7 +90,7 @@ class EventQueue {
 interface PendingRun {
   conversationId: string;
   queue: EventQueue;
-  /** Coupure du plugin : échec si pas de reconnexion le reprenant dans le délai. */
+  /** Plugin cut: fails if no reconnection resumes it within the grace period. */
   orphanTimer?: NodeJS.Timeout;
 }
 
@@ -101,22 +101,22 @@ export const sameToken = (a: string, b: string) => {
 };
 
 /**
- * Agent relié par un plugin canal (AgentUI Channel Protocol v1, voir plugins/protocol/PROTOCOL.md) :
- * c'est le plugin installé dans la plateforme (Hermes, OpenClaw…) qui se connecte à AgentUI sur /gateway.
- * La conversation AgentUI côté plateforme est identifiée par `remote_session_id` (= conversationId du protocole).
+   * Agent linked by a channel plugin (AgentUI Channel Protocol v1, see plugins/protocol/PROTOCOL.md):
+   * the plugin installed in the platform (Hermes, OpenClaw…) connects to AgentUI on /gateway.
+   * The AgentUI conversation on the platform side is identified by `remote_session_id` (= conversationId of the protocol).
  */
 export class GatewayAdapter implements AgentAdapter {
   readonly id: string;
   readonly name: string;
   private socket?: GatewaySocket;
   private hello?: Json;
-  private state: { status: ConnStatus; detail?: string } = { status: 'disconnected', detail: 'en attente du plugin' };
+  private state: { status: ConnStatus; detail?: string } = { status: 'disconnected', detail: 'waiting for the plugin' };
   private listeners: Array<(s: ConnStatus, d?: string) => void> = [];
   private runs = new Map<string, PendingRun>();
   private media = new Map<string, GatewayMedia>();
   private rpcs = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }>();
   private ping?: NodeJS.Timeout;
-  /** Branché par le serveur : enregistre un message proactif dans la bonne conversation. */
+  /** Wired by the server: records a proactive message in the right conversation. */
   onOutbound?: (msg: GatewayOutbound) => void | Promise<void>;
 
   constructor(private cfg: GatewayConfig) {
@@ -150,37 +150,37 @@ export class GatewayAdapter implements AgentAdapter {
   }
 
   async connect(): Promise<void> {
-    // Rien à ouvrir : c'est le plugin qui se connecte (voir attach).
+    // Nothing to open: the plugin is the one that connects (see attach).
   }
 
   async close(): Promise<void> {
     clearInterval(this.ping);
-    this.socket?.close(1001, 'arrêt');
+    this.socket?.close(1001, 'shutdown');
   }
 
-  // ---------- Connexion du plugin ----------
+  // ---------- Plugin connection ----------
 
-  /** Rattache la connexion d'un plugin authentifié (hello déjà validé par le serveur). */
+  /** Attaches the connection of an authenticated plugin (hello already validated by the server). */
   attach(socket: GatewaySocket, hello: Json) {
     if (hello.mode === 'send-only') {
-      // Connexion ponctuelle (cron hors gateway, CLI) : ne remplace pas la connexion principale.
+      // One-off connection (cron outside the gateway, CLI): does not replace the main connection.
       socket.send(JSON.stringify({ type: 'welcome', protocol: 1 }));
       socket.on('message', (raw) => void this.onFrame(raw, socket));
       return;
     }
-    if (this.socket && this.socket !== socket) this.socket.close(4000, 'remplacée par une nouvelle connexion');
+    if (this.socket && this.socket !== socket) this.socket.close(4000, 'replaced by a new connection');
     this.socket = socket;
     this.hello = hello;
     socket.send(JSON.stringify({ type: 'welcome', protocol: 1 }));
     const version = hello.agent?.version ? ` ${hello.agent.version}` : '';
     this.setState('connected', `${hello.agent?.type ?? 'plugin'}${version}`);
 
-    // Runs en cours avant la coupure : ceux que le plugin ne connaît plus ne reviendront pas.
+    // Runs in progress before the cut: those the plugin no longer knows will not come back.
     const alive = new Set<string>((hello.activeRuns ?? []).map((r: Json) => String(r.runId)));
     for (const [runId, run] of this.runs) {
       clearTimeout(run.orphanTimer);
       run.orphanTimer = undefined;
-      if (!alive.has(runId)) this.fail(runId, 'run perdu pendant la coupure du plugin');
+      if (!alive.has(runId)) this.fail(runId, 'run lost during the plugin disconnection');
     }
 
     socket.on('message', (raw) => void this.onFrame(raw, socket));
@@ -188,13 +188,13 @@ export class GatewayAdapter implements AgentAdapter {
       if (this.socket !== socket) return;
       this.socket = undefined;
       clearInterval(this.ping);
-      this.setState('disconnected', 'plugin déconnecté');
+      this.setState('disconnected', 'plugin disconnected');
       for (const [runId, run] of this.runs) {
-        run.orphanTimer ??= setTimeout(() => this.fail(runId, 'plugin déconnecté'), RECONNECT_GRACE_MS);
+        run.orphanTimer ??= setTimeout(() => this.fail(runId, 'plugin disconnected'), RECONNECT_GRACE_MS);
       }
       for (const [id, p] of this.rpcs) {
         clearTimeout(p.timer);
-        p.reject(new Error('plugin déconnecté'));
+        p.reject(new Error('plugin disconnected'));
         this.rpcs.delete(id);
       }
     });
@@ -238,7 +238,7 @@ export class GatewayAdapter implements AgentAdapter {
         return;
       }
       default:
-        return; // pong, champs inconnus : ignorés
+        return; // pong, unknown fields: ignored
     }
   }
 
@@ -247,12 +247,12 @@ export class GatewayAdapter implements AgentAdapter {
     if (!run || typeof ev.type !== 'string') return;
     let out = ev as AgentEvent;
     if (ev.type === 'message.media') {
-      // Le plugin pousse le contenu ; RunManager le récupère via fetchMedia comme pour les autres agents.
+      // The plugin pushes the content; RunManager fetches it via fetchMedia as for the other agents.
       const key = `${MEDIA_PREFIX}${randomUUID()}`;
       this.media.set(key, toMedia(ev));
       out = { type: 'message.media', url: key, name: String(ev.name ?? 'media'), mimeType: ev.mimeType };
     } else if (ev.type === 'subagent.start') {
-      // Pas de suivi de session distante via le canal : le plugin envoie lui-même subagent.end.
+      // No remote session tracking through the channel: the plugin sends subagent.end itself.
       out = { type: 'subagent.start', id: String(ev.id), name: String(ev.name ?? 'sous-agent') };
     }
     run.queue.push(out);
@@ -273,10 +273,10 @@ export class GatewayAdapter implements AgentAdapter {
   private rpc<T>(method: string, params?: unknown): Promise<T> {
     const id = randomUUID();
     return new Promise<T>((resolve, reject) => {
-      if (!this.write({ type: 'rpc', id, method, params })) return reject(new Error('plugin non connecté'));
+      if (!this.write({ type: 'rpc', id, method, params })) return reject(new Error('plugin not connected'));
       const timer = setTimeout(() => {
         this.rpcs.delete(id);
-        reject(new Error(`rpc ${method} : délai dépassé`));
+        reject(new Error(`rpc ${method}: timed out`));
       }, 10_000);
       this.rpcs.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
     });
@@ -285,7 +285,7 @@ export class GatewayAdapter implements AgentAdapter {
   // ---------- AgentAdapter ----------
 
   async send(sessionId: string | undefined, input: SendInput): Promise<RunHandle> {
-    if (!this.socket) throw new Error(`${this.name} : plugin non connecté`);
+    if (!this.socket) throw new Error(`${this.name}: plugin not connected`);
     const conversationId = sessionId ?? randomUUID();
     const runId = randomUUID();
     const queue = new EventQueue();
@@ -305,12 +305,12 @@ export class GatewayAdapter implements AgentAdapter {
     });
     if (!sent) {
       this.runs.delete(runId);
-      throw new Error(`${this.name} : plugin non connecté`);
+      throw new Error(`${this.name}: plugin not connected`);
     }
     return { runId, sessionId: conversationId, events: queue.iterate() };
   }
 
-  /** Après un redémarrage d'AgentUI : le run continue si le plugin le déclare encore actif à sa reconnexion. */
+  /** After an AgentUI restart: the run continues if the plugin still declares it active on reconnection. */
   async resume(runId: string, sessionId: string): Promise<RunHandle | null> {
     const queue = new EventQueue();
     const run: PendingRun = { conversationId: sessionId, queue };
@@ -322,34 +322,34 @@ export class GatewayAdapter implements AgentAdapter {
         return null;
       }
     } else {
-      run.orphanTimer = setTimeout(() => this.fail(runId, 'run interrompu (plugin non reconnecté)'), RECONNECT_GRACE_MS);
+      run.orphanTimer = setTimeout(() => this.fail(runId, 'run interrupted (plugin did not reconnect)'), RECONNECT_GRACE_MS);
     }
     return { runId, sessionId, events: queue.iterate() };
   }
 
   async abort(runId: string, sessionId: string): Promise<void> {
     if (!this.write({ type: 'abort', conversationId: this.runs.get(runId)?.conversationId ?? sessionId, runId })) {
-      this.fail(runId, 'plugin non connecté');
+      this.fail(runId, 'plugin not connected');
     }
   }
 
   async resolveApproval(runId: string, approvalId: string, approve: boolean): Promise<void> {
     const run = this.runs.get(runId);
-    if (!run) throw new Error('Run inconnu');
+    if (!run) throw new Error('Unknown run');
     if (!this.write({ type: 'approval', conversationId: run.conversationId, runId, id: approvalId, approve, ...(approve ? { scope: 'once' } : {}) })) {
-      throw new Error('plugin non connecté');
+      throw new Error('plugin not connected');
     }
   }
 
   async reply(runId: string, sessionId: string, text: string): Promise<void> {
     if (!this.write({ type: 'reply', conversationId: this.runs.get(runId)?.conversationId ?? sessionId, runId, text })) {
-      throw new Error('plugin non connecté');
+      throw new Error('plugin not connected');
     }
   }
 
   async fetchMedia(url: string): Promise<{ data: Buffer; mimeType: string }> {
     const m = this.media.get(url);
-    if (!m) throw new Error('média expiré');
+    if (!m) throw new Error('media expired');
     this.media.delete(url);
     return { data: m.data, mimeType: m.mimeType };
   }
@@ -366,7 +366,7 @@ export class GatewayAdapter implements AgentAdapter {
   }
 
   async readSkill(skillId: string, subAgentId?: string): Promise<string> {
-    if (!this.capabilities().skills) throw Object.assign(new Error('Non supporté par ce plugin'), { statusCode: 501 });
+    if (!this.capabilities().skills) throw Object.assign(new Error('Not supported by this plugin'), { statusCode: 501 });
     return (await this.rpc<{ content: string }>('readSkill', { skillId, ...(subAgentId ? { subAgentId } : {}) })).content;
   }
 
@@ -376,17 +376,17 @@ export class GatewayAdapter implements AgentAdapter {
   }
 
   async jobAction(jobId: string, action: 'pause' | 'resume' | 'run' | 'delete', subAgentId?: string): Promise<void> {
-    if (!this.capabilities().jobControl) throw Object.assign(new Error('Non supporté par ce plugin'), { statusCode: 501 });
+    if (!this.capabilities().jobControl) throw Object.assign(new Error('Not supported by this plugin'), { statusCode: 501 });
     await this.rpc('jobAction', { jobId, action, ...(subAgentId ? { subAgentId } : {}) });
   }
 
-  /** Supprime la session de plateforme d'une discussion ; le plugin annonce `sessionDelete`. */
+  /** Deletes the platform session of a chat; the plugin announces `sessionDelete`. */
   async listModels(): Promise<ModelOption[]> {
     if (!this.capabilities().models) return [];
     return this.rpc<ModelOption[]>('listModels', {});
   }
   async setModel(sessionId: string, model: string, provider?: string, subAgentId?: string) {
-    if (!this.capabilities().models) throw Object.assign(new Error(`${this.name} : ce plugin ne sait pas changer de modèle`), { statusCode: 501 });
+    if (!this.capabilities().models) throw Object.assign(new Error(`${this.name}: this plugin cannot change the model`), { statusCode: 501 });
     try {
       return await this.rpc<{ model: string; provider?: string; message?: string }>('setModel', { conversationId: sessionId, model, ...(provider ? { provider } : {}), ...(subAgentId ? { subAgentId } : {}) });
     } catch (e) {
@@ -399,17 +399,17 @@ export class GatewayAdapter implements AgentAdapter {
   }
   async deleteSession(sessionId: string): Promise<void> {
     if (!this.capabilities().sessionDelete) {
-      throw Object.assign(new Error(`${this.name} : ce plugin ne sait pas supprimer ses sessions`), { statusCode: 501 });
+      throw Object.assign(new Error(`${this.name}: this plugin cannot delete its sessions`), { statusCode: 501 });
     }
     try {
       await this.rpc('deleteSession', { conversationId: sessionId });
     } catch (e) {
-      throw Object.assign(new Error(`${this.name} : ${(e as Error).message}`), { statusCode: 502 });
+      throw Object.assign(new Error(`${this.name}: ${(e as Error).message}`), { statusCode: 502 });
     }
   }
 
   async listSessions(): Promise<Session[]> {
-    return []; // l'historique vit dans la base d'AgentUI
+    return []; // the history lives in the AgentUI database
   }
 
   async getMessages(): Promise<Message[]> {

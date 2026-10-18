@@ -1,29 +1,31 @@
 # AgentUI
 
-PWA de chat pour agents IA (Hermes, OpenClaw…) avec backend persistant.
+Chat PWA for AI agents (Hermes, OpenClaw…) with a persistent backend.
 
 ```bash
-cp .env.example .env && cp agents.config.example.yaml agents.config.yaml   # puis éditer
+cp .env.example .env && cp agents.config.example.yaml agents.config.yaml   # then edit
 npm install
-npm run dev:server   # :8080  (AGENTS_CONFIG, DATA_DIR, ADMIN_USER/ADMIN_PASSWORD, INSECURE_COOKIES=1 en HTTP local)
-npm run dev:web      # :5173, proxy vers :8080
-npm test             # tests serveur
+npm run dev:server   # :8080  (AGENTS_CONFIG, DATA_DIR, ADMIN_USER/ADMIN_PASSWORD, INSECURE_COOKIES=1 on local HTTP)
+npm run dev:web      # :5173, proxy to :8080
+npm test             # server and web tests
 docker compose up --build
 ```
 
-Ajouter un agent : implémenter `AgentAdapter` (`apps/server/src/agents/types.ts`), l'enregistrer dans `agents/registry.ts`, le déclarer dans `agents.config.yaml`.
+The interface is available in French and English (automatic from the browser language, or chosen in Settings). Texts live in `apps/web/src/i18n/`.
 
-## Agents par plugin canal
-La plateforme se connecte à AgentUI comme à Telegram, via un plugin canal : agent de type `gateway` (token) dans `agents.config.yaml`, plugin installé côté
-plateforme, connexion WebSocket sur `/gateway`. Apporte les messages proactifs (crons, envois spontanés), rangés dans
-la discussion « Messages de <agent> ». Protocole, plugins Hermes / OpenClaw et installation : [`plugins/`](plugins/README.md).
+To add an agent: implement `AgentAdapter` (`apps/server/src/agents/types.ts`), register it in `agents/registry.ts`, declare it in `agents.config.yaml`.
 
-## Notifications push
-Activables dans Réglages → « Notifications quand un agent répond ». Elles exigent **HTTPS** (hors `localhost`) ;
-sur iPhone, l'app doit d'abord être ajoutée à l'écran d'accueil. Les clés VAPID sont générées au premier démarrage et
-conservées dans la base (`data/agentui.db`) : ne pas la supprimer, sinon les appareils devront se réabonner.
-`VAPID_SUBJECT` (défaut `mailto:admin@agentui.local`) peut être défini dans `.env`.
-Tests : `npm run e2e` (interface) et `npm run e2e:push` (voir l'en-tête de `e2e/push.mjs`).
+## Agents through a channel plugin
+The platform connects to AgentUI the way it connects to Telegram, through a channel plugin: an agent of type `gateway` (token) in `agents.config.yaml`, a plugin installed on the
+platform side, a WebSocket connection on `/gateway`. It brings proactive messages (crons, spontaneous sends), filed in
+the "Messages from <agent>" chat. Protocol, Hermes / OpenClaw plugins and installation: [`plugins/`](plugins/README.md).
 
-## Site de présentation
-Page statique bilingue dans [`docs/`](docs/index.html) (français) et [`docs/en/`](docs/en/index.html) (anglais), publiée par GitHub Pages (branche `main`, dossier `/docs`). Pour la modifier ou refaire ses captures : skill `update-site` (`.claude/skills/update-site/SKILL.md`).
+## Push notifications
+Enable them in Settings → "Notify me when an agent replies". They require **HTTPS** (except on `localhost`);
+on iPhone, the app must first be added to the home screen. VAPID keys are generated at first start and
+kept in the database (`data/agentui.db`): do not delete it, otherwise devices will have to subscribe again.
+`VAPID_SUBJECT` (default `mailto:admin@agentui.local`) can be set in `.env`.
+Tests: `npm run e2e` (interface) and `npm run e2e:push` (see the header of `e2e/push.mjs`).
+
+## Presentation site
+Bilingual static page in [`docs/`](docs/index.html) (French) and [`docs/en/`](docs/en/index.html) (English), published by GitHub Pages (`main` branch, `/docs` folder). To edit it or redo its screenshots: `update-site` skill (`.claude/skills/update-site/SKILL.md`).

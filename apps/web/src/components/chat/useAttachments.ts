@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Capabilities } from '@agentui/shared';
 import { checkFile, isImage } from '../../attachments';
 
-/** Fichiers en cours de rédaction : validation selon les capacités de l'agent, aperçus des images, message d'erreur. */
+/** Files being composed: validation according to the agent's capabilities, image previews, error message. */
 export function useAttachments(attach: Capabilities['attachments']) {
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState('');

@@ -1,4 +1,4 @@
-/** Bloc ```widget : JSON `{ "type": "ask" | "confirm" | "chart" | …, "arguments": { … } }`. `undefined` si invalide. */
+/** ```widget block: JSON `{ "type": "ask" | "confirm" | "chart" | …, "arguments": { … } }`. `undefined` if invalid. */
 export function parseWidget(raw: string): { type: string; arguments: Record<string, unknown> } | undefined {
   try {
     const j = JSON.parse(raw) as { type?: unknown; arguments?: unknown };
@@ -9,7 +9,7 @@ export function parseWidget(raw: string): { type: string; arguments: Record<stri
 
 const INTERACTIVE = new Set(['ask', 'confirm', 'form']);
 
-/** Blocs interactifs d'un texte (widgets `ask`/`confirm`/`form` et ancien bloc ```ask), dans l'ordre : chacun attend une réponse. */
+/** Interactive blocks of a text (`ask`/`confirm`/`form` widgets and legacy ```ask block), in order: each waits for an answer. */
 export function interactiveBlocks(text: string): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(/```(widget|ask)[^\S\n]*\n([\s\S]*?)\n?```/g)) {
@@ -19,7 +19,7 @@ export function interactiveBlocks(text: string): string[] {
   return out;
 }
 
-/** Les plugins exposent chaque widget d'affichage comme un outil `agentui_<type>` (ex. `agentui_chart`) : ses arguments sont ceux du widget. */
+/** Plugins expose each display widget as an `agentui_<type>` tool (e.g. `agentui_chart`): its arguments are the widget's. */
 const WIDGET_TOOL_PREFIX = 'agentui_';
 export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string; startedAt?: number; endedAt?: number };
 const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image']);
@@ -34,7 +34,7 @@ export function widgetOfTool(t: { name: string; args?: unknown }): { type: strin
 
 const TOKEN = /\[\[agentui:([0-9a-f]+)\]\]/g;
 const HEAD = '[[agentui:';
-/** Retire un jeton en cours de frappe en fin de texte (« [[agent », « [[agentui:a3f », « [[agentui:a3f9c1] »). */
+/** Removes a token being typed at the end of the text ("[[agent", "[[agentui:a3f", "[[agentui:a3f9c1]"). */
 function stripPartialToken(text: string): string {
   for (let i = Math.min(text.length, HEAD.length + 7); i > 0; i--) {
     const tail = text.slice(-i);
@@ -46,12 +46,12 @@ const fence = (w: { type: string; arguments: Record<string, unknown> }) => '\n\n
 
 const sameCall = (a: ToolCallLike, b: ToolCallLike) => (a.id !== undefined && b.id !== undefined ? a.id === b.id : a === b);
 
-/** Widgets qui vivent hors du texte : affichés dès leur premier appel d'outil (sans attendre que l'agent écrive le jeton), mis à jour sur place. */
+/** Widgets that live outside the text: shown from their first tool call (without waiting for the agent to write the token), updated in place. */
 const OUT_OF_TEXT = new Set(['progress']);
 
 /**
- * Widgets « hors texte » créés dans ce message (un par jeton, dans l'ordre de création), avec l'état du **dernier** appel de
- * la discussion : un appel `update` (jeton du widget) remplace l'état affiché, il ne crée pas de second composant.
+   * "Out-of-text" widgets created in this message (one per token, in creation order), with the state of the **latest** call of
+   * the chat: an `update` call (widget token) replaces the displayed state, it does not create a second component.
  */
 export function outOfTextWidgets(own: ToolCallLike[], all: ToolCallLike[] = own): OutOfTextWidget[] {
   const latest = new Map<string, { type: string; arguments: Record<string, unknown> }>();
@@ -74,9 +74,9 @@ export interface StepTime { start?: number; end?: number }
 export interface OutOfTextWidget { token: string; type: string; arguments: Record<string, unknown>; times: StepTime[] }
 
 /**
- * Durée de chaque étape d'une progression, déduite de l'instant de chaque appel (création puis mises à jour) : une étape
- * commence quand un appel la montre `running`, et se termine quand un appel la montre `done`/`failed`. Une étape vue
- * directement terminée a commencé au précédent appel ; à la création, sa durée est inconnue.
+   * Duration of each step of a progress widget, derived from the time of each call (creation then updates): a step
+   * starts when a call shows it `running`, and ends when a call shows it `done`/`failed`. A step seen
+   * directly finished started at the previous call; at creation, its duration is unknown.
  */
 export function stepTimes(calls: ToolCallLike[]): StepTime[] {
   const times: StepTime[] = [];
@@ -98,7 +98,7 @@ export function stepTimes(calls: ToolCallLike[]): StepTime[] {
   return times;
 }
 
-/** Widget `image` : le plugin copie les fichiers locaux et renvoie, dans le résultat de l'outil, `files` = { chemin → nom de la pièce jointe }. */
+/** `image` widget: the plugin copies local files and returns, in the tool result, `files` = { path → attachment name }. */
 function filesOf(t: { resultPreview?: string }): Record<string, string> {
   try {
     const f = (JSON.parse(t.resultPreview ?? '') as { files?: unknown }).files;
@@ -106,17 +106,17 @@ function filesOf(t: { resultPreview?: string }): Record<string, string> {
   } catch { return {}; }
 }
 
-/** Pièces jointes copiées pour un widget image : leur nom commence par ce préfixe, elles ne s'affichent pas en plus du widget. */
+/** Attachments copied for an image widget: their name starts with this prefix, they are not displayed on top of the widget. */
 export const WIDGET_ATTACHMENT_PREFIX = 'agentui-img-';
 
-/** Jeton (`[[agentui:<id>]]`) renvoyé par l'outil, lu dans son résultat. */
+/** Token (`[[agentui:<id>]]`) returned by the tool, read from its result. */
 const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[agentui:([0-9a-f]+)\]\]/)?.[1];
 
 /**
- * Remplace par leur widget les jetons que l'agent a placés dans son texte après un appel d'outil `agentui_<type>`.
- * Les arguments du widget sont ceux de l'appel (`own` : outils du message ; `all` : toute la discussion, car l'agent peut
- * réutiliser un jeton d'un message précédent). Un jeton inconnu ou en cours de frappe disparaît ; un widget dont le jeton
- * n'a jamais été écrit est ajouté en fin de message une fois celui-ci terminé, pour qu'il ne soit pas perdu.
+   * Replaces with their widget the tokens the agent placed in its text after an `agentui_<type>` tool call.
+   * The widget arguments are those of the call (`own`: tools of the message; `all`: whole chat, since the agent may
+   * reuse a token from an earlier message). An unknown or in-progress token disappears; a widget whose token
+   * was never written is appended at the end of the message once it is finished, so that it is not lost.
  */
 export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolCallLike[] = own, done = true): string {
   const widgets = new Map<string, { type: string; arguments: Record<string, unknown> }>();
@@ -131,7 +131,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
   let out = text.replace(TOKEN, (_m, id: string) => {
     const w = widgets.get(id);
     if (!w) return '';
-    if (OUT_OF_TEXT.has(w.type)) return ''; // affiché par `outOfTextWidgets` ; un jeton écrit par l'agent est ignoré
+    if (OUT_OF_TEXT.has(w.type)) return ''; // shown by `outOfTextWidgets`; a token written by the agent is ignored
     used.add(id);
     return fence(w);
   });

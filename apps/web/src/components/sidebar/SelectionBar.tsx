@@ -5,7 +5,7 @@ import Delete from '@mui/icons-material/Delete';
 import Unarchive from '@mui/icons-material/Unarchive';
 import { t } from '../../i18n';
 
-/** Barre d'actions du mode sélection : tout sélectionner, archiver / désarchiver, supprimer, quitter. */
+/** Selection mode action bar: select all, archive / unarchive, delete, exit. */
 export default function SelectionBar({ count, allChosen, allArchived, onToggleAll, onArchive, onDelete, onCancel }: {
   count: number; allChosen: boolean; allArchived: boolean;
   onToggleAll: () => void; onArchive: () => void; onDelete: () => void; onCancel: () => void;

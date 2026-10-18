@@ -13,7 +13,7 @@ export interface PushPayload {
 }
 type Sender = (sub: PushSubscriptionJson, payload: string) => Promise<unknown>;
 
-/** Notifications Web Push (VAPID). Les clés sont générées une fois puis conservées en base. */
+/** Web Push notifications (VAPID). Keys are generated once then kept in the database. */
 export class PushService {
   readonly publicKey: string;
   private privateKey: string;
@@ -39,7 +39,7 @@ export class PushService {
     return (this.db.prepare('SELECT COUNT(*) AS c FROM push_subscriptions').get() as { c: number }).c;
   }
 
-  /** Envoie à tous les appareils abonnés ; purge ceux que le service push déclare expirés (404/410). */
+  /** Sends to all subscribed devices; purges those the push service declares expired (404/410). */
   async notify(payload: PushPayload): Promise<{ sent: number; removed: number }> {
     const rows = this.db.prepare('SELECT endpoint, data FROM push_subscriptions').all() as { endpoint: string; data: string }[];
     const body = JSON.stringify(payload);

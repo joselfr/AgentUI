@@ -1,9 +1,9 @@
-// Réponse à une question `ask_user` par la passerelle d'OpenClaw (`question.resolve`), comme le fait l'interface
-// de contrôle. La saisie « texte » captée par le cœur ne couvre pas les questions posées depuis le mode code
-// (`exec`) : on résout donc la question elle-même, par son identifiant.
+// Answer to an `ask_user` question through OpenClaw's gateway (`question.resolve`), as the control interface does.
+// The "text" input captured by the core does not cover questions asked from code mode
+// (`exec`): so we resolve the question itself, by its identifier.
 import { callGatewayFromCli } from 'openclaw/plugin-sdk/gateway-runtime';
 
-/** Question telle que la renvoie `question.get` (champs utiles). */
+/** Question as returned by `question.get` (useful fields). */
 export interface QuestionRecordItem {
   questionId: string;
   options?: Array<{ label: string }>;
@@ -11,7 +11,7 @@ export interface QuestionRecordItem {
   isOther?: boolean;
 }
 
-/** Une réponse → le libellé d'option qu'elle désigne (numéro 1…n ou libellé, sans tenir compte de la casse) ; sinon le texte libre si permis. */
+/** An answer → the option label it designates (number 1…n or label, case-insensitive); otherwise the free text if allowed. */
 function pick(q: QuestionRecordItem, raw: string): string | undefined {
   const text = raw.trim();
   if (!text) return undefined;
@@ -19,7 +19,7 @@ function pick(q: QuestionRecordItem, raw: string): string | undefined {
   const byIndex = /^\d+$/.test(text) ? options[Number(text) - 1] : undefined;
   const found = byIndex ?? options.find((o) => o.label.toLowerCase() === text.toLowerCase());
   if (found) return found.label;
-  if (options.length && !q.isOther) throw new Error(`« ${text} » ne correspond à aucune option`);
+  if (options.length && !q.isOther) throw new Error(`"${text}" does not match any option`);
   return text;
 }
 
@@ -29,8 +29,8 @@ function answerOf(q: QuestionRecordItem, raw: string): string[] {
 }
 
 /**
- * Réponse de l'interface → `answers` de `question.resolve`. Une question : le texte entier. Plusieurs : lignes
- * « 1: valeur », « 2: valeur »… (voir `askReplyText`), une réponse vide laissant la question sans réponse.
+ * Interface answer → `answers` of `question.resolve`. One question: the whole text. Several: lines
+ * "1: value", "2: value"… (see `askReplyText`), an empty answer leaving the question unanswered.
  */
 export function buildQuestionAnswers(questions: QuestionRecordItem[], text: string): { answers: Record<string, string[]> } {
   const answers: Record<string, string[]> = {};
@@ -49,12 +49,12 @@ export function buildQuestionAnswers(questions: QuestionRecordItem[], text: stri
   return { answers };
 }
 
-/** Résout la question en attente `id` avec la réponse de l'utilisateur. */
+/** Resolves the pending question `id` with the user's answer. */
 export async function resolveQuestion(id: string, text: string, resolvedBy: string): Promise<void> {
   const call = (method: string, params: unknown) => callGatewayFromCli(method, { json: true, timeout: '15000' }, params);
   const got = (await call('question.get', { id })) as { question?: { status?: string; questions?: QuestionRecordItem[] } };
   const record = got.question;
-  if (!record?.questions?.length) throw new Error('question introuvable');
-  if (record.status && record.status !== 'pending') throw new Error(`question déjà ${record.status}`);
+  if (!record?.questions?.length) throw new Error('question not found');
+  if (record.status && record.status !== 'pending') throw new Error(`question already ${record.status}`);
   await call('question.resolve', { id, answers: buildQuestionAnswers(record.questions, text), resolvedBy });
 }

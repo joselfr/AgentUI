@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Bouton retour (mobile) : ferme la modale ouverte au lieu de quitter la page.
- * Chaque modale ouverte empile une entrée d'historique ; un retour ferme la plus récente.
+   * Back button (mobile): closes the open dialog instead of leaving the page.
+   * Each open dialog pushes a history entry; going back closes the most recent one.
  */
 interface Entry { close: () => void }
 const stack: Entry[] = [];
-let ignore = 0; // popstate provoqués par nos propres history.back()
+let ignore = 0; // popstate events caused by our own history.back()
 let listening = false;
 
 function onPop() {
@@ -23,13 +23,13 @@ export function useBackClose(open: boolean, onClose: () => void) {
     const entry: Entry = { close: () => cb.current() };
     const token = Math.random().toString(36).slice(2);
     stack.push(entry);
-    history.pushState({ ...history.state, modal: token }, ''); // garde l'état du routeur (idx)
+    history.pushState({ ...history.state, modal: token }, ''); // keeps the router state (idx)
     return () => {
       const i = stack.indexOf(entry);
-      if (i < 0) return; // déjà dépilée par le bouton retour
+      if (i < 0) return; // already popped by the back button
       stack.splice(i, 1);
-      // On ne revient en arrière que si l'entrée courante est encore la nôtre : après une navigation (choix d'une
-      // discussion dans le tiroir), un retour ramènerait à l'ancienne URL.
+      // Only go back if the current entry is still ours: after a navigation (choosing a
+      // chat in the drawer), going back would return to the old URL.
       if (history.state?.modal !== token) return;
       ignore++;
       history.back();

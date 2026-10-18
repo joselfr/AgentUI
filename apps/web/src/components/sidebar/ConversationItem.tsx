@@ -4,7 +4,7 @@ import Star from '@mui/icons-material/Star';
 import type { Conversation } from '../../api';
 import { fmtDate, t } from '../../i18n';
 
-/** Une ligne de la liste. En mode sélection, une case à cocher précède le titre. */
+/** One row of the list. In selection mode, a checkbox precedes the title. */
 export default function ConversationItem({ conv: c, current, agentName, selecting, checked, onClick, menuHandlers }: {
   conv: Conversation; current: boolean; agentName: string; selecting: boolean; checked: boolean;
   onClick: () => void; menuHandlers: Pick<ComponentProps<typeof ListItemButton>, 'onContextMenu' | 'onTouchStart' | 'onTouchMove' | 'onTouchEnd' | 'onTouchCancel'>;

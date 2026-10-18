@@ -10,10 +10,10 @@ interface Progress { title?: string; steps: Step[] }
 
 const STATUSES: StepStatus[] = ['pending', 'running', 'done', 'failed', 'skipped'];
 const MAX_STEPS = 20;
-const FOLD_OVER = 8; // au-delà, les étapes terminées en tête de liste se replient en une ligne
+const FOLD_OVER = 8; // beyond that, completed steps at the head of the list fold into a single line
 const FOLD_MIN = 3;
 
-/** Arguments du widget `progress` : `{ title?, steps: [{ label, status, detail? }] }` (+ `update`, propre à l'outil, ignoré ici). `undefined` si invalide. */
+/** Arguments of the `progress` widget: `{ title?, steps: [{ label, status, detail? }] }` (+ `update`, specific to the tool, ignored here). `undefined` if invalid. */
 export function parseProgress(a: Record<string, unknown>): Progress | undefined {
   const { steps } = a as { steps?: unknown };
   if (!Array.isArray(steps) || !steps.length || steps.length > MAX_STEPS) return undefined;
@@ -25,7 +25,7 @@ export function parseProgress(a: Record<string, unknown>): Progress | undefined 
   return { ...(typeof a.title === 'string' && a.title ? { title: a.title } : {}), steps: out };
 }
 
-/** Durée selon la langue : « 3,2 s », « 42 s », « 2 min 05 s », « 1 h 05 min ». */
+/** Duration according to the language: "3,2 s", "42 s", "2 min 05 s", "1 h 05 min". */
 export function fmtDuration(ms: number): string {
   const s = Math.max(0, ms) / 1000;
   if (s < 10) return `${fmtDecimal(s)} s`;
@@ -50,7 +50,7 @@ function Icon({ status }: { status: Shown }) {
   return <Box sx={{ ...base, borderColor: (t) => alpha(t.palette.text.secondary, 0.55), borderStyle: status === 'skipped' ? 'dashed' : 'solid' }} />;
 }
 
-/** `ended` : le message est terminé (ou arrêté) : une étape encore en cours ou en attente n'a pas été mise à jour par l'agent, on la montre « interrompue ». */
+/** `ended`: the message is finished (or stopped): a step still running or pending was not updated by the agent, so it is shown as "interrupted". */
 export default function ProgressCard({ progress: p, ended = false, times = [] }: { progress: Progress; ended?: boolean; times?: StepTime[] }) {
   const ticking = !ended && p.steps.some((s, i) => s.status === 'running' && times[i]?.start !== undefined);
   const [now, setNow] = useState(() => Date.now());
@@ -60,7 +60,7 @@ export default function ProgressCard({ progress: p, ended = false, times = [] }:
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [ticking]);
-  /** Durée affichée : écoulée en direct pour l'étape en cours, figée pour une étape terminée ; rien pour une étape interrompue. */
+  /** Displayed duration: live elapsed time for the running step, frozen for a finished step; nothing for an interrupted step. */
   const elapsed = (i: number, status: Shown): string => {
     const t = times[i];
     if (!t || t.start === undefined) return '';

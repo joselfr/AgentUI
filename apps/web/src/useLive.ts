@@ -3,12 +3,12 @@ import type { ConnStatus, ServerPush } from '@agentui/shared';
 
 export type LiveEvent = Extract<ServerPush, { type: 'event' }>;
 
-/** WebSocket persistant avec reconnexion ; `onOpen` sert à resynchroniser l'état via REST. */
+/** Persistent WebSocket with reconnection; `onOpen` is used to resync the state via REST. */
 export function useLive(opts: {
   enabled: boolean;
   onEvent: (e: LiveEvent) => void;
   onStatus: (agentId: string, s: ConnStatus, detail?: string) => void;
-  /** Discussion marquée lue depuis un autre appareil. */
+  /** Chat marked read from another device. */
   onRead?: (conversationId: string) => void;
   onOpen: () => void;
   onUnauthorized: () => void;
@@ -26,7 +26,7 @@ export function useLive(opts: {
       ws = new WebSocket(`${proto}://${location.host}/ws`);
       ws.onopen = () => {
         delay = 500;
-        // Pas de rejeu : l'état est rechargé via REST (source de vérité), seuls les events live nous intéressent.
+        // No replay: the state is reloaded via REST (source of truth), only live events matter to us.
         ws!.send(JSON.stringify({ type: 'resume', since: Number.MAX_SAFE_INTEGER }));
         ref.current.onOpen();
       };

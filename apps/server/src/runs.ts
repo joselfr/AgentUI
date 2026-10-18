@@ -12,32 +12,32 @@ export interface ConversationRow {
   title: string;
   created_at: number;
   updated_at: number;
-  /** Dernière lecture (ms). */
+  /** Last read (ms). */
   last_read_at: number | null;
-  /** 1 si la discussion est épinglée en tête de liste. */
+  /** 1 if the chat is pinned at the top of the list. */
   favorite?: number;
-  /** 1 si la discussion est archivée (rangée hors de la liste principale). */
+  /** 1 if the chat is archived (filed outside the main list). */
   archived?: number;
-  /** Dernière consommation connue de la session (JSON `Usage`). */
+  /** Last known consumption of the session (`Usage` JSON). */
   usage?: string | null;
-  /** 1 si un message d'agent terminé est plus récent que la dernière lecture. */
+  /** 1 if a finished agent message is more recent than the last read. */
   unread?: number;
 }
 
-/** Clé de session synthétique des messages proactifs rangés dans une discussion « maison » (voir `deliver`). */
+/** Synthetic session key of proactive messages filed in a "home" chat (see `deliver`). */
 const HOME_SESSION = 'home';
-/** Attente maximale de la fin d'un run avant de supprimer sa discussion. */
+/** Maximum wait for a run to end before deleting its chat. */
 const ABORT_GRACE_MS = 5_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Un message en cours de streaming n'est pas « non lu » : il le devient en se terminant.
+// A message being streamed is not "unread": it becomes so when it finishes.
 const UNREAD = `EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.role = 'assistant'
   AND COALESCE(m.status, 'done') != 'streaming' AND m.created_at > COALESCE(c.last_read_at, 0)) AS unread`;
 
-/** Minuscules sans accents : base de la recherche (« ete » trouve « Été »). */
+/** Lowercase without accents: basis of the search ("ete" finds "Été"). */
 const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
-/** Idem, avec la correspondance de chaque caractère du texte replié vers sa position dans le texte d'origine. */
+/** Same, with the mapping of each character of the folded text to its position in the original text. */
 function foldMap(s: string): { f: string; map: number[] } {
   let f = '';
   const map: number[] = [];
@@ -51,7 +51,7 @@ function foldMap(s: string): { f: string; map: number[] } {
   return { f, map };
 }
 
-/** Extrait d'une soixantaine de caractères autour du premier mot trouvé, et plages à surligner. */
+/** Excerpt of about sixty characters around the first word found, and ranges to highlight. */
 function makeSnippet(text: string, words: string[]): { snippet: string; marks: [number, number][] } {
   const { f, map } = foldMap(text);
   const first = Math.min(...words.map((w) => { const i = f.indexOf(w); return i < 0 ? Infinity : i; }));
@@ -80,8 +80,8 @@ function makeSnippet(text: string, words: string[]): { snippet: string; marks: [
 type Listener = (push: ServerPush) => void;
 
 /**
- * Orchestre les runs côté serveur : les flux d'agent sont consommés ici, persistés,
- * puis diffusés aux clients WS. Un run continue même si plus aucun client n'est connecté.
+   * Orchestrates runs on the server side: agent streams are consumed here, persisted,
+   * then broadcast to WS clients. A run continues even if no client is connected anymore.
  */
 export class RunManager {
   private listeners = new Set<Listener>();
@@ -120,59 +120,59 @@ export class RunManager {
     const sql = `SELECT c.*, ${UNREAD} FROM conversations c ${agentId ? 'WHERE c.agent_id = ?' : ''} ORDER BY c.favorite DESC, c.updated_at DESC LIMIT 500`;
     return (agentId ? this.db.prepare(sql).all(agentId) : this.db.prepare(sql).all()) as unknown as ConversationRow[];
   }
-  /** Conversation AgentUI rattachée à une session distante (ex. discussion dédiée d'une tâche cron). */
+  /** AgentUI conversation attached to a remote session (e.g. dedicated chat of a cron task). */
   findByRemoteSession(agentId: string, remoteSessionId: string): ConversationRow | undefined {
     return this.db
       .prepare('SELECT * FROM conversations WHERE agent_id = ? AND remote_session_id = ? ORDER BY updated_at DESC LIMIT 1')
       .get(agentId, remoteSessionId) as unknown as ConversationRow | undefined;
   }
   /**
-   * Supprime une discussion, **session de plateforme comprise** : on demande d'abord au plugin canal
-   * d'effacer sa session, et on n'efface localement que s'il a confirmé (sinon la discussion est conservée
-   * telle quelle). Une discussion sans session distante réelle (jamais utilisée, ou messages proactifs
-   * rangés dans la session `home`) n'a rien à supprimer côté agent.
+     * Deletes a chat, **platform session included**: the channel plugin is first asked
+     * to erase its session, and local data is only erased once it confirmed (otherwise the chat is kept
+     * as is). A chat without a real remote session (never used, or proactive messages
+     * filed in the `home` session) has nothing to delete on the agent side.
    */
   async deleteConversation(id: string): Promise<void> {
     const conv = this.getConversation(id);
     if (!conv) return;
-    // Un run vivant écrit encore dans des lignes qu'on s'apprête à effacer, et la plateforme refuse de
-    // supprimer une session active : on l'arrête et on attend sa fin (le run se termine par un événement
-    // terminal du plugin, consommé ici même).
+    // A live run still writes into rows we are about to erase, and the platform refuses to
+    // delete an active session: we stop it and wait for it to end (the run ends with a terminal
+    // event from the plugin, consumed right here).
     if (this.active.has(id)) {
       await this.abort(id);
       const deadline = Date.now() + ABORT_GRACE_MS;
       while (this.active.has(id) && Date.now() < deadline) await sleep(50);
-      if (this.active.has(id)) throw Object.assign(new Error('Le run n’a pas pu être arrêté'), { statusCode: 502 });
+      if (this.active.has(id)) throw Object.assign(new Error('The run could not be stopped'), { statusCode: 502 });
     }
     const sessionId = conv.remote_session_id;
     if (sessionId && sessionId !== HOME_SESSION) {
       const adapter = this.adapters.get(conv.agent_id);
       if (!adapter?.deleteSession) {
         throw Object.assign(
-          new Error(`${adapter?.name ?? conv.agent_id} : la suppression de la session côté agent n’est pas supportée`),
+          new Error(`${adapter?.name ?? conv.agent_id}: deleting the session on the agent side is not supported`),
           { statusCode: 501 },
         );
       }
-      await adapter.deleteSession(sessionId); // échec → rien n'est effacé localement
+      await adapter.deleteSession(sessionId); // failure → nothing is erased locally
     }
     this.db.prepare('DELETE FROM conversations WHERE id = ?').run(id);
     this.files?.removeConversation(id);
   }
-  /** Marque la discussion lue (tous les messages reçus jusqu'ici) et prévient les autres appareils. */
+  /** Marks the chat read (all messages received so far) and notifies the other devices. */
   markRead(id: string) {
-    // max(maintenant, dernier message d'agent) : un message daté légèrement dans le futur (« now + 1 » au lancement d'un run) est bien lu
+    // max(now, last agent message): a message dated slightly in the future ("now + 1" at the start of a run) is indeed read
     const r = this.db
       .prepare(`UPDATE conversations SET last_read_at = MAX(?, COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id = conversations.id AND role = 'assistant'), 0)) WHERE id = ?`)
       .run(Date.now(), id);
     if (Number(r.changes)) this.broadcast({ type: 'conversation.read', conversationId: id });
   }
-  /** Mémorise la consommation de la session (cumulée côté agent) et prévient les appareils connectés. */
+  /** Stores the consumption of the session (cumulative on the agent side) and notifies connected devices. */
   setUsage(id: string, usage: Usage) {
     this.db.prepare('UPDATE conversations SET usage = ? WHERE id = ?').run(JSON.stringify(usage), id);
   }
   /**
-   * Identifiant de session distante d'une discussion, créé au besoin : permet d'agir sur la session de l'agent
-   * (choix du modèle) avant le premier message. Les plugins canal créent la session à la première utilisation.
+     * Remote session identifier of a chat, created if needed: allows acting on the agent's session
+     * (model choice) before the first message. Channel plugins create the session on first use.
    */
   ensureRemoteSession(id: string): string {
     const c = this.getConversation(id);
@@ -188,9 +188,9 @@ export class RunManager {
     this.db.prepare('UPDATE conversations SET favorite = ? WHERE id = ?').run(favorite ? 1 : 0, id);
   }
   /**
-   * Recherche plein texte dans les titres et les messages (sans tenir compte de la casse ni des accents).
-   * Tous les mots de la requête doivent figurer dans le titre, ou dans un même message. Les titres d'abord, puis
-   * les discussions les plus récentes ; l'extrait vient du message correspondant le plus récent.
+     * Full-text search in titles and messages (case- and accent-insensitive).
+     * All words of the query must appear in the title, or in a single message. Titles first, then
+     * most recent chats; the excerpt comes from the most recent matching message.
    */
   search(query: string, limit = 30): SearchHit[] {
     const words = [...new Set(fold(query).split(/\s+/).filter(Boolean))];
@@ -202,7 +202,7 @@ export class RunManager {
       if (matches(c.title)) hits.set(c.id, { id: c.id, agentId: c.agent_id, title: c.title, updatedAt: c.updated_at, favorite: !!c.favorite, archived: !!c.archived, inTitle: true });
     }
     const info = new Map(convs.map((c) => [c.id as string, c]));
-    // Messages du plus récent au plus ancien : le premier qui correspond fournit l'extrait.
+    // Messages from newest to oldest: the first one that matches provides the excerpt.
     const rows = this.db.prepare("SELECT conversation_id, text FROM messages WHERE role IN ('user','assistant') AND text != '' ORDER BY created_at DESC").all() as any[];
     const withSnippet = new Set<string>();
     for (const r of rows) {
@@ -264,7 +264,7 @@ export class RunManager {
     }));
   }
 
-  /** Médias qui apparaissent dans le transcript de l'agent peu après la fin du run (relevés espacés, ~25 s). */
+  /** Media that appear in the agent's transcript shortly after the run ends (spaced polls, ~25 s). */
   private async lateMedia(conv: ConversationRow, runId: string, messageId: string, seen: Set<string>, emit: (e: AgentEvent) => void) {
     const ad = this.adapters.get(conv.agent_id);
     const sessionId = this.getConversation(conv.id)?.remote_session_id;
@@ -280,7 +280,7 @@ export class RunManager {
     }
   }
 
-  /** Récupère un média produit par l'agent et l'enregistre comme pièce jointe du message. */
+  /** Fetches a media produced by the agent and records it as an attachment of the message. */
   private async attachMedia(conv: ConversationRow, messageId: string, ev: Extract<AgentEvent, { type: 'message.media' }>) {
     const ad = this.adapters.get(conv.agent_id);
     if (!ad?.fetchMedia || !this.files) return undefined;
@@ -288,12 +288,12 @@ export class RunManager {
       const { data, mimeType } = await ad.fetchMedia(ev.url);
       return this.files.save(messageId, conv.id, [{ name: ev.name, mimeType: ev.mimeType ?? mimeType, data }])[0];
     } catch (e) {
-      console.error('[media] échec du téléchargement :', (e as Error).message);
+      console.error('[media] download failed:', (e as Error).message);
       return undefined;
     }
   }
 
-  /** Un run terminé ne laisse ni outil ni sous-agent « en cours » (leur événement de fin peut ne jamais arriver). */
+  /** A finished run leaves no tool or sub-agent "running" (their end event may never arrive). */
   private closeRunning(messageId: string, status: 'done' | 'failed', now: number) {
     this.db.prepare('UPDATE messages SET pending_question = NULL WHERE id = ?').run(messageId);
     this.db.prepare("UPDATE tool_calls SET status = ?, ended_at = ? WHERE message_id = ? AND status = 'running'").run(status, now, messageId);
@@ -302,7 +302,7 @@ export class RunManager {
 
   private following = new Set<string>();
 
-  /** Suit la session d'un sous-agent (qui peut finir après le run principal) et synchronise raisonnement, outils et réponse. */
+  /** Tracks the session of a sub-agent (which may end after the main run) and syncs reasoning, tools and reply. */
   private async followSub(conv: ConversationRow, messageId: string, subId: string, sessionId: string) {
     const ad = this.adapters.get(conv.agent_id);
     const key = `${messageId}:${subId}`;
@@ -367,12 +367,12 @@ export class RunManager {
   // ---------- Run ----------
   async start(convId: string, text: string, attachments: OutgoingAttachment[] = []): Promise<{ runId: string; messageId: string }> {
     const conv = this.getConversation(convId);
-    if (!conv) throw new Error('Conversation inconnue');
-    if (this.active.has(convId)) throw new Error('Un run est déjà en cours dans cette conversation');
+    if (!conv) throw new Error('Unknown conversation');
+    if (this.active.has(convId)) throw new Error('A run is already in progress in this conversation');
     const adapter = this.adapters.get(conv.agent_id);
-    if (!adapter) throw new Error('Agent inconnu');
+    if (!adapter) throw new Error('Unknown agent');
 
-    // Validation AVANT toute écriture : une erreur de pièce jointe ne laisse rien derrière elle.
+    // Validation BEFORE any write: an attachment error leaves nothing behind.
     const prepared = prepareAttachments(text, attachments, adapter.capabilities());
     const now = Date.now();
     const userMsgId = randomUUID();
@@ -381,7 +381,7 @@ export class RunManager {
       .run(userMsgId, convId, 'user', text, 'done', now);
     if (prepared.stored.length) this.files?.save(userMsgId, convId, prepared.stored);
     if (conv.title === 'Nouvelle conversation') {
-      const label = text.replace(/\s+/g, ' ').trim() || prepared.stored[0]?.name || 'Pièce jointe';
+      const label = text.replace(/\s+/g, ' ').trim() || prepared.stored[0]?.name || 'Attachment';
       this.renameConversation(convId, label.slice(0, 60));
     }
 
@@ -403,8 +403,8 @@ export class RunManager {
   }
 
   /**
-   * Au démarrage : rattache les runs restés « streaming » (serveur redémarré en plein run).
-   * Impossible de reprendre → le message est marqué interrompu au lieu de tourner indéfiniment.
+     * At startup: reattaches runs left "streaming" (server restarted mid-run).
+     * Cannot resume → the message is marked interrupted instead of spinning forever.
    */
   async recover(): Promise<number> {
     const rows = this.db
@@ -426,7 +426,7 @@ export class RunManager {
         handle = null;
       }
       if (!handle) {
-        this.db.prepare("UPDATE messages SET status = 'failed', text = text || ? WHERE id = ?").run('\n\n⚠️ Run interrompu (AgentUI a redémarré, reprise impossible).', r.message_id);
+        this.db.prepare("UPDATE messages SET status = 'failed', text = text || ? WHERE id = ?").run('\n\n⚠️ Run interrupted (AgentUI restarted, cannot resume).', r.message_id);
         this.broadcast({ type: 'event', seq: 0, agentId: conv.agent_id, sessionId: conv.id, runId: r.run_id, event: { type: 'run.failed', error: 'Run interrompu' } });
         continue;
       }
@@ -438,8 +438,8 @@ export class RunManager {
   }
 
   /**
-   * Message proactif d'un agent (cron, envoi spontané) : rangé dans la conversation correspondant à la session
-   * distante, ou dans la discussion « maison » de l'agent (créée au besoin), puis notifié comme une réponse.
+     * Proactive message from an agent (cron, spontaneous send): filed in the conversation matching the remote
+     * session, or in the agent's "home" chat (created if needed), then notified like a reply.
    */
   deliver(
     agentId: string,
@@ -452,8 +452,8 @@ export class RunManager {
     const key = remoteSessionId ?? HOME_SESSION;
     let conv = this.findByRemoteSession(agentId, key);
     if (!conv) {
-      conv = this.createConversation(agentId, undefined, title ?? (key === HOME_SESSION ? `Messages de ${agentName}` : 'Message de l’agent'), key);
-      this.db.prepare('UPDATE conversations SET last_read_at = 0 WHERE id = ?').run(conv.id); // créée par l'agent : non lue d'emblée
+      conv = this.createConversation(agentId, undefined, title ?? (key === HOME_SESSION ? `Messages from ${agentName}` : 'Message from the agent'), key);
+      this.db.prepare('UPDATE conversations SET last_read_at = 0 WHERE id = ?').run(conv.id); // created by the agent: unread from the start
     }
     const now = Date.now();
     const messageId = randomUUID();
@@ -478,7 +478,7 @@ export class RunManager {
     await this.adapters.get(a.agentId)?.abort(a.runId, a.remoteSessionId);
   }
 
-  /** Vrai si le run en cours attend une réponse de l'utilisateur (question.requested sans question.resolved) et que l'agent sait la recevoir. */
+  /** True if the current run waits for a user answer (question.requested without question.resolved) and the agent can receive it. */
   awaitingReply(convId: string): boolean {
     const a = this.active.get(convId);
     if (!a || !this.adapters.get(a.agentId)?.reply) return false;
@@ -487,10 +487,10 @@ export class RunManager {
       .get(convId, a.runId);
   }
 
-  /** Transmet la réponse de l'utilisateur à la question posée par l'agent ; le run en cours se poursuit. */
+  /** Passes the user's answer to the question asked by the agent; the current run continues. */
   async reply(convId: string, text: string): Promise<{ runId: string; messageId: string }> {
     const a = this.active.get(convId);
-    if (!a || !this.awaitingReply(convId)) throw new Error('Un run est déjà en cours dans cette conversation');
+    if (!a || !this.awaitingReply(convId)) throw new Error('A run is already in progress in this conversation');
     await this.adapters.get(a.agentId)!.reply!(a.runId, a.remoteSessionId, text);
     this.db
       .prepare('INSERT INTO messages (id, conversation_id, role, text, status, created_at) VALUES (?,?,?,?,?,?)')
@@ -501,9 +501,9 @@ export class RunManager {
 
   async approve(convId: string, approvalId: string, approve: boolean) {
     const a = this.active.get(convId);
-    if (!a) throw new Error('Aucun run actif');
+    if (!a) throw new Error('No active run');
     const ad = this.adapters.get(a.agentId);
-    if (!ad?.resolveApproval) throw new Error('Approbations non supportées');
+    if (!ad?.resolveApproval) throw new Error('Approvals not supported');
     await ad.resolveApproval(a.runId, approvalId, approve);
   }
 
@@ -538,7 +538,7 @@ export class RunManager {
       this.apply(messageId, ev, text);
       emit(ev);
     }
-    // Flux terminé sans événement terminal explicite
+    // Stream ended without an explicit terminal event
     const st = this.db.prepare('SELECT status FROM messages WHERE id = ?').get(messageId) as { status: string };
     if (st.status === 'streaming') {
       this.db.prepare("UPDATE messages SET status = 'done' WHERE id = ?").run(messageId);
@@ -550,7 +550,7 @@ export class RunManager {
     this.onRunFinished?.(conv, outcome, text.replace(/\[\[agentui:[0-9a-f]+\]\]/g, '').trim().slice(0, 140));
   }
 
-  /** Applique un événement à l'état persistant du message assistant. */
+  /** Applies an event to the persistent state of the assistant message. */
   private apply(messageId: string, ev: AgentEvent, text: string): string {
     const now = Date.now();
     switch (ev.type) {

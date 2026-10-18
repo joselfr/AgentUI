@@ -12,7 +12,7 @@ const KINDS: Kind[] = ['text', 'textarea', 'number', 'date', 'select', 'checkbox
 const MAX_FIELDS = 12;
 const EMPTY = '—';
 
-/** Arguments du widget `form` : `{ title?, text?, submit?, fields: [{ name, label, kind?, required?, default?, placeholder?, hint?, options?, min?, max?, unit? }] }`. `undefined` si invalide. */
+/** Arguments of the `form` widget: `{ title?, text?, submit?, fields: [{ name, label, kind?, required?, default?, placeholder?, hint?, options?, min?, max?, unit? }] }`. `undefined` if invalid. */
 export function parseForm(a: Record<string, unknown>): Parsed | undefined {
   if (!Array.isArray(a.fields) || !a.fields.length || a.fields.length > MAX_FIELDS) return undefined;
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined);
@@ -37,7 +37,7 @@ export function parseForm(a: Record<string, unknown>): Parsed | undefined {
 type Values = Record<string, string | boolean>;
 const initial = (p: Parsed): Values => Object.fromEntries(p.fields.map((f) => [f.name, f.kind === 'checkbox' ? f.def === true : f.def != null ? String(f.def) : '']));
 
-/** Message envoyé à l'agent : une ligne « Libellé: valeur » par champ. */
+/** Message sent to the agent: one "Label: value" line per field. */
 function serialize(p: Parsed, v: Values) {
   return p.fields.map((f) => {
     const x = v[f.name];
@@ -46,7 +46,7 @@ function serialize(p: Parsed, v: Values) {
   }).join('\n');
 }
 
-/** Relit un message déjà envoyé pour remplir le formulaire figé. */
+/** Reads back an already sent message to fill in the frozen form. */
 function deserialize(p: Parsed, answer: string): Values {
   const lines = answer.split('\n');
   const v = initial(p);
@@ -73,7 +73,7 @@ function validate(f: Field, x: string | boolean): string | undefined {
   return undefined;
 }
 
-/** `answer` : message déjà envoyé (formulaire figé et relu), `onAnswer` absent : formulaire plus répondable. */
+/** `answer`: message already sent (frozen, read-back form), `onAnswer` absent: form can no longer be answered. */
 export default function FormCard({ form, answer, onAnswer }: { form: Parsed; answer?: string; onAnswer?: (text: string) => void }) {
   const live = !!onAnswer && answer === undefined;
   const [vals, setVals] = useState<Values>(() => initial(form));

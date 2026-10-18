@@ -8,7 +8,7 @@ import { RunManager } from '../runs.js';
 import { AttachmentStore } from '../attachments.js';
 import { GatewayAdapter, type GatewaySocket } from './gateway.js';
 
-/** Plugin simulé : capte ce qu'AgentUI lui envoie et peut lui répondre. */
+/** Simulated plugin: captures what AgentUI sends it and can answer. */
 class FakePlugin extends EventEmitter implements GatewaySocket {
   readyState = 1;
   sent: any[] = [];
@@ -46,7 +46,7 @@ function setup() {
 }
 const tick = () => new Promise((r) => setTimeout(r, 20));
 
-test('connexion : welcome, statut et capacités annoncées par le plugin', () => {
+test('connection: welcome, status and capabilities announced by the plugin', () => {
   const { adapter } = setup();
   expect(adapter.status().status).toBe('disconnected');
   const p = new FakePlugin();
@@ -57,7 +57,7 @@ test('connexion : welcome, statut et capacités annoncées par le plugin', () =>
   expect(adapter.type).toBe('hermes');
 });
 
-test('run : inbound, streaming, outil, média, fin ; même conversationId au message suivant', async () => {
+test('run: inbound, streaming, tool, media, end; same conversationId on the next message', async () => {
   const { adapter, runs } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello());
@@ -83,16 +83,16 @@ test('run : inbound, streaming, outil, média, fin ; même conversationId au mes
   expect(msg.toolCalls?.[0]).toMatchObject({ id: 't1', name: 'terminal', status: 'done', resultPreview: 'a.txt' });
   expect(msg.attachments?.[0]).toMatchObject({ name: 'chart.png', mimeType: 'image/png', size: 3 });
 
-  // Fil conservé : la conversation AgentUI garde son identifiant côté plateforme.
+  // Thread kept: the AgentUI conversation keeps its identifier on the platform side.
   const again = new Promise<string>((r) => (runs.onRunFinished = (_c, o) => r(o)));
-  await runs.start(conv.id, 'encore');
+  await runs.start(conv.id, 'again');
   const second = p.last('inbound');
   expect(second.conversationId).toBe(inbound.conversationId);
   p.frame({ type: 'event', conversationId: second.conversationId, runId: second.runId, event: { type: 'run.completed' } });
   expect(await again).toBe('completed');
 });
 
-test('arrêt et approbation transmis au plugin', async () => {
+test('abort and approval forwarded to the plugin', async () => {
   const { adapter, runs } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello());
@@ -107,36 +107,36 @@ test('arrêt et approbation transmis au plugin', async () => {
   expect(p.last('abort')).toEqual({ type: 'abort', conversationId, runId });
 });
 
-test('messages proactifs : discussion maison créée une fois, ou conversation existante', async () => {
+test('proactive messages: home chat created once, or existing conversation', async () => {
   const { adapter, runs } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello());
   const notified: string[] = [];
   runs.onRunFinished = (c) => notified.push(c.title);
 
-  p.frame({ type: 'outbound', id: 'o1', text: 'Rappel : réunion à 14 h' });
-  p.frame({ type: 'outbound', id: 'o2', text: 'Second rappel' });
+  p.frame({ type: 'outbound', id: 'o1', text: 'Reminder: meeting at 2 pm' });
+  p.frame({ type: 'outbound', id: 'o2', text: 'Second reminder' });
   await tick();
   const home = runs.listConversations('gw');
   expect(home).toHaveLength(1);
-  expect(home[0]!.title).toBe('Messages de Hermes (canal)');
-  expect(runs.getMessages(home[0]!.id).map((m) => m.text)).toEqual(['Rappel : réunion à 14 h', 'Second rappel']);
+  expect(home[0]!.title).toBe('Messages from Hermes (canal)');
+  expect(runs.getMessages(home[0]!.id).map((m) => m.text)).toEqual(['Reminder: meeting at 2 pm', 'Second reminder']);
   expect(notified).toHaveLength(2);
 
-  // Vers une conversation existante (identifiée par son conversationId côté plateforme)
+  // To an existing conversation (identified by its conversationId on the platform side)
   const conv = runs.createConversation('gw');
   await runs.start(conv.id, 'salut');
   const { conversationId, runId } = p.last('inbound');
   p.frame({ type: 'event', conversationId, runId, event: { type: 'run.completed' } });
   await tick();
-  p.frame({ type: 'outbound', id: 'o3', conversationId, text: 'Tâche finie', media: [{ name: 'r.txt', mimeType: 'text/plain', data: Buffer.from('ok').toString('base64') }] });
+  p.frame({ type: 'outbound', id: 'o3', conversationId, text: 'Task done', media: [{ name: 'r.txt', mimeType: 'text/plain', data: Buffer.from('ok').toString('base64') }] });
   await tick();
   const last = runs.getMessages(conv.id).at(-1)!;
-  expect(last.text).toBe('Tâche finie');
+  expect(last.text).toBe('Task done');
   expect(last.attachments?.[0]?.name).toBe('r.txt');
 });
 
-test('messages proactifs titrés : une discussion par tâche, titre gardé ensuite', async () => {
+test('titled proactive messages: one chat per task, title kept afterwards', async () => {
   const { adapter, runs } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello());
@@ -150,7 +150,7 @@ test('messages proactifs titrés : une discussion par tâche, titre gardé ensui
   expect(runs.getMessages(rapport.id).map((m) => m.text)).toEqual(['Lundi', 'Mardi']);
 });
 
-test('tâches et skills : RPC vers le plugin', async () => {
+test('tasks and skills: RPC to the plugin', async () => {
   const { adapter } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello({ capabilities: { ...CAPS, skills: true, jobs: true, jobControl: true } }));
@@ -168,13 +168,13 @@ test('tâches et skills : RPC vers le plugin', async () => {
   const skills = adapter.listSkills();
   expect(reply([{ id: 's', name: 's' }]).method).toBe('listSkills');
   expect(await skills).toHaveLength(1);
-  // Erreur côté plugin → erreur côté AgentUI
+  // Plugin-side error → AgentUI-side error
   const failing = adapter.jobAction('nope', 'run');
-  p.frame({ type: 'rpc.result', id: p.last('rpc').id, error: 'tâche inconnue' });
-  await expect(failing).rejects.toThrow('tâche inconnue');
+  p.frame({ type: 'rpc.result', id: p.last('rpc').id, error: 'unknown task' });
+  await expect(failing).rejects.toThrow('unknown task');
 });
 
-test('tâches : liste vide sans la capacité, sans appel au plugin', async () => {
+test('tasks: empty list without the capability, no call to the plugin', async () => {
   const { adapter } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello());
@@ -182,7 +182,7 @@ test('tâches : liste vide sans la capacité, sans appel au plugin', async () =>
   expect(p.last('rpc')).toBeUndefined();
 });
 
-test('suppression de session : RPC deleteSession, erreur du plugin relayée, 501 sans la capacité', async () => {
+test('session deletion: deleteSession RPC, plugin error relayed, 501 without the capability', async () => {
   const { adapter } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello({ capabilities: { ...CAPS, sessionDelete: true } }));
@@ -194,8 +194,8 @@ test('suppression de session : RPC deleteSession, erreur du plugin relayée, 501
   await ok;
 
   const failing = adapter.deleteSession('c2');
-  p.frame({ type: 'rpc.result', id: p.last('rpc').id, error: 'run en cours dans cette discussion' });
-  await expect(failing).rejects.toThrow('Hermes (canal) : run en cours dans cette discussion');
+  p.frame({ type: 'rpc.result', id: p.last('rpc').id, error: 'run in progress in this chat' });
+  await expect(failing).rejects.toThrow('Hermes (canal): run in progress in this chat');
 
   const { adapter: plain } = setup();
   const p2 = new FakePlugin();
@@ -204,7 +204,7 @@ test('suppression de session : RPC deleteSession, erreur du plugin relayée, 501
   expect(p2.last('rpc')).toBeUndefined();
 });
 
-test('modèle et coût : RPC listModels, setModel et sessionUsage ; sans la capacité, rien n’est appelé', async () => {
+test('model and cost: listModels, setModel and sessionUsage RPCs; without the capability, nothing is called', async () => {
   const { adapter } = setup();
   const p = new FakePlugin();
   adapter.attach(p, hello({ capabilities: { ...CAPS, models: true } }));
@@ -218,14 +218,14 @@ test('modèle et coût : RPC listModels, setModel et sessionUsage ; sans la capa
   p.frame({ type: 'rpc.result', id: p.last('rpc').id, result: { model: 'deepseek-v4-pro', provider: 'deepseek', message: '✓ ok' } });
   expect(await set).toMatchObject({ model: 'deepseek-v4-pro' });
 
-  const refused = adapter.setModel!('c1', 'inconnu');
-  p.frame({ type: 'rpc.result', id: p.last('rpc').id, error: 'Modèle inconnu' });
-  await expect(refused).rejects.toMatchObject({ message: 'Modèle inconnu', statusCode: 502 });
+  const refused = adapter.setModel!('c1', 'unknown');
+  p.frame({ type: 'rpc.result', id: p.last('rpc').id, error: 'Unknown model' });
+  await expect(refused).rejects.toMatchObject({ message: 'Unknown model', statusCode: 502 });
 
   const usage = adapter.sessionUsage!('c1');
   expect(p.last('rpc').method).toBe('sessionUsage');
   p.frame({ type: 'rpc.result', id: p.last('rpc').id, result: null });
-  expect(await usage).toBeUndefined(); // session inconnue du plugin
+  expect(await usage).toBeUndefined(); // session unknown to the plugin
 
   const { adapter: plain } = setup();
   const p2 = new FakePlugin();
@@ -236,7 +236,7 @@ test('modèle et coût : RPC listModels, setModel et sessionUsage ; sans la capa
   expect(p2.last('rpc')).toBeUndefined();
 });
 
-test('connexion send-only : livre sans remplacer la connexion principale', async () => {
+test('send-only connection: delivers without replacing the main connection', async () => {
   const { adapter, runs } = setup();
   const main = new FakePlugin();
   adapter.attach(main, hello());
@@ -249,7 +249,7 @@ test('connexion send-only : livre sans remplacer la connexion principale', async
   expect(runs.listConversations('gw')).toHaveLength(1);
 });
 
-test('coupure du plugin : run repris si déclaré actif à la reconnexion, sinon en échec', async () => {
+test('plugin disconnection: run resumed if declared active on reconnection, otherwise failed', async () => {
   const { adapter, runs } = setup();
   const p1 = new FakePlugin();
   adapter.attach(p1, hello());
@@ -264,7 +264,7 @@ test('coupure du plugin : run repris si déclaré actif à la reconnexion, sinon
 
   p1.close();
   expect(adapter.status().status).toBe('disconnected');
-  await expect(runs.start(runs.createConversation('gw').id, 'C')).rejects.toThrow(/non connecté/);
+  await expect(runs.start(runs.createConversation('gw').id, 'C')).rejects.toThrow(/not connected/);
 
   const p2 = new FakePlugin();
   adapter.attach(p2, hello({ activeRuns: [{ runId: ra.runId, conversationId: ra.conversationId }] }));
@@ -273,6 +273,6 @@ test('coupure du plugin : run repris si déclaré actif à la reconnexion, sinon
   await done;
   expect(outcomes.get(a.id)).toBe('completed');
   expect(outcomes.get(b.id)).toBe('failed');
-  expect(runs.getMessages(b.id)[1]!.text).toMatch(/perdu/);
+  expect(runs.getMessages(b.id)[1]!.text).toMatch(/lost/);
   expect(rb.runId).not.toBe(ra.runId);
 });

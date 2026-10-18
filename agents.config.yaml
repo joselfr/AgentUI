@@ -1,2 +1,2 @@
-# Agents reliés par plugin canal (type: gateway) : voir agents.config.example.yaml.
+# Agents linked by channel plugin (type: gateway): see agents.config.example.yaml.
 agents: []

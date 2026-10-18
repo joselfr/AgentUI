@@ -2,7 +2,7 @@
   "name": "@agentui/openclaw-agentui",
   "version": "0.1.0",
   "private": true,
-  "description": "Canal AgentUI pour OpenClaw (AgentUI Channel Protocol v1)",
+  "description": "AgentUI channel for OpenClaw (AgentUI Channel Protocol v1)",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",

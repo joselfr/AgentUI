@@ -197,6 +197,8 @@ export const en: Record<FullKey, string> = {
   'image.next': 'Next',
   'code.copied': '✓ Copied',
   'code.copy': 'Copy',
+  'code.fold': 'Collapse',
+  'code.showLines': 'Show all {count} lines',
 
   // Pages
   'agents.title': 'Agents',

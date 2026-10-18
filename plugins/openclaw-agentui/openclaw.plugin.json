@@ -3,7 +3,7 @@
   "channels": ["agentui"],
   "contracts": { "tools": ["agentui_chart", "agentui_map", "agentui_code", "agentui_table", "agentui_progress", "agentui_image", "agentui_ask", "agentui_confirm", "agentui_form"] },
   "name": "AgentUI",
-  "description": "Canal AgentUI : OpenClaw se connecte à AgentUI (WebSocket sortante) selon l'AgentUI Channel Protocol v1.",
+  "description": "AgentUI channel: OpenClaw connects to AgentUI (outgoing WebSocket) using the AgentUI Channel Protocol v1.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -16,15 +16,15 @@
         "additionalProperties": false,
         "properties": {
           "enabled": { "type": "boolean" },
-          "url": { "type": "string", "description": "URL WebSocket de la gateway AgentUI (wss://…/gateway)" },
+          "url": { "type": "string", "description": "WebSocket URL of the AgentUI gateway (wss://…/gateway)" },
           "token": { "type": "string" },
-          "name": { "type": "string", "description": "Nom affiché dans AgentUI (défaut : OpenClaw)" }
+          "name": { "type": "string", "description": "Name displayed in AgentUI (default: OpenClaw)" }
         }
       },
       "uiHints": {
         "url": { "label": "URL AgentUI" },
         "token": { "label": "Token AgentUI", "sensitive": true },
-        "name": { "label": "Nom affiché" }
+        "name": { "label": "Display name" }
       }
     }
   }

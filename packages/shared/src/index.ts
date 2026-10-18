@@ -1,29 +1,29 @@
 import { z } from 'zod';
 
-// ---------- Capacités ----------
+// ---------- Capabilities ----------
 export const CapabilitiesSchema = z.object({
   sessions: z.boolean(),
   abort: z.boolean(),
   approvals: z.boolean(),
   subagents: z.boolean(),
   reasoning: z.boolean(),
-  toolDetails: z.boolean(), // args/résultat des outils disponibles
+  toolDetails: z.boolean(), // tool args/result available
   skills: z.boolean(),
   jobs: z.boolean(),
-  jobControl: z.boolean(), // pause/reprise/exécution/suppression
-  sessionDelete: z.boolean().optional(), // suppression de la session de plateforme avec la discussion
-  models: z.boolean().optional(), // choix du modèle par discussion + modèle et coût d'une session
+  jobControl: z.boolean(), // pause/resume/run/delete
+  sessionDelete: z.boolean().optional(), // deletion of the platform session along with the chat
+  models: z.boolean().optional(), // model choice per chat + model and cost of a session
   attachments: z.object({
-    images: z.boolean(), // PNG/JPEG/GIF/WebP envoyés nativement
-    files: z.boolean(), // fichiers binaires (PDF, zip…) ; les fichiers texte sont toujours insérés dans le message
-    maxBytes: z.number(), // taille max par fichier
+    images: z.boolean(), // PNG/JPEG/GIF/WebP sent natively
+    files: z.boolean(), // binary files (PDF, zip…); text files are always inserted in the message
+    maxBytes: z.number(), // max size per file
   }),
 });
 export type Capabilities = z.infer<typeof CapabilitiesSchema>;
 
 export type ConnStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
-// ---------- Entités ----------
+// ---------- Entities ----------
 export interface AgentInfo {
   id: string;
   name: string;
@@ -52,27 +52,27 @@ export interface Job {
   id: string;
   name: string;
   schedule: string;
-  /** `agent` : un prompt est confié à l'agent ; `script` : un script/une commande s'exécute sans agent. */
+  /** `agent`: a prompt is given to the agent; `script`: a script/command runs without an agent. */
   mode?: 'agent' | 'script';
   prompt?: string;
-  /** Script exécuté (chemin, commande ou source) : le job lui-même en mode `script`, collecte préalable en mode `agent`. */
+  /** Executed script (path, command or source): the job itself in `script` mode, prior collection in `agent` mode. */
   script?: string;
   enabled: boolean;
   nextRunAt?: number;
   lastRunAt?: number;
   lastStatus?: string;
-  /** Exécution demandée (« Exécuter maintenant »), pas encore prise par le planificateur. */
+  /** Run requested ("Run now"), not yet picked up by the scheduler. */
   queued?: boolean;
-  /** Exécution en cours. */
+  /** Run in progress. */
   running?: boolean;
   lastError?: string;
-  /** Destination côté plateforme (plugin canal) : id de la discussion qui reçoit les résultats. */
+  /** Platform-side destination (channel plugin): id of the chat that receives the results. */
   deliverTo?: string;
-  /** Discussion AgentUI correspondante, si elle existe déjà (renseigné par le serveur). */
+  /** Matching AgentUI chat, if it already exists (filled in by the server). */
   conversationId?: string;
 }
 
-/** Résultat de recherche : une discussion dont le titre ou un message correspond à tous les mots de la requête. */
+/** Search result: a chat whose title or a message matches all the words of the query. */
 export interface SearchHit {
   id: string;
   agentId: string;
@@ -80,15 +80,15 @@ export interface SearchHit {
   updatedAt: number;
   favorite: boolean;
   archived?: boolean;
-  /** Le titre correspond (sinon seul un message correspond). */
+  /** The title matches (otherwise only a message matches). */
   inTitle: boolean;
-  /** Extrait du message le plus récent qui correspond. */
+  /** Excerpt of the most recent matching message. */
   snippet?: string;
-  /** Plages [début, longueur] à surligner dans `snippet`. */
+  /** Ranges [start, length] to highlight in `snippet`. */
   marks?: [number, number][];
 }
 
-/** Consommation d'une session de l'agent : modèle utilisé, tokens et coût cumulés depuis son début. */
+/** Consumption of an agent session: model used, tokens and cost accumulated since its start. */
 export interface Usage {
   model?: string;
   provider?: string;
@@ -96,13 +96,13 @@ export interface Usage {
   outputTokens: number;
   cacheReadTokens?: number;
   reasoningTokens?: number;
-  /** Coût cumulé en dollars US. */
+  /** Accumulated cost in US dollars. */
   costUsd?: number;
-  /** Le coût est une estimation (tarifs publics) et non un montant facturé. */
+  /** The cost is an estimate (public prices), not a billed amount. */
   costEstimated?: boolean;
 }
 
-/** Un modèle que l'agent peut utiliser, avec son fournisseur. */
+/** A model the agent can use, with its provider. */
 export interface ModelOption {
   provider: string;
   providerName: string;
@@ -110,7 +110,7 @@ export interface ModelOption {
 }
 
 export interface Session {
-  id: string; // id côté agent
+  id: string; // id on the agent side
   title: string;
   subAgentId?: string;
   updatedAt: number;
@@ -138,7 +138,7 @@ export interface SubAgentRun {
   endedAt?: number;
   reasoning?: string;
   summary?: string;
-  /** Session de l'agent distant où le sous-agent travaille (suivie jusqu'à sa fin). */
+  /** Session of the remote agent where the sub-agent works (tracked until it ends). */
   sessionId?: string;
 }
 
@@ -149,7 +149,7 @@ export interface AttachmentMeta {
   size: number;
 }
 
-/** Pièce jointe telle qu'envoyée par le navigateur (contenu en base64). */
+/** Attachment as sent by the browser (content in base64). */
 export interface OutgoingAttachment {
   name: string;
   mimeType: string;
@@ -167,11 +167,11 @@ export interface Message {
   createdAt: number;
   runId?: string;
   status?: 'streaming' | 'done' | 'failed' | 'aborted';
-  /** Question posée par l'agent en plein run, en attente de réponse (le prompt est dans le texte, en widget). */
+  /** Question asked by the agent mid-run, awaiting an answer (the prompt is in the text, as a widget). */
   pendingQuestion?: string;
 }
 
-// ---------- Événements normalisés ----------
+// ---------- Normalized events ----------
 export type AgentEvent =
   | { type: 'message.delta'; text: string }
   | { type: 'reasoning.delta'; text: string }
@@ -196,17 +196,17 @@ export type AgentEvent =
   | { type: 'subagent.end'; id: string; failed?: boolean }
   | { type: 'message.media'; url: string; name: string; mimeType?: string }
   | { type: 'attachment.added'; attachment: AttachmentMeta }
-  /** Consommation cumulée de la session, émise à la fin d'un run. */
+  /** Accumulated consumption of the session, emitted at the end of a run. */
   | { type: 'usage'; usage: Usage }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }
-  /** L'agent attend une réponse en plein run : le prochain message de l'utilisateur la lui remet, sans nouveau run. */
+  /** The agent waits for an answer mid-run: the user's next message hands it over, without a new run. */
   | { type: 'question.requested'; id: string }
-  /** La question `id` n'attend plus de réponse (répondue, annulée ou expirée). */
+  /** Question `id` no longer awaits an answer (answered, cancelled or expired). */
   | { type: 'question.resolved'; id: string }
   | { type: 'run.completed' }
   | { type: 'run.failed'; error: string }
   | { type: 'run.aborted' }
-  /** Message proactif de l'agent (cron, envoi spontané) enregistré hors run : recharger la conversation. */
+  /** Proactive message from the agent (cron, spontaneous send) recorded outside a run: reload the conversation. */
   | { type: 'message.added'; messageId: string };
 
 export interface SendInput {
@@ -215,7 +215,7 @@ export interface SendInput {
   attachments?: AdapterAttachment[];
 }
 
-/** Pièce jointe validée, prête pour un adapter. `image` = envoi natif, `file` = fichier binaire. */
+/** Validated attachment, ready for an adapter. `image` = native send, `file` = binary file. */
 export interface AdapterAttachment {
   kind: 'image' | 'file';
   name: string;
@@ -223,14 +223,14 @@ export interface AdapterAttachment {
   data: Uint8Array;
 }
 
-// ---------- Configuration des agents ----------
+// ---------- Agent configuration ----------
 export const AgentConfigSchema = z.discriminatedUnion('type', [
-  // Agent relié par un plugin canal qui se connecte à AgentUI sur /gateway (plugins/protocol/PROTOCOL.md)
+  // Agent linked by a channel plugin that connects to AgentUI on /gateway (plugins/protocol/PROTOCOL.md)
   z.object({
     id: z.string().regex(/^[a-z0-9_-]+$/i),
     type: z.literal('gateway'),
     name: z.string(),
-    token: z.string().min(16, 'token de 16 caractères minimum'),
+    token: z.string().min(16, 'token of at least 16 characters'),
   }),
 ]);
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
@@ -242,5 +242,5 @@ export type ConfigFile = z.infer<typeof ConfigFileSchema>;
 export type ServerPush =
   | { type: 'event'; seq: number; agentId: string; sessionId: string; runId: string; event: AgentEvent }
   | { type: 'agent.status'; agentId: string; status: ConnStatus; detail?: string }
-  /** Discussion marquée lue (depuis un autre appareil) : retirer son indicateur « non lu ». */
+  /** Chat marked read (from another device): remove its "unread" indicator. */
   | { type: 'conversation.read'; conversationId: string };

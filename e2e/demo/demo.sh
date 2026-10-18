@@ -1,9 +1,9 @@
 #!/bin/sh
-# Instance de démonstration pour les captures du site (docs/) : AgentUI + faux agent, sur des données jetables.
-#   e2e/demo/demo.sh up            démarre (serveur :8181, build web inclus) ; identifiants demo / demo-pass-123
-#   e2e/demo/demo.sh down          arrête tout
-#   e2e/demo/demo.sh webp <captures> <docs/img>   convertit les PNG de capture.mjs en WebP (desktop 1600 px, mobile 600 px)
-# Variables : DEMO_DIR (défaut /tmp/agentui-demo), DEMO_PORT (défaut 8181).
+# Demo instance for the site captures (docs/): AgentUI + fake agent, on throwaway data.
+#   e2e/demo/demo.sh up            starts (server :8181, web build included); credentials demo / demo-pass-123
+#   e2e/demo/demo.sh down          stops everything
+#   e2e/demo/demo.sh webp <captures> <docs/img>   converts the capture.mjs PNGs to WebP (desktop 1600 px, mobile 600 px)
+# Variables: DEMO_DIR (default /tmp/agentui-demo), DEMO_PORT (default 8181).
 set -e
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 DIR=${DEMO_DIR:-/tmp/agentui-demo}
@@ -25,10 +25,10 @@ case "$1" in
     nohup node e2e/demo/fake-agent.mjs "ws://localhost:$PORT/gateway" "$TOKEN" Atlas >"$DIR/agent.log" 2>&1 &
     echo $! > "$DIR/agent.pid"
     sleep 2
-    echo "AgentUI de démo : http://localhost:$PORT (demo / demo-pass-123) — journaux dans $DIR"
+    echo "Demo AgentUI: http://localhost:$PORT (demo / demo-pass-123) — logs in $DIR"
     ;;
   down)
-    # npx lance le serveur dans un processus fils : on arrête aussi ce qui écoute sur le port
+    # npx runs the server in a child process: also stop whatever listens on the port
     for p in $(cat "$DIR/server.pid" "$DIR/agent.pid" 2>/dev/null) $(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2); do kill "$p" 2>/dev/null || true; done
     rm -f "$DIR/server.pid" "$DIR/agent.pid"
     ;;
@@ -38,5 +38,5 @@ case "$1" in
     for f in "$2"/mobile-*.png; do magick "$f" -resize 600x -quality 84 "$3/$(basename "${f%.png}").webp"; done
     cp "$3/desktop-dark-chart.webp" "$3/hero-desktop.webp"; cp "$3/mobile-dark-progress.webp" "$3/hero-mobile.webp"
     ;;
-  *) echo "usage : $0 up | down | webp <captures> <docs/img>"; exit 1 ;;
+  *) echo "usage: $0 up | down | webp <captures> <docs/img>"; exit 1 ;;
 esac

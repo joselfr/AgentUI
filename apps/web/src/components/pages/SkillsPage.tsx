@@ -7,7 +7,7 @@ import { useBackClose } from '../../useBackClose';
 import { t } from '../../i18n';
 import { card, useLoad, Page, Status, Pickers, useScope } from './shared';
 
-/** Popup de lecture d'une skill : son SKILL.md (sans l'en-tête YAML) rendu en Markdown. */
+/** Skill reading popup: its SKILL.md (without the YAML header) rendered as Markdown. */
 function SkillDialog({ agentId, sub, skill, onClose }: { agentId?: string; sub?: string; skill?: Skill; onClose: () => void }) {
   useBackClose(!!skill, onClose);
   const [state, setState] = useState<{ content?: string; err?: string }>({});

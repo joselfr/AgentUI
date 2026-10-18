@@ -12,7 +12,7 @@ import { useBackClose } from '../../useBackClose';
 import type { ItemMenu } from './useItemMenu';
 import { t } from '../../i18n';
 
-/** Menu clic droit / appui long d'une discussion. Chaque action ferme le menu avant de s'exécuter. */
+/** Right-click / long-press menu of a chat. Each action closes the menu before running. */
 export default function ConversationMenu({ menu, onRequestClose, onClose, onToggleFavorite, onRename, onArchive, onSelect, onDelete }: {
   menu?: ItemMenu<Conversation>; onRequestClose: () => void; onClose: () => void;
   onToggleFavorite: (c: Conversation) => void; onRename: (c: Conversation) => void; onArchive: (c: Conversation, archived: boolean) => void;
@@ -45,7 +45,7 @@ export default function ConversationMenu({ menu, onRequestClose, onClose, onTogg
   );
 }
 
-/** Modale de renommage ; `conv` non défini = fermée. */
+/** Rename dialog; `conv` undefined = closed. */
 export function RenameDialog({ conv, onSubmit, onClose }: { conv?: Conversation; onSubmit: (c: Conversation, title: string) => void; onClose: () => void }) {
   const [title, setTitle] = useState('');
   useBackClose(!!conv, onClose);

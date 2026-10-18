@@ -6,8 +6,8 @@ import App from './App';
 
 registerSW({ immediate: true });
 
-// Hauteur réellement visible (clavier mobile déduit) : Safari iOS ignore interactive-widget=resizes-content
-// et se contente de recouvrir la page avec le clavier, puis de la faire défiler.
+// Actually visible height (mobile keyboard deducted): iOS Safari ignores interactive-widget=resizes-content
+// and just overlays the page with the keyboard, then scrolls it.
 const vv = window.visualViewport;
 if (vv) {
   const fit = () => {

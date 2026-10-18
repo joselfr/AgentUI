@@ -3,8 +3,8 @@ import { api, type Conversation } from './api';
 import { t } from './i18n';
 
 /**
- * Actions de gestion de la liste (favori, renommage, archivage, suppression). Les changements sont appliqués tout de
- * suite à la liste locale, puis annulés si le serveur refuse ; les suppressions demandent une confirmation.
+   * List management actions (favorite, rename, archive, delete). Changes are applied to the local list
+   * immediately, then rolled back if the server refuses; deletions ask for confirmation.
  */
 export function useConversationActions({ setConvs, setCurrentId, currentRef, guard, ask }: {
   setConvs: Dispatch<SetStateAction<Conversation[]>>;
@@ -38,11 +38,11 @@ export function useConversationActions({ setConvs, setCurrentId, currentRef, gua
       api.remove(c.id).then(() => removeLocal(c.id)).catch(guard);
     }
   };
-  /** Suppression groupée : une confirmation, puis une suppression par discussion (la session de l'agent est supprimée aussi). */
+  /** Bulk delete: one confirmation, then one deletion per chat (the agent's session is deleted too). */
   const deleteMany = async (cs: Conversation[]): Promise<boolean> => {
     if (!(await ask({ title: t('confirm.deleteMany.title', { count: cs.length }), text: t('confirm.deleteMany.text', { count: cs.length }), confirmLabel: t('common.delete'), danger: true }))) return false;
     for (const c of cs) {
-      try { await api.remove(c.id); removeLocal(c.id); } catch (e) { guard(e); break; } // on s'arrête à la première erreur : le reste est conservé
+      try { await api.remove(c.id); removeLocal(c.id); } catch (e) { guard(e); break; } // stop at the first error: the rest is kept
     }
     return true;
   };

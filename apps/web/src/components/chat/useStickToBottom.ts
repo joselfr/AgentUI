@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { Message } from '@agentui/shared';
 
 /**
- * Suivi automatique du bas de la conversation. Seul un défilement vers le haut désactive le suivi : la croissance
- * du contenu ne fait jamais reculer `scrollTop`. Un changement de conversation repart du bas.
+   * Automatic following of the bottom of the conversation. Only scrolling up disables following: content growth
+   * never moves `scrollTop` back. A change of conversation starts again from the bottom.
  */
 export function useStickToBottom(messages: Message[]) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -12,9 +12,9 @@ export function useStickToBottom(messages: Message[]) {
   const lastTop = useRef(0);
   const toBottom = () => { const el = scroller.current; if (el && stick.current) el.scrollTop = el.scrollHeight; };
   const firstId = messages[0]?.id;
-  useEffect(() => { stick.current = true; }, [firstId]); // autre conversation : on repart du bas
+  useEffect(() => { stick.current = true; }, [firstId]); // other conversation: start again from the bottom
   useEffect(toBottom, [messages]);
-  // Le contenu peut grandir sans que les messages changent (bloc ask rendu en carte, images chargées…)
+  // The content may grow without the messages changing (ask block rendered as a card, loaded images…)
   useEffect(() => {
     const el = content.current;
     if (!el || typeof ResizeObserver === 'undefined') return;

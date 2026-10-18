@@ -1,7 +1,7 @@
 import type { PluginRuntime } from 'openclaw/plugin-sdk/channel-core';
 import type { AgentUIClient } from './client.js';
 
-// Runtime injecté par OpenClaw au chargement (setRuntime) et client par compte démarré (gateway.startAccount).
+// Runtime injected by OpenClaw at load (setRuntime) and client per started account (gateway.startAccount).
 let runtime: PluginRuntime | undefined;
 const clients = new Map<string, AgentUIClient>();
 
@@ -10,7 +10,7 @@ export function setAgentUIRuntime(rt: PluginRuntime): void {
 }
 
 export function getAgentUIRuntime(): PluginRuntime {
-  if (!runtime) throw new Error('AgentUI : runtime OpenClaw indisponible');
+  if (!runtime) throw new Error('AgentUI: OpenClaw runtime unavailable');
   return runtime;
 }
 

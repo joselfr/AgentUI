@@ -30,13 +30,13 @@ const FOLD_LINES = 15;
 const MAX_LINES = 2000;
 const ALIAS: Record<string, string> = { js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', yml: 'yaml', html: 'xml', svg: 'xml' };
 
-/** Numéros de ligne d'un `highlight` : `[4, "6-7"]` → {4, 6, 7}. `undefined` si une entrée est invalide. */
+/** Line numbers of a `highlight`: `[4, "6-7"]` → {4, 6, 7}. `undefined` if an entry is invalid. */
 function parseLines(v: unknown): Set<number> | undefined {
   const out = new Set<number>();
   if (v === undefined) return out;
   if (!Array.isArray(v)) return undefined;
   for (const x of v) {
-    // Un numéro seul peut arriver en chaîne ("7") : le groupe de fin de plage est alors absent, pas NaN.
+    // A lone number may arrive as a string ("7"): the range-end group is then absent, not NaN.
     const m = typeof x === 'number' ? [x, x] : typeof x === 'string' ? /^(\d+)(?:-(\d+))?$/.exec(x.trim())?.slice(1).map((n) => (n === undefined ? undefined : Number(n))) : undefined;
     const [a, b = a] = m ?? [];
     if (a === undefined || b === undefined || !Number.isInteger(a) || !Number.isInteger(b) || a < 1 || b < a || b - a > MAX_LINES) return undefined;
@@ -45,7 +45,7 @@ function parseLines(v: unknown): Set<number> | undefined {
   return out;
 }
 
-/** Arguments du widget `code` : `{ code, language?, filename?, highlight?, start? }`. `undefined` si invalide. */
+/** Arguments of the `code` widget: `{ code, language?, filename?, highlight?, start? }`. `undefined` if invalid. */
 export function parseCode(a: Record<string, unknown>): Code | undefined {
   if (typeof a.code !== 'string' || !a.code.trim()) return undefined;
   const highlight = parseLines(a.highlight);
@@ -56,7 +56,7 @@ export function parseCode(a: Record<string, unknown>): Code | undefined {
   return { code: a.code.replace(/\n$/, ''), language: str(a.language)?.toLowerCase(), filename: str(a.filename), highlight, start };
 }
 
-/** HTML coloré par ligne : un `<span>` qui s'étend sur plusieurs lignes est refermé puis rouvert à chaque saut de ligne. `undefined` si langage inconnu. */
+/** Per-line colored HTML: a `<span>` spanning several lines is closed then reopened at each line break. `undefined` if the language is unknown. */
 function highlightLines(code: string, language?: string): string[] | undefined {
   const lang = language && (ALIAS[language] ?? language);
   if (!lang || !hljs.getLanguage(lang)) return undefined;
@@ -95,7 +95,7 @@ export default function CodeCard({ code: c }: { code: Code }) {
         position: 'relative', overflow: folded ? 'hidden' : 'auto', maxHeight: folded ? `calc(${FOLD_LINES} * 1.55em + 20px)` : undefined,
         '&::after': folded ? { content: '""', position: 'absolute', left: 0, right: 0, bottom: 0, height: 56, background: (th) => `linear-gradient(transparent, ${th.palette.background.default})` } : undefined,
       }}>
-        <Box sx={{ // pas un <code> : la bulle de message y appliquerait son style de code en ligne (fond, marges, coins arrondis)
+        <Box sx={{ // not a <code>: the message bubble would apply its inline code style to it (background, margins, rounded corners)
           display: 'block', py: 1.25, minWidth: 'max-content', fontFamily: MONO, fontSize: 12.5, lineHeight: 1.55,
           '& .hljs-keyword, & .hljs-built_in, & .hljs-literal, & .hljs-selector-tag, & .hljs-tag, & .hljs-name': { color: tok.kw },
           '& .hljs-string, & .hljs-regexp, & .hljs-attr': { color: tok.str },
@@ -122,7 +122,7 @@ export default function CodeCard({ code: c }: { code: Code }) {
       </Box>
       {foldable && (
         <Button fullWidth size="small" onClick={() => setOpen(!open)} sx={{ borderRadius: 0, borderTop: 1, borderColor: 'divider', bgcolor: 'action.hover', color: 'text.primary', fontSize: 12 }}>
-          {open ? 'Replier' : `Afficher les ${lines.length} lignes`}
+          {open ? tr('code.fold') : tr('code.showLines', { count: lines.length })}
         </Button>)}
     </Box>
   );

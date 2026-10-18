@@ -14,12 +14,12 @@ import type {
 
 export interface RunHandle {
   runId: string;
-  /** Session distante (créée si absente). */
+  /** Remote session (created if absent). */
   sessionId: string;
   events: AsyncIterable<AgentEvent>;
 }
 
-/** Interface commune à tous les agents : un nouvel agent = un nouvel adapter. */
+/** Interface common to all agents: a new agent = a new adapter. */
 export interface AgentAdapter {
   readonly id: string;
   readonly name: string;
@@ -32,34 +32,34 @@ export interface AgentAdapter {
 
   listSubAgents(): Promise<SubAgent[]>;
   listSkills(subAgentId?: string): Promise<Skill[]>;
-  /** Contenu (Markdown) d'une skill ; absent = l'agent ne sait pas la lire. */
+  /** Content (Markdown) of a skill; absent = the agent cannot read it. */
   readSkill?(skillId: string, subAgentId?: string): Promise<string>;
   listJobs(subAgentId?: string): Promise<Job[]>;
   jobAction?(jobId: string, action: 'pause' | 'resume' | 'run' | 'delete', subAgentId?: string): Promise<void>;
-  /** Supprime la session de la plateforme (adaptateurs canal) ; absent = l'agent ne sait pas le faire. */
+  /** Deletes the platform session (channel adapters); absent = the agent cannot do it. */
   deleteSession?(sessionId: string): Promise<void>;
-  /** Modèles disponibles (adaptateurs qui savent en changer par session). */
+  /** Available models (adapters that can switch per session). */
   listModels?(): Promise<ModelOption[]>;
-  /** Fixe le modèle d'une session ; renvoie le modèle effectivement retenu. */
+  /** Sets the model of a session; returns the model actually retained. */
   setModel?(sessionId: string, model: string, provider?: string, subAgentId?: string): Promise<{ model: string; provider?: string; message?: string }>;
-  /** Modèle courant et consommation d'une session existante (sans attendre un nouveau run). */
+  /** Current model and consumption of an existing session (without waiting for a new run). */
   sessionUsage?(sessionId: string, subAgentId?: string): Promise<Usage | undefined>;
 
   listSessions(): Promise<Session[]>;
   getMessages(sessionId: string): Promise<Message[]>;
-  /** Télécharge un média produit par l'agent (image…) à partir de l'URL fournie dans ses événements. */
-  /** Médias de la réponse d'un run apparus dans le transcript après sa fin (hors `seen`), sans attendre. */
+  /** Downloads a media produced by the agent (image…) from the URL given in its events. */
+  /** Media of a run's reply that appeared in the transcript after it ended (outside `seen`), without waiting. */
   collectMedia?(runId: string, sessionId: string, seen: Set<string>): Promise<AgentEvent[]>;
   fetchMedia?(url: string): Promise<{ data: Buffer; mimeType: string }>;
-  /** Session d'un sous-agent (raisonnement, outils, réponse) et indicateur de fin. */
+  /** Session of a sub-agent (reasoning, tools, reply) and end indicator. */
   subSession?(sessionId: string): Promise<{ messages: Message[]; ended: boolean }>;
 
   send(sessionId: string | undefined, input: SendInput): Promise<RunHandle>;
-  /** Rattache un run lancé avant un redémarrage d'AgentUI ; `null` si impossible. */
+  /** Reattaches a run started before an AgentUI restart; `null` if impossible. */
   resume?(runId: string, sessionId: string, subAgentId?: string): Promise<RunHandle | null>;
   abort(runId: string, sessionId: string): Promise<void>;
   resolveApproval?(runId: string, approvalId: string, approve: boolean): Promise<void>;
-  /** Répond à une question que l'agent pose en plein run (`question.requested`) : le run reprend, il n'en démarre pas un autre. */
+  /** Answers a question the agent asks mid-run (`question.requested`): the run resumes, it does not start another one. */
   reply?(runId: string, sessionId: string, text: string): Promise<void>;
 }
 

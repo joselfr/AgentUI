@@ -1,5 +1,5 @@
-// Client WebSocket vers la gateway AgentUI : handshake, reconnexion avec backoff, file d'envoi ordonnée.
-// Sans dépendance à OpenClaw (WebSocket natif de Node ≥ 22).
+// WebSocket client to the AgentUI gateway: handshake, reconnection with backoff, ordered send queue.
+// No dependency on OpenClaw (native WebSocket of Node ≥ 22).
 import { PROTOCOL, type Capabilities, type GatewayMessage, type PluginMessage } from './protocol.js';
 
 export interface ClientOptions {
@@ -7,9 +7,9 @@ export interface ClientOptions {
   token: string;
   agent: { type: string; name: string; version?: string };
   capabilities: Capabilities;
-  /** Runs encore en cours, renvoyés dans `hello` après une reconnexion. */
+  /** Runs still in progress, sent back in `hello` after a reconnection. */
   activeRuns?: () => Array<{ runId: string; conversationId: string }>;
-  /** Sous-agents annoncés dans `hello` (agents OpenClaw). */
+  /** Sub-agents announced in `hello` (OpenClaw agents). */
   subAgents?: () => Array<{ id: string; name: string; description?: string; isDefault?: boolean }>;
   onMessage: (msg: GatewayMessage) => void | Promise<void>;
   onStatus?: (connected: boolean, detail?: string) => void;
@@ -38,10 +38,10 @@ export class AgentUIClient {
   stop(): void {
     this.closed = true;
     clearTimeout(this.timer);
-    this.ws?.close(1000, 'arrêt');
+    this.ws?.close(1000, 'shutdown');
   }
 
-  /** Résolu au premier `welcome` (ou après `timeoutMs`). */
+  /** Resolved at the first `welcome` (or after `timeoutMs`). */
   waitReady(timeoutMs = 15000): Promise<boolean> {
     if (this.ready) return Promise.resolve(true);
     return new Promise((resolve) => {
@@ -50,7 +50,7 @@ export class AgentUIClient {
     });
   }
 
-  /** Envoi ordonné ; conservé en file pendant une coupure. */
+  /** Ordered send; kept in the queue during a cut. */
   send(msg: PluginMessage): void {
     if (this.ready && this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
@@ -88,31 +88,31 @@ export class AgentUIClient {
         this.ready = true;
         this.delay = 1000;
         this.opts.onStatus?.(true);
-        this.opts.log?.(`connecté à ${this.opts.url}`);
+        this.opts.log?.(`connected to ${this.opts.url}`);
         for (const m of this.outbox.splice(0)) ws.send(JSON.stringify(m));
         for (const w of this.welcomeWaiters.splice(0)) w();
         return;
       }
       if (msg.type === 'ping') return this.send({ type: 'pong' });
-      void Promise.resolve(this.opts.onMessage(msg)).catch((e) => this.opts.log?.(`trame en échec : ${String(e)}`));
+      void Promise.resolve(this.opts.onMessage(msg)).catch((e) => this.opts.log?.(`frame failed: ${String(e)}`));
     };
     ws.onclose = (ev) => {
       if (this.ws !== ws) return;
       this.ready = false;
       this.ws = undefined;
       if (ev.code === 4001 || ev.code === 4002) {
-        this.opts.onStatus?.(false, `refusé par AgentUI (${ev.code} ${ev.reason})`);
+        this.opts.onStatus?.(false, `rejected by AgentUI (${ev.code} ${ev.reason})`);
         this.closed = true;
         return;
       }
       this.opts.onStatus?.(false, ev.reason || `fermeture ${ev.code}`);
       if (this.closed) return;
-      this.opts.log?.(`connexion perdue, reconnexion dans ${this.delay / 1000} s`);
+      this.opts.log?.(`connection lost, reconnecting in ${this.delay / 1000} s`);
       this.timer = setTimeout(() => this.open(), this.delay);
       this.delay = Math.min(this.delay * 2, 30000);
     };
     ws.onerror = () => {
-      /* suivi par onclose */
+      /* followed by onclose */
     };
   }
 }

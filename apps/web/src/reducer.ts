@@ -1,13 +1,13 @@
 import type { AgentEvent, Message, ToolCall } from '@agentui/shared';
 
-/** Un run terminé ne laisse ni outil ni sous-agent « en cours » (miroir du serveur). */
+/** A finished run leaves no tool or sub-agent "running" (mirror of the server). */
 function closeRunning(m: Message, status: 'done' | 'failed', now: number) {
   m.pendingQuestion = undefined;
   m.toolCalls = m.toolCalls?.map((t) => (t.status === 'running' ? { ...t, status, endedAt: now } : t));
   m.subAgentRuns = m.subAgentRuns?.map((s) => (s.status === 'running' && !s.sessionId ? { ...s, status, endedAt: now } : s));
 }
 
-/** L'agent attend une réponse en plein run (question en cours) : son texte est complet, le message suivant en est la réponse. */
+/** The agent is waiting for an answer mid-run (question pending): its text is complete, the next message is the answer. */
 export function isAwaiting(m: Message): boolean {
   return m.status === 'streaming' && !!m.pendingQuestion;
 }
@@ -17,10 +17,10 @@ export function awaitingReply(messages: Message[]): boolean {
   return !!m && isAwaiting(m);
 }
 
-/** Applique un événement normalisé au dernier message assistant en streaming (miroir du serveur). */
+/** Applies a normalized event to the last streaming assistant message (mirror of the server). */
 export function applyEvent(messages: Message[], ev: AgentEvent): Message[] | null {
   const i = messages.findLastIndex((m) => m.role === 'assistant' && m.status === 'streaming');
-  if (i < 0) return null; // run lancé ailleurs → l'appelant recharge via REST
+  if (i < 0) return null; // run started elsewhere → the caller reloads via REST
   const m = { ...messages[i]! };
   const now = Date.now();
   switch (ev.type) {
@@ -47,7 +47,7 @@ export function applyEvent(messages: Message[], ev: AgentEvent): Message[] | nul
     case 'run.completed': m.status = 'done'; closeRunning(m, 'done', now); break;
     case 'run.aborted': m.status = 'aborted'; closeRunning(m, 'failed', now); break;
     case 'run.failed': m.status = 'failed'; m.text += `\n\n⚠️ ${ev.error}`; closeRunning(m, 'failed', now); break;
-    case 'subagent.sync': return null; // l'appelant recharge les messages
+    case 'subagent.sync': return null; // the caller reloads the messages
     default: return messages;
   }
   const next = messages.slice();

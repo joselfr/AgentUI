@@ -8,8 +8,8 @@ import { useBackClose } from '../useBackClose';
 import { t } from '../i18n';
 
 /**
- * Modèle de la discussion, dans la zone de saisie. Cliquable quand l'agent sait changer de modèle : le menu liste les
- * modèles par fournisseur. Le changement ne s'applique qu'entre deux réponses (`disabled` pendant un run).
+   * Model of the chat, in the input area. Clickable when the agent can switch models: the menu lists the
+   * models by provider. The change only applies between two replies (`disabled` during a run).
  */
 export default function ModelChip({ usage, canPick, disabled, load, onPick }: {
   usage?: Usage; canPick: boolean; disabled: boolean; load: () => Promise<ModelOption[]>; onPick: (o: ModelOption) => Promise<void>;

@@ -4,7 +4,7 @@ import { alpha, keyframes } from '@mui/material/styles';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks'; // un retour à la ligne = une ligne (sorties de cron, messages courts)
+import remarkBreaks from 'remark-breaks'; // a line break = a line (cron outputs, short messages)
 import type { Message } from '@agentui/shared';
 import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
@@ -25,7 +25,7 @@ import { t } from '../../i18n';
 const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
 const halo = keyframes`0% { box-shadow: 0 0 0 0 var(--halo) } 70%, 100% { box-shadow: 0 0 0 7px transparent }`;
 
-/** Indicateur « l'agent travaille » : points animés + activité en cours. */
+/** "The agent is working" indicator: animated dots + current activity. */
 function Working({ m }: { m: Message }) {
   const tool = [...(m.toolCalls ?? [])].reverse().find((t) => t.status === 'running');
   const label = tool ? t('chat.working.tool', { tool: tool.name }) : m.text ? t('chat.working.writing') : t('chat.working.thinking');
@@ -39,9 +39,9 @@ function Working({ m }: { m: Message }) {
   );
 }
 
-/** Images (aperçu cliquable) et fichiers (puces de téléchargement) joints à un message. */
+/** Images (clickable preview) and files (download chips) attached to a message. */
 function Attachments({ m }: { m: Message }) {
-  const shown = (m.attachments ?? []).filter((a) => !a.name.startsWith(WIDGET_ATTACHMENT_PREFIX)); // copies d'un widget image : déjà dans le widget
+  const shown = (m.attachments ?? []).filter((a) => !a.name.startsWith(WIDGET_ATTACHMENT_PREFIX)); // copies of an image widget: already in the widget
   if (!shown.length) return null;
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: m.text ? 1 : 0 }}>
@@ -58,7 +58,7 @@ function Attachments({ m }: { m: Message }) {
   );
 }
 
-/** Widgets d'affichage (sans réponse) : bloc ```widget ou outil `agentui_<type>`. `undefined` si le type ou les arguments sont invalides. */
+/** Display widgets (no answer): ```widget block or `agentui_<type>` tool. `undefined` if the type or arguments are invalid. */
 function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
@@ -67,7 +67,7 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
     const gallery = parseImage(w.arguments);
     if (gallery) {
       const files = (w.arguments.files ?? {}) as Record<string, string>;
-      // Fichier local : copié par le plugin en pièce jointe du message ; URL externe : chargée directement par le navigateur.
+      // Local file: copied by the plugin as a message attachment; external URL: loaded directly by the browser.
       const resolve = (src: string): Resolved => {
         if (isRemote(src)) return { state: 'ok', url: src };
         const a = m.attachments?.find((x) => x.name === files[src]);
@@ -80,19 +80,19 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
   return undefined;
 }
 
-/** Une bulle de message : texte Markdown (ou carte de question « ask »), raisonnement, outils, pièces jointes. */
+/** A message bubble: Markdown text (or "ask" question card), reasoning, tools, attachments. */
 export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, working, allTools }: {
   m: Message; expandTools: boolean; agentName: string; answers?: string[]; onAnswer?: (t: string) => void; working?: boolean;
-  /** Appels d'outils de toute la discussion : l'agent peut réutiliser le jeton d'un widget d'un message précédent. */
+  /** Tool calls of the whole chat: the agent may reuse the token of a widget from an earlier message. */
   allTools?: ToolCallLike[];
 }) {
   const mine = m.role === 'user';
-  // Le widget d'un outil `agentui_<type>` prend la place du jeton que l'agent a écrit dans son texte ; l'appel reste aussi listé avec les autres outils.
-  // Widgets qui évoluent pendant le run (progress) : affichés dès leur appel d'outil, sans attendre le texte de l'agent.
+  // The widget of an `agentui_<type>` tool takes the place of the token the agent wrote in its text; the call is also still listed with the other tools.
+  // Widgets that evolve during the run (progress): shown as soon as their tool call, without waiting for the agent's text.
   const live = useMemo(() => (m.role === 'user' ? [] : outOfTextWidgets(m.toolCalls ?? [], allTools)), [m.role, m.toolCalls, allTools]);
   const text = useMemo(() => (m.role === 'user' ? m.text : expandWidgetTokens(m.text, m.toolCalls ?? [], allTools, m.status !== 'streaming')), [m.role, m.text, m.toolCalls, m.status, allTools]);
-  // `pre` doit garder la même identité d'un rendu à l'autre : sinon React le démonte et remonte, et les widgets
-  // (saisie d'un formulaire, carte, cases cochées) perdent leur état et leur focus à chaque rendu du chat.
+  // `pre` must keep the same identity from one render to the next: otherwise React unmounts and remounts it, and the widgets
+  // (form input, map, checked boxes) lose their state and focus on every chat render.
   const latest = useRef({ m, answers, onAnswer });
   latest.current = { m, answers, onAnswer };
   const components = useMemo<Components>(() => ({
@@ -101,10 +101,10 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
       const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
       const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
-      // Pendant le streaming, seule la galerie d'images s'affiche déjà (le bloc vient d'un jeton développé, donc complet) : ses fichiers locaux arrivent un à un.
+      // While streaming, only the image gallery is already shown (the block comes from an expanded token, hence complete): its local files arrive one by one.
       const early = lang === 'widget' && m.status === 'streaming' && parseWidget(raw)?.type === 'image';
       if ((m.status !== 'streaming' || isAwaiting(m) || early) && (lang === 'widget' || lang === 'ask')) {
-        // Un message peut poser plusieurs questions de suite (question.requested puis réponse) : la k-ième reçoit la k-ième réponse, seule la première sans réponse est active.
+        // A message can ask several questions in a row (question.requested then answer): the k-th gets the k-th answer, only the first unanswered one is active.
         const k = interactiveBlocks(m.text).indexOf(raw);
         const answer = k >= 0 ? answers[k] : undefined;
         const onAnswer = k >= 0 && k !== answers.length ? undefined : canAnswer;
@@ -129,7 +129,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         '& pre': { overflow: 'auto', p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: 1, borderColor: 'divider', fontSize: 13 },
         '& code': { fontSize: '0.88em' }, '& :not(pre) > code': { px: 0.6, py: 0.15, borderRadius: 1, bgcolor: 'action.selected' },
         '& p': { my: 0.5 }, '& a': { color: 'primary.main' }, '& table': { borderCollapse: 'collapse', display: 'block', maxWidth: '100%', overflowX: 'auto' }, '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5 },
-        // Petit écran : un tableau de 3 colonnes ou plus devient une suite de cartes, une ligne par attribut
+        // Small screen: a table with 3 or more columns becomes a series of cards, one line per attribute
         '@media (max-width: 599.95px)': {
           '& table.stackable, & table.stackable tbody, & table.stackable tr, & table.stackable td': { display: 'block', overflowX: 'visible' },
           '& table.stackable thead': { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' },

@@ -1,6 +1,6 @@
-# Copier en agents.config.yaml. Les ${VARIABLES} sont lues dans l'environnement (.env).
-# Chaque agent est relié par un plugin canal (plugins/) : c'est la plateforme qui se connecte à AgentUI sur /gateway.
-# Le même token est déclaré côté plateforme (Hermes : AGENTUI_TOKEN ; OpenClaw : channels.agentui.token).
+# Copy to agents.config.yaml. ${VARIABLES} are read from the environment (.env).
+# Each agent is linked by a channel plugin (plugins/): the platform is the one that connects to AgentUI on /gateway.
+# The same token is declared on the platform side (Hermes: AGENTUI_TOKEN; OpenClaw: channels.agentui.token).
 agents:
   - id: hermes
     type: gateway

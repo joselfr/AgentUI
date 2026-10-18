@@ -35,17 +35,17 @@ async function main() {
     const agent = adapters.get(conv.agent_id)?.name ?? conv.agent_id;
     void push
       .notify({
-        title: outcome === 'failed' ? `${agent} : échec` : `${agent} a répondu`,
+        title: outcome === 'failed' ? `${agent}: failed` : `${agent} replied`,
         body: preview ? `${fresh.title} — ${preview}` : fresh.title,
         url: `/c/${conv.id}`,
         tag: conv.id,
       })
-      .catch((e) => app.log.warn({ err: e }, 'envoi push échoué'));
+      .catch((e) => app.log.warn({ err: e }, 'push send failed'));
   };
 
   const app = Fastify({ logger: true, trustProxy: true });
   const secret = env.cookieSecret || randomBytes(32).toString('hex');
-  if (!env.cookieSecret) app.log.warn('COOKIE_SECRET absent : secret éphémère (sessions invalidées au redémarrage de cookie)');
+  if (!env.cookieSecret) app.log.warn('COOKIE_SECRET missing: ephemeral secret (sessions invalidated on restart)');
   await app.register(fastifyCookie, { secret });
   await app.register(fastifyWebsocket);
 
@@ -56,7 +56,7 @@ async function main() {
     return userFromToken(db, unsigned?.valid ? (unsigned.value ?? undefined) : undefined);
   };
 
-  // Garde d'authentification + protection CSRF (SameSite + en-tête personnalisé) sur /api
+  // Authentication guard + CSRF protection (SameSite + custom header) on /api
   app.addHook('onRequest', async (req, reply) => {
     if (!req.url.startsWith('/api/') || req.url.startsWith('/api/auth/login') || req.url === '/api/health') return;
     if (req.method !== 'GET' && req.headers['x-requested-with'] !== 'agentui') {
@@ -65,13 +65,13 @@ async function main() {
     if (!userOf(req.cookies)) return reply.code(401).send({ error: 'unauthorized' });
   });
 
-  // Erreurs de validation (zod) → 400 lisible plutôt que 500
+  // Validation errors (zod) → readable 400 rather than 500
   app.setErrorHandler((err: unknown, _req, reply) => {
     if (err instanceof z.ZodError) return reply.code(400).send({ error: err.issues.map((i) => i.message).join(' ; ') });
     const e = err as { statusCode?: number; message?: string };
     const code = e.statusCode ?? 500;
     if (code >= 500) app.log.error(err);
-    return reply.code(code).send({ error: e.message ?? 'Erreur interne' });
+    return reply.code(code).send({ error: e.message ?? 'Internal error' });
   });
 
   app.get('/api/health', async () => ({ status: 'ok' }));
@@ -81,11 +81,11 @@ async function main() {
     if (req.headers['x-requested-with'] !== 'agentui') return reply.code(403).send({ error: 'csrf' });
     const body = z.object({ username: z.string().min(1), password: z.string().min(1) }).parse(req.body);
     const key = `${req.ip}|${body.username}`;
-    if (limiter.blocked(key)) return reply.code(429).send({ error: 'Trop de tentatives, réessayez plus tard' });
+    if (limiter.blocked(key)) return reply.code(429).send({ error: 'Too many attempts, try again later' });
     const res = login(db, body.username, body.password);
     if (!res) {
       limiter.fail(key);
-      return reply.code(401).send({ error: 'Identifiants invalides' });
+      return reply.code(401).send({ error: 'Invalid credentials' });
     }
     limiter.reset(key);
     reply.setCookie(COOKIE, res.token, {
@@ -109,7 +109,7 @@ async function main() {
   app.post('/api/auth/password', async (req, reply) => {
     const body = z.object({ oldPassword: z.string(), newPassword: z.string().min(8) }).parse(req.body);
     const user = userOf(req.cookies)!;
-    if (!changePassword(db, user.id, body.oldPassword, body.newPassword)) return reply.code(400).send({ error: 'Mot de passe actuel incorrect' });
+    if (!changePassword(db, user.id, body.oldPassword, body.newPassword)) return reply.code(400).send({ error: 'Current password is incorrect' });
     return { ok: true };
   });
 
@@ -136,7 +136,7 @@ async function main() {
   });
   const adapterOf = (id: string): AgentAdapter => {
     const a = adapters.get(id);
-    if (!a) throw Object.assign(new Error('Agent inconnu'), { statusCode: 404 });
+    if (!a) throw Object.assign(new Error('Unknown agent'), { statusCode: 404 });
     return a;
   };
 
@@ -147,11 +147,11 @@ async function main() {
   );
   app.get<{ Params: { id: string; skillId: string }; Querystring: { sub?: string } }>('/api/agents/:id/skills/:skillId', async (req, reply) => {
     const a = adapterOf(req.params.id);
-    if (!a.readSkill) return reply.code(501).send({ error: 'Non supporté' });
+    if (!a.readSkill) return reply.code(501).send({ error: 'Not supported' });
     return { content: await a.readSkill(req.params.skillId, req.query.sub) };
   });
   app.get<{ Params: { id: string }; Querystring: { sub?: string } }>('/api/agents/:id/jobs', async (req) =>
-    // Lien vers la discussion qui reçoit les résultats de chaque tâche, quand elle existe déjà.
+    // Link to the chat that receives the results of each task, when it already exists.
     (await adapterOf(req.params.id).listJobs(req.query.sub)).map((j) => {
       const conv = j.deliverTo ? runs.findByRemoteSession(req.params.id, j.deliverTo) : undefined;
       return conv ? { ...j, conversationId: conv.id } : j;
@@ -162,7 +162,7 @@ async function main() {
     async (req, reply) => {
       const a = adapterOf(req.params.id);
       const action = z.enum(['pause', 'resume', 'run', 'delete']).parse(req.params.action);
-      if (!a.jobAction) return reply.code(501).send({ error: 'Non supporté' });
+      if (!a.jobAction) return reply.code(501).send({ error: 'Not supported' });
       await a.jobAction(req.params.jobId, action, req.query.sub);
       return { ok: true };
     },
@@ -180,8 +180,8 @@ async function main() {
     favorite: !!c.favorite,
     archived: !!c.archived,
     usage: c.usage ? (JSON.parse(c.usage) as Usage) : undefined,
-    cron: !!c.remote_session_id?.startsWith('cron-'), // discussion dédiée d'une tâche planifiée
-    lastReadAt: c.last_read_at ?? 0, // lecture précédente : sert à repérer les messages non lus à l'ouverture
+    cron: !!c.remote_session_id?.startsWith('cron-'), // chat dedicated to a scheduled task
+    lastReadAt: c.last_read_at ?? 0, // previous read: used to spot unread messages at opening
   });
   app.get<{ Querystring: { agentId?: string } }>('/api/conversations', async (req) =>
     runs.listConversations(req.query.agentId).map(convDto),
@@ -189,12 +189,12 @@ async function main() {
   app.get<{ Querystring: { q?: string } }>('/api/search', async (req) =>
     runs.search(z.string().max(100).catch('').parse(req.query.q)),
   );
-  // ---------- Modèle et coût ----------
+  // ---------- Model and cost ----------
   app.get<{ Params: { id: string } }>('/api/agents/:id/models', async (req) => {
     const a = adapterOf(req.params.id);
     return a.listModels ? a.listModels() : [];
   });
-  /** Rafraîchit la consommation d'une discussion depuis l'agent (modèle courant, tokens, coût), p. ex. à l'ouverture. */
+  /** Refreshes the consumption of a chat from the agent (current model, tokens, cost), e.g. at opening. */
   app.get<{ Params: { id: string } }>('/api/conversations/:id/usage', async (req, reply) => {
     const c = runs.getConversation(req.params.id);
     if (!c) return reply.code(404).send({ error: 'not found' });
@@ -204,14 +204,14 @@ async function main() {
     if (usage) runs.setUsage(c.id, usage);
     return usage ?? (c.usage ? JSON.parse(c.usage) : null);
   });
-  /** Change le modèle d'une discussion. Une discussion jamais utilisée reçoit d'abord son identifiant de session. */
+  /** Changes the model of a chat. A never-used chat first gets its session identifier. */
   app.put<{ Params: { id: string } }>('/api/conversations/:id/model', async (req, reply) => {
     const b = z.object({ model: z.string().min(1).max(200), provider: z.string().max(100).optional() }).parse(req.body);
     const c = runs.getConversation(req.params.id);
     if (!c) return reply.code(404).send({ error: 'not found' });
     const a = adapterOf(c.agent_id);
-    if (!a.setModel) return reply.code(501).send({ error: 'Cet agent ne sait pas changer de modèle' });
-    if (runs.isRunning(c.id)) return reply.code(409).send({ error: 'Une réponse est en cours : attendez sa fin pour changer de modèle' });
+    if (!a.setModel) return reply.code(501).send({ error: 'This agent cannot change the model' });
+    if (runs.isRunning(c.id)) return reply.code(409).send({ error: 'A reply is in progress: wait for it to finish before changing the model' });
     const sessionId = runs.ensureRemoteSession(c.id);
     const r = await a.setModel(sessionId, b.model, b.provider, c.sub_agent_id ?? undefined);
     const usage = (await a.sessionUsage?.(sessionId, c.sub_agent_id ?? undefined).catch(() => undefined)) ?? { ...(c.usage ? JSON.parse(c.usage) : { inputTokens: 0, outputTokens: 0 }), model: r.model, provider: r.provider };
@@ -241,7 +241,7 @@ async function main() {
     return { ok: true };
   });
   app.delete<{ Params: { id: string } }>('/api/conversations/:id', async (req) => {
-    await runs.deleteConversation(req.params.id); // la session de plateforme est supprimée par le plugin canal
+    await runs.deleteConversation(req.params.id); // the platform session is deleted by the channel plugin
     return { ok: true };
   });
   app.post<{ Params: { id: string } }>('/api/conversations/:id/send', { bodyLimit: 40 * 1024 * 1024 }, async (req, reply) => {
@@ -253,9 +253,9 @@ async function main() {
       .refine((v) => v.text.trim() || v.attachments.length, { message: 'Message vide' })
       .parse(req.body);
     try {
-      // Pendant une question de l'agent (question.requested), le message est la réponse : il reprend le run en cours.
+      // During an agent question (question.requested), the message is the answer: it resumes the current run.
       if (runs.awaitingReply(req.params.id)) {
-        if (b.attachments.length) return reply.code(400).send({ error: 'Pas de pièce jointe dans une réponse' });
+        if (b.attachments.length) return reply.code(400).send({ error: 'No attachment in an answer' });
         return await runs.reply(req.params.id, b.text);
       }
       return await runs.start(req.params.id, b.text, b.attachments);
@@ -266,7 +266,7 @@ async function main() {
   app.get<{ Params: { id: string } }>('/api/attachments/:id', async (req, reply) => {
     const f = files.get(req.params.id);
     if (!f) return reply.code(404).send({ error: 'not found' });
-    // Seules les images vérifiées sont affichées en ligne ; tout le reste est téléchargé, jamais interprété par le navigateur.
+    // Only verified images are displayed inline; everything else is downloaded, never interpreted by the browser.
     const inline = /^image\/(png|jpeg|gif|webp)$/.test(f.mimeType);
     return reply
       .header('Content-Type', inline ? f.mimeType : 'application/octet-stream')
@@ -293,7 +293,7 @@ async function main() {
     }
     const send = (p: ServerPush) => socket.readyState === 1 && socket.send(JSON.stringify(p));
     for (const a of adapters.values()) send({ type: 'agent.status', agentId: a.id, status: a.status().status, detail: a.status().detail });
-    // Les events live ne sont envoyés qu'après le "resume" pour éviter doublons/trous
+    // Live events are only sent after the "resume" to avoid duplicates/gaps
     let live = false;
     const queue: ServerPush[] = [];
     const unsub = runs.subscribe((p) => (live ? send(p) : queue.push(p)));
@@ -310,20 +310,20 @@ async function main() {
           live = true;
         }
       } catch {
-        /* ignoré */
+        /* ignored */
       }
     });
     socket.on('close', unsub);
     socket.on('error', unsub);
   });
 
-  // ---------- Gateway des plugins canal (Hermes, OpenClaw…) ----------
-  // Le plugin installé dans la plateforme se connecte ici ; authentification par le token de l'agent (premier message).
+  // ---------- Plugin channel gateway (Hermes, OpenClaw…) ----------
+  // The plugin installed in the platform connects here; authentication by the agent's token (first message).
   const gateways = [...adapters.values()].filter((a): a is GatewayAdapter => a instanceof GatewayAdapter);
   for (const g of gateways) {
     g.onOutbound = (m) => {
       const conv = runs.deliver(g.id, m.conversationId, m.text, m.media, g.name, m.title);
-      app.log.info({ agent: g.id, conversation: conv.id }, 'message proactif reçu');
+      app.log.info({ agent: g.id, conversation: conv.id }, 'proactive message received');
     };
   }
   app.get('/gateway', { websocket: true }, (socket) => {
@@ -335,16 +335,16 @@ async function main() {
       try {
         hello = JSON.parse(String(raw));
       } catch {
-        return ws.close(4001, 'hello invalide');
+        return ws.close(4001, 'invalid hello');
       }
       if (hello.type !== 'hello' || typeof hello.token !== 'string') return ws.close(4001, 'hello attendu');
       const g = gateways.find((x) => sameToken(x.token, hello.token));
       if (!g) {
-        app.log.warn('gateway : token refusé');
-        return ws.close(4001, 'token invalide');
+        app.log.warn('gateway: token rejected');
+        return ws.close(4001, 'invalid token');
       }
-      if (hello.protocol !== 1) return ws.close(4002, 'protocole non supporté');
-      app.log.info({ agent: g.id, plugin: hello.agent, mode: hello.mode }, 'plugin canal connecté');
+      if (hello.protocol !== 1) return ws.close(4002, 'unsupported protocol');
+      app.log.info({ agent: g.id, plugin: hello.agent, mode: hello.mode }, 'channel plugin connected');
       g.attach(ws, hello);
     });
   });
@@ -352,10 +352,10 @@ async function main() {
   const connections: Promise<unknown>[] = [];
   for (const a of adapters.values()) {
     a.onStatus((status, detail) => runs.broadcast({ type: 'agent.status', agentId: a.id, status, detail }));
-    connections.push(a.connect().catch((e) => app.log.error({ err: e, agent: a.id }, 'connexion agent échouée')));
+    connections.push(a.connect().catch((e) => app.log.error({ err: e, agent: a.id }, 'agent connection failed')));
   }
-  // Reprise des runs interrompus par un redémarrage, une fois les agents (re)connectés
-  void Promise.allSettled(connections).then(() => runs.recover()).then((n) => n && app.log.info(`${n} run(s) repris après redémarrage`));
+  // Resume the runs interrupted by a restart, once the agents are (re)connected
+  void Promise.allSettled(connections).then(() => runs.recover()).then((n) => n && app.log.info(`${n} run(s) resumed after restart`));
 
   // ---------- Front statique (build web) ----------
   const webDist = resolve(process.env.WEB_DIST ?? '../web/dist');

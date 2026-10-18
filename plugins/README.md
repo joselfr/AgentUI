@@ -1,82 +1,81 @@
-# Plugins canal AgentUI
+# AgentUI channel plugins
 
-AgentUI joue le rôle de **gateway**, comme Telegram pour un bot : ce sont les plateformes d'agents qui s'y connectent,
-via un plugin canal qui traduit leurs spécificités vers un protocole unique.
+AgentUI plays the role of the **gateway**, like Telegram for a bot: the agent platforms are the ones that connect to it,
+through a channel plugin that translates their specifics into a single protocol.
 
-| Dossier | Contenu |
+| Folder | Content |
 |---|---|
-| [`SPIKE.md`](SPIKE.md) | Étude de faisabilité : matrice des capacités Hermes / OpenClaw, API utilisées, risques |
+| [`SPIKE.md`](SPIKE.md) | Feasibility study: Hermes / OpenClaw capability matrix, APIs used, risks |
 | [`protocol/`](protocol/PROTOCOL.md) | **AgentUI Channel Protocol v1** (`PROTOCOL.md` + `channel.schema.json`) |
-| [`hermes-agentui/`](hermes-agentui/) | Plugin plateforme Hermes Agent (Python) |
-| [`openclaw-agentui/`](openclaw-agentui/) | Plugin canal OpenClaw (TypeScript) |
-| [`dev/mock-gateway.mjs`](dev/mock-gateway.mjs) | Faux AgentUI interactif pour tester un plugin sans l'app |
+| [`hermes-agentui/`](hermes-agentui/) | Hermes Agent platform plugin (Python) |
+| [`openclaw-agentui/`](openclaw-agentui/) | OpenClaw channel plugin (TypeScript) |
+| [`dev/mock-gateway.mjs`](dev/mock-gateway.mjs) | Interactive fake AgentUI to test a plugin without the app |
 
-Supprimer une discussion dans AgentUI demande au plugin d'effacer la session correspondante côté plateforme (`rpc
-deleteSession`, capacité `sessionDelete`) : la discussion n'est effacée localement **que** si le plugin a confirmé. Un agent
-dont le plugin ne sait pas le faire — adaptateurs directs, plugin pas encore mis à jour — refuse la suppression (message
-explicite, discussion conservée) ; une discussion sans session côté plateforme (jamais utilisée, ou « maison ») reste
-supprimable normalement.
+Deleting a chat in AgentUI asks the plugin to erase the matching session on the platform side (`rpc
+deleteSession`, `sessionDelete` capability): the chat is only erased locally **if** the plugin confirmed. An agent
+whose plugin cannot do it — direct adapters, plugin not yet updated — refuses the deletion (explicit message,
+chat kept); a chat without a platform-side session (never used, or "home") can be deleted normally.
 
-Côté AgentUI : déclarer l'agent dans `agents.config.yaml` (`type: gateway`, `token` de 16 caractères minimum).
-Le plugin se connecte à `ws(s)://<agentui>/gateway` ; en Docker sur le même réseau : `ws://agentui:8080/gateway`.
-Les anciens adapters directs (`hermes` via api_server, `openclaw` via le WebSocket opérateur) ont été supprimés.
+On the AgentUI side: declare the agent in `agents.config.yaml` (`type: gateway`, `token` of at least 16 characters).
+The plugin connects to `ws(s)://<agentui>/gateway`; in Docker on the same network: `ws://agentui:8080/gateway`.
+The old direct adapters (`hermes` via api_server, `openclaw` via the operator WebSocket) were removed.
 
-Les widgets `chart`, `map` et `code` sont aussi exposés comme outils de plugin (`agentui_chart`, `agentui_map`, `agentui_code`,
-voir `SPIKE.md`), et les widgets interactifs `ask`, `confirm` et `form` comme outils **bloquants** (`agentui_ask`,
-`agentui_confirm`, `agentui_form` : l'outil affiche le widget, attend la trame `reply` et renvoie la réponse de l'utilisateur
-à l'agent, sans terminer son tour). Leurs schémas sont dans `protocol/widget-tools.json` : après modification, lancer
-`node plugins/sync-widget-tools.mjs` pour les recopier dans les deux plugins (Hermes : le fichier `widget_tools.json` doit
-être copié avec `adapter.py`).
+The `chart`, `map` and `code` widgets are also exposed as plugin tools (`agentui_chart`, `agentui_map`, `agentui_code`,
+see `SPIKE.md`), and the interactive widgets `ask`, `confirm` and `form` as **blocking** tools (`agentui_ask`,
+`agentui_confirm`, `agentui_form`: the tool displays the widget, waits for the `reply` frame and returns the user's answer
+to the agent, without ending its turn). Their schemas are in `protocol/widget-tools.json`: after editing, run
+`node plugins/sync-widget-tools.mjs` to copy them into both plugins (Hermes: the `widget_tools.json` file must be
+copied along with `adapter.py`).
 
-## Tester un plugin sans AgentUI (faux serveur)
+## Test a plugin without AgentUI (fake server)
 
 ```bash
 AGENTUI_TOKEN=dev node plugins/dev/mock-gateway.mjs --port 8790
-# puis taper un message ; /new pour une nouvelle discussion (= nouvelle session côté agent),
-# /agent [nom] pour choisir l'agent ciblé (plusieurs plugins peuvent être connectés),
-# /abort, /approve [once|session|always], /deny, /attach <fichier>, /rpc <méthode> [json]
-# (ex. /rpc listSubAgents ; /rpc deleteSession = efface la session de la discussion courante)
+# then type a message; /new for a new chat (= new session on the agent side),
+# /agent [name] to pick the targeted agent (several plugins can be connected),
+# /abort, /approve [once|session|always], /deny, /attach <file>, /rpc <method> [json]
+# (e.g. /rpc listSubAgents; /rpc deleteSession = erases the session of the current chat)
 ```
 
-L'URL à donner aux plugins est `ws://<hôte>:8790/gateway`. Si l'agent tourne sur un autre serveur, ouvrir un tunnel,
-par exemple `ssh -R 8790:127.0.0.1:8790 root@jlfr.io`, puis utiliser `ws://127.0.0.1:8790/gateway` côté serveur.
+The URL to give to the plugins is `ws://<host>:8790/gateway`. If the agent runs on another server, open a tunnel,
+for example `ssh -R 8790:127.0.0.1:8790 root@jlfr.io`, then use `ws://127.0.0.1:8790/gateway` on the server side.
 
-## Hermes Agent (≥ 0.19, validé en 0.21)
+## Hermes Agent (≥ 0.19, validated on 0.21)
 
 ```bash
 cp plugins/hermes-agentui/{plugin.yaml,__init__.py,adapter.py,widget_tools.json} ~/.hermes/plugins/agentui/
-hermes plugins enable agentui-platform     # les plugins sont opt-in
+hermes plugins enable agentui-platform     # plugins are opt-in
 ```
 
-`~/.hermes/.env` :
+`~/.hermes/.env`:
 
 ```env
 AGENTUI_URL=wss://agentui.example.com/gateway
-AGENTUI_TOKEN=…            # token de l'agent dans agents.config.yaml d'AgentUI
+AGENTUI_TOKEN=…            # agent token in AgentUI's agents.config.yaml
 # AGENTUI_NAME=Hermes
 ```
 
-Le plugin active par défaut le streaming et coupe les bulles de progression d'outils pour la plateforme. Mais un
-réglage **global** `display.tool_progress` du `config.yaml` prend le pas : dans ce cas, le fixer pour la plateforme :
+The plugin enables streaming by default and turns off the tool progress bubbles for the platform. But a
+**global** `display.tool_progress` setting in `config.yaml` takes precedence: in that case, set it for the platform:
 
 ```bash
 hermes config set display.platforms.agentui.tool_progress off
 hermes config set display.platforms.agentui.streaming true
 ```
 
-Redémarrer `hermes gateway` ; `hermes gateway status` doit lister **AgentUI**. Les crons `deliver=agentui` arrivent dans
-la discussion « maison » d'AgentUI (`AGENTUI_HOME_CHANNEL` pour en choisir une autre). Avec plusieurs profils, chaque
-profil lance sa gateway et donc sa propre connexion.
+Restart `hermes gateway`; `hermes gateway status` must list **AgentUI**. `deliver=agentui` crons arrive in
+AgentUI's "home" chat (`AGENTUI_HOME_CHANNEL` to choose another one). With several profiles, each
+profile runs its own gateway and therefore its own connection.
 
-Test d'intégration, contre la vraie classe `BasePlatformAdapter`, dans un environnement où Hermes est installé :
+Integration test, against the real `BasePlatformAdapter` class, in an environment where Hermes is installed:
 
 ```bash
-<python de Hermes> plugins/hermes-agentui/tests/test_adapter.py
+<Hermes python> plugins/hermes-agentui/tests/test_adapter.py
 ```
 
-## OpenClaw (≥ 2026.9.9, validé en 2026.9.9)
+## OpenClaw (≥ 2026.9.9, validated on 2026.9.9)
 
-L'installation d'un paquet exige le JavaScript compilé (`dist/`, non versionné) :
+Installing a package requires compiled JavaScript (`dist/`, not versioned):
 
 ```bash
 cd plugins/openclaw-agentui && npm install && npm run build
@@ -85,59 +84,59 @@ openclaw config set channels.agentui.url wss://agentui.example.com/gateway
 openclaw config set channels.agentui.token …
 ```
 
-La gateway applique l'installation et la configuration à chaud ; `openclaw channels status` doit afficher **AgentUI** connecté. Chaque discussion AgentUI est un
-pair direct isolé (le plugin impose `dmScope: "per-channel-peer"`). Le sous-agent choisi dans AgentUI est transmis comme
-agent par défaut de la route ; les bindings de configuration restent prioritaires.
+The gateway applies the installation and configuration hot; `openclaw channels status` must show **AgentUI** connected. Each AgentUI chat is an
+isolated direct peer (the plugin enforces `dmScope: "per-channel-peer"`). The sub-agent chosen in AgentUI is passed as the
+route's default agent; configuration bindings keep priority.
 
-Développement :
+Development:
 
 ```bash
 cd plugins/openclaw-agentui
 npm install            # openclaw (types) + typescript
-npm run typecheck      # contre les vrais types du SDK
-npm test               # runtime OpenClaw simulé + faux AgentUI
+npm run typecheck      # against the real SDK types
+npm test               # simulated OpenClaw runtime + fake AgentUI
 ```
 
-## Limites connues
+## Known limits
 
-- **Hermes** : le raisonnement arrive en un bloc en fin de tour (hook `post_llm_call`), pas en streaming.
-- **OpenClaw** : sous-agents pas encore relayés (`subagents: false`) ; approbations par commande `/approve` dans le même chat
-  (le natif `approvalCapability` reste à faire).
-- Aucune des deux plateformes n'expose aux canaux la liste des sessions, des skills ou des jobs : AgentUI s'appuie sur
-  sa propre base de messages.
-- Envois directs : cible = id de discussion AgentUI ou `home` (`openclaw message send --channel agentui --target home …`).
-  Hors du processus de la gateway (CLI, cron isolé), les deux plugins ouvrent une connexion ponctuelle `send-only`.
+- **Hermes**: reasoning arrives as one block at the end of the turn (`post_llm_call` hook), not streamed.
+- **OpenClaw**: sub-agents not relayed yet (`subagents: false`); approvals through the `/approve` command in the same chat
+  (the native `approvalCapability` remains to be done).
+- Neither platform exposes the list of sessions, skills or jobs to channels: AgentUI relies on
+  its own message database.
+- Direct sends: target = AgentUI chat id or `home` (`openclaw message send --channel agentui --target home …`).
+  Outside the gateway process (CLI, isolated cron), both plugins open a one-off `send-only` connection.
 
-## Validation sur jlfr.io (15/10/2026)
+## Validation on jlfr.io (2026-10-15)
 
-Faux AgentUI lancé sur le serveur (`agentui-mock` dans `media_default`), plugins installés dans les instances réelles,
-puis tout remis en état (configs restaurées à l'identique, plugins désinstallés).
+Fake AgentUI launched on the server (`agentui-mock` in `media_default`), plugins installed in the real instances,
+then everything restored (configs restored identically, plugins uninstalled).
 
-| Scénario | Hermes 0.21.0 | OpenClaw 2026.9.9 |
+| Scenario | Hermes 0.21.0 | OpenClaw 2026.9.9 |
 |---|---|---|
-| Connexion, reconnexion après coupure du serveur | ✅ | ✅ |
-| Outil réel : carte avec arguments + résultat, texte streamé, réponse, fin | ✅ | ✅ |
-| Fils isolés (un mot confié dans le fil A, inconnu du fil B, retrouvé dans A) | ✅ | ✅ |
-| Arrêt en cours d'outil (`sleep 120` interrompu, `run.aborted`) | ✅ | ✅ |
-| Raisonnement | ✅ (en fin de tour) | non observé avec le modèle actuel |
-| Message proactif | ✅ cron `--deliver agentui` | ✅ `openclaw message send` |
-| Approbation | ⚠️ non déclenchée : le serveur auto-approuve (« smart approval ») ; couverte par les tests | ⚠️ aucune demande d'approbation pendant les essais ; couverte par les tests |
+| Connection, reconnection after a server cut | ✅ | ✅ |
+| Real tool: card with arguments + result, streamed text, reply, end | ✅ | ✅ |
+| Isolated threads (a word given in thread A, unknown in thread B, found again in A) | ✅ | ✅ |
+| Stop mid-tool (`sleep 120` interrupted, `run.aborted`) | ✅ | ✅ |
+| Reasoning | ✅ (at end of turn) | not observed with the current model |
+| Proactive message | ✅ cron `--deliver agentui` | ✅ `openclaw message send` |
+| Approval | ⚠️ not triggered: the server auto-approves ("smart approval"); covered by the tests | ⚠️ no approval request during the trials; covered by the tests |
 
-Défauts trouvés et corrigés pendant la validation : streaming Hermes 0.21 (passage par `send`/`edit_message`),
-argument `allow_session` ajouté en 0.21, bulles d'outils malgré le défaut du plugin (réglage global), paquet OpenClaw sans
-`dist/`, cibles d'envoi direct non résolues, envoi depuis la CLI hors gateway.
+Defects found and fixed during validation: Hermes 0.21 streaming (going through `send`/`edit_message`),
+`allow_session` argument added in 0.21, tool bubbles despite the plugin's default (global setting), OpenClaw package without
+`dist/`, unresolved direct-send targets, send from the CLI outside the gateway.
 
-## En production sur jlfr.io (15/10/2026)
+## In production on jlfr.io (2026-10-15)
 
-Agents `hermes-canal` et `openclaw-canal` déclarés dans `config/agentui/agents.config.yaml` (tokens générés, fichier en
-640), à côté de `hermes` et `openclaw` inchangés. Plugins installés : `config/hermes-agent/plugins/agentui` (+
-`AGENTUI_URL`/`AGENTUI_TOKEN` dans son `.env`, `display.platforms.agentui.*`) et extension OpenClaw `agentui`
-(`channels.agentui.*`). Vérifié via l'API d'AgentUI : les 4 agents connectés, un message avec outil traité par chaque
-canal, un cron Hermes et un envoi OpenClaw livrés dans « Messages de … ».
+Agents `hermes-canal` and `openclaw-canal` declared in `config/agentui/agents.config.yaml` (generated tokens, file mode
+640), next to the unchanged `hermes` and `openclaw`. Plugins installed: `config/hermes-agent/plugins/agentui` (+
+`AGENTUI_URL`/`AGENTUI_TOKEN` in its `.env`, `display.platforms.agentui.*`) and the OpenClaw `agentui` extension
+(`channels.agentui.*`). Verified through AgentUI's API: the 4 agents connected, a message with a tool handled by each
+channel, a Hermes cron and an OpenClaw send delivered in "Messages from …".
 
-Puis, le même jour, la suppression propagée : `apps/agentui` reconstruit, `adapter.py` du plugin Hermes remplacé
-(`hermes-agent` redémarré, sauvegarde `adapter.py.bak-session-delete`) et extension OpenClaw réinstallée à chaud
-(`plugins install … --force`, sans redémarrage). Les adaptateurs directs, dépréciés, ont été retirés de la
-configuration. Vérifié sur une discussion jetable de chaque canal : la discussion supprimée dans l'app disparaît de sa
-base et sa session de plateforme avec elle — plus aucune ligne `sessions` chez Hermes, une seule clé de session effacée
-chez OpenClaw (les autres intactes).
+Then, the same day, propagated deletion: `apps/agentui` rebuilt, the Hermes plugin's `adapter.py` replaced
+(`hermes-agent` restarted, backup `adapter.py.bak-session-delete`) and the OpenClaw extension reinstalled hot
+(`plugins install … --force`, no restart). The deprecated direct adapters were removed from the
+configuration. Verified on a throwaway chat of each channel: the chat deleted in the app disappears from its
+database and its platform session with it — no more `sessions` row in Hermes, a single session key erased
+in OpenClaw (the others intact).

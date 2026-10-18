@@ -35,9 +35,9 @@ export const makeTheme = (mode: 'light' | 'dark') => {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
-          // Texte un peu plus compact, à la manière d'une app native (la typo MUI est en rem)
-          html: { touchAction: 'manipulation', fontSize: 14 }, // manipulation : pas de zoom au double tap
-          // Page figée : seule l'app (hauteur --app-height) défile en interne, y compris clavier ouvert.
+          // Slightly more compact text, like a native app (MUI typography is in rem)
+          html: { touchAction: 'manipulation', fontSize: 14 }, // manipulation: no zoom on double tap
+          // Frozen page: only the app (height --app-height) scrolls internally, even with the keyboard open.
           'html, body': { height: '100%', overflow: 'hidden', overscrollBehavior: 'none' },
           body: { backgroundColor: t.bg },
           '::selection': { background: alpha(t.accent, 0.35) },

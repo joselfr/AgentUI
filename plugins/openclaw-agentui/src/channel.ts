@@ -18,7 +18,7 @@ const CAPABILITIES: Capabilities = {
   sessions: true,
   abort: true,
   approvals: true,
-  subagents: false, // TODO : sessions de sous-agents (outil sessions_spawn) via les événements d'agent
+  subagents: false, // TODO: sub-agent sessions (sessions_spawn tool) via agent events
   reasoning: true,
   toolDetails: true,
   skills: true,
@@ -42,7 +42,7 @@ function resolveAccount(cfg: OpenClawConfig, accountId?: string | null): AgentUI
   };
 }
 
-/** Message proactif (cron, outil message, livraison différée) : hors de tout run AgentUI. */
+/** Proactive message (cron, message tool, deferred delivery): outside any AgentUI run. */
 async function sendOutbound(
   cfg: OpenClawConfig,
   accountId: string | null | undefined,
@@ -63,9 +63,9 @@ async function sendOutbound(
     client.send(msg);
     return { messageId: id };
   }
-  // Hors du processus de la gateway (CLI `openclaw message send`, cron isolé) : connexion d'envoi ponctuelle.
+  // Outside the gateway process (CLI `openclaw message send`, isolated cron): one-off send connection.
   const account = resolveAccount(cfg, accountId);
-  if (!account.url || !account.token) throw new Error('AgentUI : channels.agentui.url et token sont requis');
+  if (!account.url || !account.token) throw new Error('AgentUI: channels.agentui.url and token are required');
   const once = new AgentUIClient({
     url: account.url,
     token: account.token,
@@ -78,7 +78,7 @@ async function sendOutbound(
   try {
     if (!(await once.waitReady(10_000))) throw new Error('AgentUI injoignable');
     once.send(msg);
-    await new Promise((r) => setTimeout(r, 200)); // laisse partir la trame avant la fermeture
+    await new Promise((r) => setTimeout(r, 200)); // let the frame leave before closing
   } finally {
     once.stop();
   }
@@ -88,7 +88,7 @@ async function sendOutbound(
 export const agentUIPlugin = createChatChannelPlugin<AgentUIAccount>({
   base: {
     id: CHANNEL,
-    meta: { id: CHANNEL, label: 'AgentUI', selectionLabel: 'AgentUI', docsPath: '/channels/agentui', blurb: 'PWA de chat AgentUI utilisée comme canal.' },
+    meta: { id: CHANNEL, label: 'AgentUI', selectionLabel: 'AgentUI', docsPath: '/channels/agentui', blurb: 'AgentUI chat PWA used as a channel.' },
     capabilities: { chatTypes: ['direct'], media: true },
     config: {
       listAccountIds: () => ['default'],
@@ -104,20 +104,20 @@ export const agentUIPlugin = createChatChannelPlugin<AgentUIAccount>({
         channels: { ...cfg.channels, [CHANNEL]: { ...sectionOf(cfg), ...input } },
       }),
     },
-    // Cibles des envois directs (outil message, crons, `openclaw message send`) : un id de discussion AgentUI,
-    // ou « home » pour la discussion maison.
+    // Targets of direct sends (message tool, crons, `openclaw message send`): an AgentUI chat id,
+    // or "home" for the home chat.
     messaging: {
       normalizeTarget: (raw) => raw.trim().replace(/^agentui:/i, '') || undefined,
       targetResolver: {
         looksLikeId: () => true,
-        hint: `<id de discussion AgentUI> ou ${HOME_CONVERSATION}`,
+        hint: `<AgentUI chat id> or ${HOME_CONVERSATION}`,
         resolveTarget: async ({ normalized }) => ({ to: normalized, kind: 'user', source: 'normalized' }),
       },
     },
     gateway: {
       startAccount: async (ctx) => {
         const account = ctx.account;
-        if (!account.url || !account.token) throw new Error('AgentUI : channels.agentui.url et token sont requis');
+        if (!account.url || !account.token) throw new Error('AgentUI: channels.agentui.url and token are required');
         const log = (msg: string) => ctx.log?.info?.(`[agentui] ${msg}`);
         let client: AgentUIClient | undefined;
         const bridge = new AgentUIBridge({ cfg: ctx.cfg, accountId: ctx.accountId, client: () => client, log });
@@ -145,7 +145,7 @@ export const agentUIPlugin = createChatChannelPlugin<AgentUIAccount>({
       },
     },
   },
-  // L'accès est contrôlé par le token AgentUI (l'utilisateur est authentifié par AgentUI).
+  // Access is controlled by the AgentUI token (the user is authenticated by AgentUI).
   security: {
     dm: {
       channelKey: CHANNEL,

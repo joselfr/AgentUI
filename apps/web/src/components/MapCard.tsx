@@ -12,9 +12,9 @@ import { t as tr } from '../i18n';
 interface Point { lat: number; lon: number; title: string; text?: string; maps: boolean }
 interface MapData { title?: string; maps: boolean; points: Point[] }
 
-const MAX_POINTS = 10; // limite de l'itinéraire Google Maps (origine, destination, 8 étapes)
+const MAX_POINTS = 10; // Google Maps route limit (origin, destination, 8 waypoints)
 
-/** Arguments du widget `map` : `{ title?, maps?, points: [{ lat, lon, title, text?, maps? }] }`. `undefined` si invalide. */
+/** Arguments of the `map` widget: `{ title?, maps?, points: [{ lat, lon, title, text?, maps? }] }`. `undefined` if invalid. */
 export function parseMap(a: Record<string, unknown>): MapData | undefined {
   if (!Array.isArray(a.points) || !a.points.length) return undefined;
   const points: Point[] = [];
@@ -28,7 +28,7 @@ export function parseMap(a: Record<string, unknown>): MapData | undefined {
 }
 
 const ll = (p: Point) => `${p.lat},${p.lon}`;
-/** Un point : sa fiche ; plusieurs : l'itinéraire dans l'ordre des points. */
+/** One point: its card; several: the route in point order. */
 export function mapsUrl(ps: Point[]) {
   if (ps.length === 1) return `https://www.google.com/maps/search/?api=1&query=${ll(ps[0]!)}`;
   const mid = ps.slice(1, -1).map(ll).join('|');
@@ -41,7 +41,7 @@ const pin = (color: string) => L.divIcon({
   html: `<svg viewBox="0 0 24 24" width="28" height="28" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" fill="${color}" stroke="#fff" stroke-width="1.6"/><circle cx="12" cy="10" r="2.6" fill="#fff"/></svg>`,
 });
 
-/** Contenu d'une popup : titre, texte Markdown, bouton Maps éventuel. Rendu dans un nœud DOM pour Leaflet. */
+/** Popup content: title, Markdown text, optional Maps button. Rendered in a DOM node for Leaflet. */
 function PopupBody({ p }: { p: Point }) {
   return (
     <Box sx={{ fontSize: 13, lineHeight: 1.45, '& p': { m: '0 0 4px' }, '& ul, & ol': { m: '0 0 4px', pl: 2.25 }, '& a': { color: 'primary.main' } }}>
@@ -81,7 +81,7 @@ export default function MapCard({ map: m }: { map: MapData }) {
       {m.points.length > 1 && <Typography variant="caption" color="text.secondary">{tr('map.points', { count: m.points.length })}</Typography>}
       <Box ref={el} sx={{
         mt: 1, height: { xs: 240, sm: 300 }, borderRadius: '10px', overflow: 'hidden', border: 1, borderColor: 'divider', isolation: 'isolate',
-        // tuiles OSM assombries en thème sombre
+        // OSM tiles darkened in dark theme
         ...(dark && { '& .leaflet-tile-pane': { filter: 'invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)' } }),
         '& .leaflet-popup-content-wrapper, & .leaflet-popup-tip': { bgcolor: 'background.paper', color: 'text.primary', border: 1, borderColor: 'divider', boxShadow: `0 6px 20px ${alpha('#000', 0.25)}` },
         '& .leaflet-popup-content-wrapper': { borderRadius: '12px' },

@@ -10,7 +10,7 @@ export function useLoad<T>(fn: () => Promise<T>, deps: unknown[]) {
   const [data, setData] = useState<T>();
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
-  /** Rechargement silencieux (sans indicateur de chargement), pour le suivi en direct. */
+  /** Silent reload (no loading indicator), for live tracking. */
   const refresh = useCallback(() => fn().then((d) => { setData(d); setErr(''); return d; }), deps); // eslint-disable-line react-hooks/exhaustive-deps
   const reload = useCallback(() => {
     setLoading(true);
@@ -45,7 +45,7 @@ export function Status({ loading, err, empty }: { loading: boolean; err: string;
   );
 }
 
-/** Sélecteurs d'agent (et de sous-agent pour les pages qui en dépendent). */
+/** Agent pickers (and sub-agent pickers for the pages that depend on them). */
 export function Pickers({ agents, agentId, sub, onAgent, onSub, subs }: {
   agents: AgentInfo[]; agentId?: string; sub?: string; onAgent: (id: string) => void; onSub?: (s?: string) => void; subs?: SubAgent[];
 }) {
@@ -63,7 +63,7 @@ export function Pickers({ agents, agentId, sub, onAgent, onSub, subs }: {
   );
 }
 
-/** Agent + sous-agent choisis dans une page, parmi les agents compatibles. */
+/** Agent + sub-agent chosen in a page, among the compatible agents. */
 export function useScope(agents: AgentInfo[], supports: (a: AgentInfo) => boolean) {
   const ok = agents.filter(supports);
   const [agentId, setAgentId] = useState<string>();

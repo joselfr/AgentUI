@@ -3,7 +3,7 @@ import { Box, Collapse, List, ListItemButton, ListItemText } from '@mui/material
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
-/** Section repliable de la liste (Tâches cron, Archivées) ; `unread` signale des messages non lus quand elle est repliée. */
+/** Collapsible list section (Cron tasks, Archived); `unread` signals unread messages when it is collapsed. */
 export default function Section({ title, count, open, onToggle, unread = false, children }: {
   title: string; count: number; open: boolean; onToggle: () => void; unread?: boolean; children: ReactNode;
 }) {

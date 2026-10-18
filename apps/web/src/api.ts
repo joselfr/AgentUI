@@ -8,17 +8,17 @@ export interface Conversation {
   title: string;
   updatedAt: number;
   running: boolean;
-  /** Un message d'agent est arrivé depuis la dernière lecture. */
+  /** An agent message arrived since the last read. */
   unread: boolean;
-  /** Épinglée en tête de liste. */
+  /** Pinned at the top of the list. */
   favorite: boolean;
-  /** Rangée dans la section « Archivées ». */
+  /** Filed in the "Archived" section. */
   archived: boolean;
-  /** Modèle, tokens et coût de la session (derniers connus). */
+  /** Model, tokens and cost of the session (latest known). */
   usage?: Usage;
-  /** Discussion dédiée d'une tâche cron. */
+  /** Chat dedicated to a cron task. */
   cron: boolean;
-  /** Dernière lecture avant l'ouverture en cours (ms) : sert à repérer les messages non lus. */
+  /** Last read before the current opening (ms): used to spot unread messages. */
   lastReadAt: number;
 }
 
