@@ -9,8 +9,8 @@
   "scripts": {
     "dev:server": "npm -w @agentui/server run dev",
     "dev:web": "npm -w @agentui/web run dev",
-    "build": "npm -w @agentui/shared run build && npm -w @agentui/server run build && npm -w @agentui/web run build",
-    "typecheck": "npm -w @agentui/shared run typecheck && npm -w @agentui/server run typecheck && npm -w @agentui/web run typecheck",
+    "build": "npm -w @agentui/shared run build && npm -w @agentui/app-runtime run build && npm -w @agentui/server run build && npm -w @agentui/web run build",
+    "typecheck": "npm -w @agentui/shared run typecheck && npm -w @agentui/server run typecheck && npm -w @agentui/web run typecheck && npm -w @agentui/app-runtime run typecheck",
     "test": "npm -w @agentui/server run test && npm -w @agentui/web run test",
     "e2e": "node e2e/front.mjs",
     "e2e:push": "node e2e/push.mjs"
