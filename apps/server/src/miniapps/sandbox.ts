@@ -1,5 +1,6 @@
 import { MessageChannel, Worker } from 'node:worker_threads';
 import type { AppData } from './data.js';
+import { appFetch, FETCH_LIMITS } from './net.js';
 import { AppError } from './store.js';
 
 export interface SandboxRequest {
@@ -13,7 +14,7 @@ export interface SandboxResult {
   body: unknown;
 }
 
-export const SANDBOX_LIMITS = { timeoutMs: 3000, maxResponseBytes: 2 * 1024 * 1024, maxCalls: 2000 };
+export const SANDBOX_LIMITS = { timeoutMs: 3000, maxResponseBytes: 2 * 1024 * 1024, maxCalls: 2000, maxTotalMs: 30_000 };
 
 /**
  * Worker code. One worker per request: it is killed at the timeout.
@@ -28,10 +29,11 @@ const vm = require('node:vm');
 const flag = new Int32Array(workerData.sab);
 let calls = 0;
 function hostCall(op, argsJson) {
+  const waitMs = op === 'fetch' ? workerData.fetchWaitMs : workerData.timeoutMs;
   if (++calls > workerData.maxCalls) return JSON.stringify({ ok: false, e: 'Too many data calls in one request.' });
   Atomics.store(flag, 0, 0);
   parentPort.postMessage({ t: 'call', op: String(op), args: String(argsJson) });
-  if (Atomics.wait(flag, 0, 0, workerData.timeoutMs) === 'timed-out') return JSON.stringify({ ok: false, e: 'Data call timed out.' });
+  if (Atomics.wait(flag, 0, 0, waitMs) === 'timed-out') return JSON.stringify({ ok: false, e: 'Data call timed out.' });
   const m = receiveMessageOnPort(workerData.port);
   return m ? m.message : JSON.stringify({ ok: false, e: 'No answer.' });
 }
@@ -56,6 +58,10 @@ const boot = vm.runInContext(\`(function (call, inputJson) {
       remove: (id) => rpc('db.remove', { c, id }),
     }) },
     kv: { get: (k) => rpc('kv.get', { k }), set: (k, v) => rpc('kv.set', { k, v }), delete: (k) => rpc('kv.delete', { k }) },
+    fetch: (url, init) => {
+      const r = rpc('fetch', { url: String(url), init: init === undefined ? null : init });
+      return { status: r.status, ok: r.ok, url: r.url, headers: r.headers, text: r.text, json: () => JSON.parse(r.text) };
+    },
     log,
     status: (status, body) => ({ __status: status, body }),
   };
@@ -85,6 +91,8 @@ export function runHandler(opts: {
   user: { id: number; username: string };
   data: AppData;
   log: (line: string) => void;
+  /** Called when the handler wrote data (insert / update / remove / kv). */
+  onData?: () => void;
 }): Promise<SandboxResult> {
   const { appId, data } = opts;
   const sab = new SharedArrayBuffer(4);
@@ -103,55 +111,74 @@ export function runHandler(opts: {
       code: opts.code,
       input: JSON.stringify({ req: opts.req, user: opts.user }),
       timeoutMs: SANDBOX_LIMITS.timeoutMs,
+      fetchWaitMs: FETCH_LIMITS.timeoutMs * (FETCH_LIMITS.maxRedirects + 1) + 2000,
       maxCalls: SANDBOX_LIMITS.maxCalls,
     },
     transferList: [port2],
     resourceLimits: { maxOldGenerationSizeMb: 64, maxYoungGenerationSizeMb: 16, stackSizeMb: 2 },
   });
 
-  const dispatch = (op: string, a: any): unknown => {
+  let fetches = 0;
+  const dispatch = async (op: string, a: any): Promise<unknown> => {
     switch (op) {
+      case 'fetch':
+        if (++fetches > FETCH_LIMITS.maxCalls) throw new AppError('Too many network calls in one request.');
+        return appFetch(a.url, a.init);
       case 'log': opts.log(String(a.m).slice(0, 500)); return true;
       case 'db.find': return data.find(appId, a.c, a.filter ?? undefined, a.opts ?? undefined);
       case 'db.get': return data.get(appId, a.c, a.id);
-      case 'db.insert': return data.insert(appId, a.c, a.doc);
-      case 'db.update': return data.update(appId, a.c, a.id, a.patch);
-      case 'db.remove': return data.remove(appId, a.c, a.id);
+      case 'db.insert': opts.onData?.(); return data.insert(appId, a.c, a.doc);
+      case 'db.update': opts.onData?.(); return data.update(appId, a.c, a.id, a.patch);
+      case 'db.remove': opts.onData?.(); return data.remove(appId, a.c, a.id);
       case 'kv.get': return data.kvGet(appId, a.k);
-      case 'kv.set': return data.kvSet(appId, a.k, a.v);
-      case 'kv.delete': return data.kvDelete(appId, a.k);
+      case 'kv.set': opts.onData?.(); return data.kvSet(appId, a.k, a.v);
+      case 'kv.delete': opts.onData?.(); return data.kvDelete(appId, a.k);
       default: throw new AppError(`Unknown operation ${op}`);
     }
   };
 
   return new Promise<SandboxResult>((resolve) => {
     let settled = false;
+    let total: ReturnType<typeof setTimeout>;
     const finish = (r: SandboxResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(total);
       void worker.terminate();
       port1.close();
       resolve(r);
     };
-    const timer = setTimeout(
-      () => {
+    // Two clocks: the handler's own computation (restarted after each host call, so a loop is killed fast) and a total cap.
+    let timer: ReturnType<typeof setTimeout>;
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
         opts.log(`timeout: ${opts.req.method} ${opts.req.path}`);
         finish({ status: 504, body: { error: 'The app handler took too long.' } });
-      },
-      SANDBOX_LIMITS.timeoutMs + 500,
-    );
+      }, SANDBOX_LIMITS.timeoutMs + 500);
+    };
+    total = setTimeout(() => {
+      opts.log(`timeout (total): ${opts.req.method} ${opts.req.path}`);
+      finish({ status: 504, body: { error: 'The app handler took too long.' } });
+    }, SANDBOX_LIMITS.maxTotalMs);
+    arm();
     worker.on('message', (m: any) => {
       if (m.t === 'call') {
-        let res: string;
-        try {
-          res = JSON.stringify({ ok: true, v: dispatch(m.op, JSON.parse(m.args)) ?? null });
-        } catch (e) {
-          res = JSON.stringify({ ok: false, e: (e as Error).message });
-        }
-        port1.postMessage(res);
-        Atomics.store(flag, 0, 1);
-        Atomics.notify(flag, 0);
+        clearTimeout(timer); // waiting on the host (data, network): not the handler's CPU time
+        void (async () => {
+          let res: string;
+          try {
+            res = JSON.stringify({ ok: true, v: (await dispatch(m.op, JSON.parse(m.args))) ?? null });
+          } catch (e) {
+            res = JSON.stringify({ ok: false, e: (e as Error).message });
+          }
+          if (settled) return;
+          port1.postMessage(res);
+          Atomics.store(flag, 0, 1);
+          Atomics.notify(flag, 0);
+          arm();
+        })();
       } else if (m.t === 'done') {
         if (m.error) {
           opts.log(`error: ${m.error.split('\n')[0]}`);
