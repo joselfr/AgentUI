@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentUI — Le chat qui affiche vraiment ce que font vos agents</title>
+<meta name="description" content="AgentUI est une PWA de chat pour agents IA : graphiques, tableaux, cartes, formulaires et suivis de tâches interactifs, sur mobile comme sur desktop. Auto-hébergée.">
+<meta name="theme-color" content="#0e1015">
+<meta property="og:title" content="AgentUI — Le chat qui affiche vraiment ce que font vos agents">
+<meta property="og:description" content="Graphiques, tableaux, cartes, formulaires et suivis de tâches interactifs dans le chat de vos agents IA.">
+<meta property="og:image" content="img/hero-desktop.webp">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #0e1015; --bg-2: #141821; --card: #171b25; --line: #262c3a;
+    --text: #eef0f5; --muted: #9aa3b5; --accent: #ff5c5c; --accent-2: #8b6cf0; --ok: #2fd27a;
+    --radius: 16px; --maxw: 1160px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.6 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  img { max-width: 100%; height: auto; display: block; }
+  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* Navigation */
+  header.nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+  .nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; text-decoration: none; letter-spacing: -.01em; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+  .nav nav { display: flex; gap: 24px; margin-left: auto; font-size: 15px; color: var(--muted); }
+  .nav nav a { text-decoration: none; transition: color .15s; }
+  .nav nav a:hover { color: var(--text); }
+
+  /* Boutons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 999px; font-weight: 600; font-size: 16px; text-decoration: none; border: 1px solid var(--line); transition: transform .15s, background .15s, border-color .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 8px 30px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+  .btn.primary:hover { background: #ff7272; }
+  .btn.ghost:hover { border-color: var(--muted); background: var(--bg-2); }
+  .btn.small { padding: 8px 16px; font-size: 14px; }
+  [data-repo-link][hidden] { display: none; }
+
+  /* Hero */
+  .hero { position: relative; padding: 84px 0 40px; overflow: hidden; text-align: center; }
+  .hero::before { content: ""; position: absolute; inset: -20% -10% auto; height: 640px; z-index: -1;
+    background: radial-gradient(40% 55% at 30% 20%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%),
+                radial-gradient(40% 50% at 75% 10%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 70%); }
+  .pill { display: inline-flex; gap: 8px; align-items: center; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; color: var(--muted); background: color-mix(in srgb, var(--card) 70%, transparent); }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+  h1 { font-size: clamp(38px, 6.2vw, 72px); line-height: 1.04; letter-spacing: -.035em; margin: 22px auto 0; max-width: 16ch; font-weight: 800; }
+  h1 em { font-style: normal; background: linear-gradient(100deg, var(--accent), #ff9b6a 60%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { max-width: 640px; margin: 22px auto 0; font-size: clamp(17px, 2vw, 20px); color: var(--muted); }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 32px; }
+  .hero-shot { position: relative; margin: 64px auto 0; max-width: 1040px; }
+  .frame { border-radius: 14px; border: 1px solid var(--line); background: var(--card); overflow: hidden; box-shadow: 0 40px 90px -30px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.03); }
+  .frame .bar { display: flex; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+  .frame .bar span { width: 11px; height: 11px; border-radius: 50%; background: #343b4d; }
+  .phone { position: absolute; right: -2%; bottom: -9%; width: 22%; min-width: 120px; border-radius: 22px; border: 5px solid #232837; background: #000; overflow: hidden; box-shadow: 0 30px 60px -18px rgba(0,0,0,.8); }
+  .phone img { border-radius: 16px; }
+
+  /* Sections */
+  section { padding: 96px 0; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
+  h2 { font-size: clamp(30px, 4.2vw, 48px); line-height: 1.1; letter-spacing: -.03em; margin: 12px 0 0; font-weight: 800; }
+  .sub { color: var(--muted); max-width: 640px; margin: 16px 0 0; font-size: 18px; }
+  .center { text-align: center; } .center .sub { margin-inline: auto; }
+
+  .strip { padding: 36px 0 12px; }
+  .strip p { text-align: center; color: var(--muted); margin: 0 0 18px; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; }
+  .strip ul { list-style: none; display: flex; flex-wrap: wrap; gap: 14px 38px; justify-content: center; margin: 0; padding: 0; font-weight: 700; font-size: 20px; color: #c2c9d8; }
+
+  /* Lignes de widgets */
+  .row { display: grid; grid-template-columns: 1fr 1.45fr; gap: 56px; align-items: center; margin-top: 110px; }
+  .row.flip { grid-template-columns: 1.45fr 1fr; }
+  .row.flip .copy { order: 2; }
+  .row h3 { font-size: clamp(24px, 3vw, 34px); line-height: 1.15; letter-spacing: -.025em; margin: 10px 0 0; }
+  .row p { color: var(--muted); margin: 16px 0 0; }
+  .row ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .row li { padding-left: 28px; position: relative; color: #c8cfdd; font-size: 16px; }
+  .row li::before { content: ""; position: absolute; left: 0; top: .55em; width: 14px; height: 8px; border-left: 2.5px solid var(--accent); border-bottom: 2.5px solid var(--accent); transform: rotate(-45deg) translateY(-50%); }
+  .shot { position: relative; }
+  .shot .phone { width: 24%; right: -3%; bottom: -8%; }
+  .row.flip .shot .phone { right: auto; left: -3%; }
+  .tag { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 3px 9px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); color: #c8cfdd; margin: 0 6px 6px 0; }
+
+  /* Thèmes */
+  .themes { background: linear-gradient(180deg, transparent, var(--bg-2) 20%, var(--bg-2) 80%, transparent); }
+  .themes-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; margin-top: 56px; align-items: end; }
+  .stack { display: grid; gap: 24px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .cap { color: var(--muted); font-size: 14px; margin-top: 10px; text-align: center; }
+
+  /* Cartes de fonctionnalités */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; transition: border-color .2s, transform .2s; }
+  .card:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); transform: translateY(-2px); }
+  .card .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; background: color-mix(in srgb, var(--accent) 16%, transparent); margin-bottom: 16px; }
+  .card h3 { margin: 0; font-size: 19px; letter-spacing: -.01em; }
+  .card p { margin: 8px 0 0; color: var(--muted); font-size: 15.5px; }
+
+  /* Fonctionnement */
+  .how { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; margin-top: 56px; }
+  .steps { display: grid; gap: 26px; counter-reset: s; }
+  .step { display: grid; grid-template-columns: 44px 1fr; gap: 16px; }
+  .step::before { counter-increment: s; content: counter(s); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; border: 1px solid var(--line); background: var(--card); color: var(--accent); }
+  .step h3 { margin: 0; font-size: 19px; }
+  .step p { margin: 4px 0 0; color: var(--muted); font-size: 15.5px; }
+  pre { margin: 0; padding: 22px; overflow: auto; background: #0a0c11; border: 1px solid var(--line); border-radius: var(--radius); font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; color: #d6dbe8; box-shadow: 0 30px 70px -30px rgba(0,0,0,.7); }
+  pre .c { color: #6b7488; } pre .k { color: var(--accent); } pre .s { color: #8fd9a8; } pre .n { color: #8bb4ff; }
+
+  /* Appel final */
+  .final { text-align: center; }
+  .final .box { padding: 72px 24px; border-radius: 28px; border: 1px solid var(--line); background:
+    radial-gradient(60% 90% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%), var(--card); }
+  footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
+
+  /* Apparition au défilement */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
+
+  @media (max-width: 900px) {
+    section { padding: 72px 0; }
+    .row, .row.flip, .how, .themes-grid { grid-template-columns: 1fr; gap: 36px; margin-top: 80px; }
+    .row.flip .copy { order: 0; }
+    .features { grid-template-columns: 1fr 1fr; }
+    .nav nav a:not([data-repo-link]) { display: none; }
+    .hero { padding-top: 56px; }
+    .phone, .shot .phone, .row.flip .shot .phone { right: 2%; left: auto; bottom: -6%; width: 30%; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    .features, .pair { grid-template-columns: 1fr; }
+    .nav .wrap { gap: 12px; }
+    .btn { padding: 11px 18px; }
+  }
+</style>
+<noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="img/icon.svg" alt="" width="30" height="30">AgentUI</a>
+    <nav>
+      <a href="#widgets">Widgets</a>
+      <a href="#themes">Interface</a>
+      <a href="#fonctions">Fonctions</a>
+      <a href="#fonctionnement">Fonctionnement</a>
+      <a href="#" data-repo-link hidden>GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- HERO -->
+  <div class="hero">
+    <div class="wrap">
+      <span class="pill"><i></i>PWA open source · auto-hébergée</span>
+      <h1>Vos agents IA méritent mieux qu’<em>un mur de texte</em>.</h1>
+      <p class="lead">AgentUI transforme les réponses de vos agents en graphiques, tableaux, cartes, formulaires et suivis de tâches <strong>interactifs</strong> — sur desktop comme sur mobile.</p>
+      <div class="cta">
+        <a class="btn primary" href="#widgets">Découvrir les widgets</a>
+        <a class="btn ghost" href="#" data-repo-link hidden>Voir sur GitHub</a>
+      </div>
+      <div class="hero-shot reveal">
+        <div class="frame">
+          <div class="bar"><span></span><span></span><span></span></div>
+          <img src="img/hero-desktop.webp" alt="AgentUI sur desktop : un agent répond avec un graphique interactif" width="1600" height="1067" fetchpriority="high">
+        </div>
+        <div class="phone"><img src="img/hero-mobile.webp" alt="AgentUI sur mobile : suivi de migration étape par étape" width="600" height="1300" loading="lazy"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="wrap">
+      <p>Se branche sur vos plateformes d’agents</p>
+      <ul><li>Hermes</li><li>OpenClaw</li><li>Votre agent, via le protocole canal</li></ul>
+    </div>
+  </div>
+
+  <!-- WIDGETS -->
+  <section id="widgets">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">Les widgets</span>
+        <h2>Le bon composant, au bon moment.</h2>
+        <p class="sub">Chaque widget est un <strong>outil</strong> que l’agent appelle : il valide ses arguments, et l’interface affiche un vrai composant — pas du Markdown bricolé.</p>
+      </div>
+
+      <div class="row reveal">
+        <div class="copy">
+          <span class="kicker">Graphiques</span>
+          <h3>Des courbes, barres et camemberts qui répondent au doigt.</h3>
+          <p>L’agent passe ses séries, AgentUI trace. Info-bulles au survol, graduations lisibles, donut interactif, copie des données en un clic.</p>
+          <ul><li>Courbes, barres, camemberts</li><li>Unités et légendes automatiques</li><li>Clair et sombre</li></ul>
+          <p><span class="tag">agentui_chart</span></p>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-chart.webp" alt="Widget graphique : chiffre d’affaires mensuel" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-chart.webp" alt="Widget graphique sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="row flip reveal">
+        <div class="copy">
+          <span class="kicker">Tableaux</span>
+          <h3>Des données triables, prêtes à être copiées.</h3>
+          <p>Colonnes typées, nombres alignés, unités affichées et export CSV. Jusqu’à 200 lignes sans quitter la conversation.</p>
+          <ul><li>Tri numérique et alphabétique</li><li>Unités par colonne</li><li>Copie au format CSV</li></ul>
+          <p><span class="tag">agentui_table</span></p>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-table.webp" alt="Widget tableau : comparatif d’offres" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-table.webp" alt="Widget tableau sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="row reveal">
+        <div class="copy">
+          <span class="kicker">Cartes</span>
+          <h3>Un itinéraire, des lieux, un bouton « Ouvrir dans Maps ».</h3>
+          <p>Jusqu’à dix points avec leur popup en Markdown, et un lien direct vers votre application de cartes pour la navigation.</p>
+          <ul><li>Fond de carte adapté au thème</li><li>Popups détaillées par point</li><li>Ouverture dans Maps</li></ul>
+          <p><span class="tag">agentui_map</span></p>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-map.webp" alt="Widget carte : tournée du jeudi à Toulouse" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-map.webp" alt="Widget carte sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="row flip reveal">
+        <div class="copy">
+          <span class="kicker">Suivi de tâches</span>
+          <h3>Voyez l’agent travailler, étape par étape.</h3>
+          <p>Une checklist vivante : l’agent met à jour le même composant au fil de l’eau, avec la durée de chaque étape et un compteur en direct pour celle en cours.</p>
+          <ul><li>Statuts : en attente, en cours, terminé, échec, ignoré</li><li>Détail et durée par étape</li><li>Un seul composant, mis à jour sur place</li></ul>
+          <p><span class="tag">agentui_progress</span></p>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-progress.webp" alt="Widget progression : migration de base de données" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-progress.webp" alt="Widget progression sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="row reveal">
+        <div class="copy">
+          <span class="kicker">Code & diff</span>
+          <h3>Du code lisible, avec les changements en couleur.</h3>
+          <p>Coloration syntaxique, numéros de ligne, lignes mises en évidence et rendu diff pour montrer exactement ce qui change.</p>
+          <ul><li>Coloration par langage</li><li>Diff ajouté / supprimé</li><li>Bouton Copier</li></ul>
+          <p><span class="tag">agentui_code</span></p>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-code.webp" alt="Widget code : correctif au format diff" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-code.webp" alt="Widget code sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="row flip reveal">
+        <div class="copy">
+          <span class="kicker">Interactif</span>
+          <h3>L’agent pose la question, vous répondez d’un geste.</h3>
+          <p>Confirmations (y compris en mode « danger »), questions à choix et formulaires complets : l’agent <strong>attend votre réponse</strong>, puis reprend son travail là où il s’était arrêté.</p>
+          <ul><li>Confirmer / annuler avant une action sensible</li><li>Formulaires : texte, date, liste, case à cocher…</li><li>Validation avant envoi</li></ul>
+          <p><span class="tag">agentui_confirm</span><span class="tag">agentui_form</span><span class="tag">agentui_ask</span></p>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-form.webp" alt="Widget formulaire : préparer un déplacement" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-confirm.webp" alt="Widget de confirmation sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THEMES / RESPONSIVE -->
+  <section id="themes" class="themes">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">L’interface</span>
+        <h2>Pensée pour le mobile. À l’aise partout.</h2>
+        <p class="sub">Une PWA installable sur l’écran d’accueil, avec un thème clair, un thème sombre et un tiroir de discussions qui s’efface devant la conversation.</p>
+      </div>
+      <div class="themes-grid">
+        <div class="stack reveal">
+          <div class="frame"><img src="img/desktop-light-chart.webp" alt="AgentUI en thème clair" width="1600" height="1067" loading="lazy"></div>
+          <p class="cap">Thème clair · desktop</p>
+        </div>
+        <div class="pair reveal">
+          <div>
+            <div class="frame"><img src="img/mobile-light-progress.webp" alt="AgentUI mobile en thème clair" width="600" height="1300" loading="lazy"></div>
+            <p class="cap">Clair · mobile</p>
+          </div>
+          <div>
+            <div class="frame"><img src="img/mobile-dark-liste.webp" alt="Liste des discussions sur mobile" width="600" height="1300" loading="lazy"></div>
+            <p class="cap">Liste des discussions</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FONCTIONS -->
+  <section id="fonctions">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">Et aussi</span>
+        <h2>Tout ce qu’il faut pour vivre avec vos agents.</h2>
+      </div>
+      <div class="features">
+        <div class="card reveal"><div class="ico">🔔</div><h3>Notifications push</h3><p>Soyez prévenu quand un agent répond ou qu’une tâche planifiée se termine — un clic ouvre la bonne discussion.</p></div>
+        <div class="card reveal"><div class="ico">⏰</div><h3>Tâches planifiées</h3><p>Visualisez les crons de vos agents, leur dernier statut et leurs erreurs. Mettez en pause, lancez ou supprimez.</p></div>
+        <div class="card reveal"><div class="ico">🧠</div><h3>Skills lisibles</h3><p>Parcourez les skills de chaque agent et lisez leur contenu directement dans l’application.</p></div>
+        <div class="card reveal"><div class="ico">🤖</div><h3>Plusieurs agents</h3><p>Hermes, OpenClaw ou les vôtres, côte à côte. Filtrez la liste par agent et reprenez n’importe quelle discussion.</p></div>
+        <div class="card reveal"><div class="ico">📎</div><h3>Pièces jointes & images</h3><p>Envoyez fichiers et images à l’agent ; il vous renvoie des visuels affichés dans la conversation.</p></div>
+        <div class="card reveal"><div class="ico">🔒</div><h3>Chez vous, sous votre contrôle</h3><p>Auto-hébergé via Docker. Chaque plateforme s’authentifie par son propre jeton ; vos données restent sur votre serveur.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FONCTIONNEMENT -->
+  <section id="fonctionnement">
+    <div class="wrap">
+      <div class="reveal">
+        <span class="kicker">Comment ça marche</span>
+        <h2>Un plugin, un protocole, zéro bricolage.</h2>
+        <p class="sub">AgentUI se connecte à votre plateforme comme Telegram à un bot : par un plugin canal qui parle un protocole WebSocket simple.</p>
+      </div>
+      <div class="how">
+        <div class="steps reveal">
+          <div class="step"><div><h3>Installez le plugin</h3><p>Plugins fournis pour Hermes et OpenClaw. La plateforme ouvre la connexion vers AgentUI — rien à exposer de son côté.</p></div></div>
+          <div class="step"><div><h3>L’agent reçoit de nouveaux outils</h3><p>Graphique, tableau, carte, progression, code, formulaire… décrits comme de vrais outils, avec leurs schémas.</p></div></div>
+          <div class="step"><div><h3>L’interface fait le reste</h3><p>L’agent appelle l’outil et place le jeton dans sa réponse. AgentUI le remplace par le composant, en direct pendant le streaming.</p></div></div>
+        </div>
+        <pre class="reveal"><span class="c">// L’agent appelle un outil…</span>
+<span class="n">agentui_chart</span>({
+  <span class="k">kind</span>: <span class="s">"line"</span>,
+  <span class="k">title</span>: <span class="s">"Chiffre d’affaires mensuel"</span>,
+  <span class="k">unit</span>: <span class="s">" k€"</span>,
+  <span class="k">x</span>: [<span class="s">"Jan"</span>, <span class="s">"Fév"</span>, <span class="s">"Mar"</span>],
+  <span class="k">series</span>: [{ <span class="k">name</span>: <span class="s">"2026"</span>, <span class="k">y</span>: [96, 103, 112] }]
+})
+
+<span class="c">// …et place le jeton dans sa réponse :</span>
+<span class="s">"Voici l’évolution : [[agentui:a3f9c1]]"</span>
+
+<span class="c">// AgentUI affiche le graphique à cet endroit.</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- APPEL FINAL -->
+  <section class="final">
+    <div class="wrap">
+      <div class="box reveal">
+        <h2>Donnez un vrai visage à vos agents.</h2>
+        <p class="sub">Déployez AgentUI en quelques minutes avec Docker, branchez vos agents, et regardez vos conversations prendre vie.</p>
+        <div class="cta">
+          <a class="btn primary" href="#" data-repo-link hidden>Démarrer sur GitHub</a>
+          <a class="btn ghost" href="#widgets">Revoir les widgets</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="brand"><img src="img/icon.svg" alt="" width="26" height="26">AgentUI</span>
+    <span>Les captures de cette page ont été générées avec un agent de démonstration.</span>
+  </div>
+</footer>
+
+<script>
+  // URL du dépôt : à renseigner pour afficher les boutons GitHub.
+  const REPO_URL = '';
+  if (REPO_URL) document.querySelectorAll('[data-repo-link]').forEach((a) => { a.href = REPO_URL; a.hidden = false; });
+
+  // Apparition douce des blocs au défilement (sans JS ou avec mouvement réduit : tout est visible)
+  const items = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
+    items.forEach((el) => io.observe(el));
+  } else items.forEach((el) => el.classList.add('in'));
+</script>
+</body>
+</html>

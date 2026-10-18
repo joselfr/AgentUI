@@ -1,0 +1,140 @@
+// Faux plugin canal pour les captures du site de présentation : il se connecte à AgentUI (/gateway) comme Hermes ou
+// OpenClaw et joue des réponses scénarisées avec de vrais appels d'outils `agentui_<widget>`.
+//   node e2e/demo/fake-agent.mjs ws://localhost:8080/gateway <token> [nom]
+import { randomBytes } from 'node:crypto';
+import { WebSocket } from 'ws';
+
+const [url, token, name = 'Atlas'] = process.argv.slice(2);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const hex = () => randomBytes(3).toString('hex');
+
+const ws = new WebSocket(url);
+const send = (o) => ws.send(JSON.stringify(o));
+ws.on('open', () => send({
+  type: 'hello', protocol: 1, token, agent: { type: 'demo', name, version: '1.0' },
+  capabilities: { sessions: true, abort: true, approvals: false, subagents: false, reasoning: true, toolDetails: true, skills: false, jobs: false, jobControl: false, sessionDelete: false, models: false, attachments: { images: true, files: true, maxBytes: 20971520 } },
+}));
+
+/** Scénarios : le premier dont le mot-clé figure dans le message de l'utilisateur est joué. */
+const SCENARIOS = [
+  {
+    match: /ventes|chiffre/i,
+    intro: 'Voici l’évolution du chiffre d’affaires, comparée à l’an dernier.',
+    tools: [
+      ['chart', { kind: 'line', title: 'Chiffre d’affaires mensuel', unit: ' k€', x: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep'], series: [{ name: '2025', y: [82, 88, 91, 97, 104, 99, 93, 90, 108] }, { name: '2026', y: [96, 103, 112, 121, 130, 128, 124, 119, 141] }] }],
+    ],
+    outro: 'Le mois de septembre atteint **141 k€**, soit **+31 %** par rapport à l’an dernier.',
+  },
+  {
+    match: /compar|tableau/i,
+    intro: 'Voici la comparaison des quatre offres, triable par colonne.',
+    tools: [
+      ['table', { title: 'Comparatif des offres', caption: 'Tarifs mensuels HT, octobre 2026', columns: [{ label: 'Offre' }, { label: 'Utilisateurs', kind: 'number' }, { label: 'Stockage', kind: 'number', unit: ' Go' }, { label: 'Prix', kind: 'number', unit: ' €' }, { label: 'Support' }], rows: [['Starter', 5, 50, 19, 'Email'], ['Équipe', 25, 500, 79, 'Chat'], ['Business', 100, 2000, 249, 'Prioritaire'], ['Entreprise', 500, 10000, 890, 'Dédié']] }],
+    ],
+    outro: 'L’offre **Équipe** offre le meilleur rapport prix par utilisateur (3,16 €).',
+  },
+  {
+    match: /itin|rendez|carte|visite/i,
+    intro: 'Voici le parcours de la journée, de la gare jusqu’au dernier rendez-vous.',
+    tools: [
+      ['map', { title: 'Tournée du jeudi', maps: true, points: [
+        { lat: 43.6047, lon: 1.4442, title: 'Toulouse Matabiau', text: 'Départ **8 h 10**' },
+        { lat: 43.6108, lon: 1.4537, title: 'Client Aerotech', text: 'RDV **9 h 30**, salle Clément Ader', maps: true },
+        { lat: 43.5962, lon: 1.4380, title: 'Déjeuner — Le Bibent', text: 'Table réservée à **12 h 30**', maps: true },
+        { lat: 43.5640, lon: 1.4670, title: 'Prestataire Sigma', text: 'RDV **15 h 00**' },
+      ] }],
+    ],
+    outro: 'Environ **45 minutes** de transport au total, en métro et à pied.',
+  },
+  {
+    match: /migr|déploie|deploie/i,
+    intro: 'C’est parti, je lance la migration et je vous tiens au courant.',
+    progress: { title: 'Migration vers la nouvelle base', steps: [
+      ['Sauvegarde de la base actuelle', 'Dump de 2,4 Go'],
+      ['Création du nouveau schéma', 'Version 14'],
+      ['Copie des données', '1 280 000 lignes sur 1 800 000'],
+      ['Vérification d’intégrité', ''],
+      ['Bascule du trafic', ''],
+    ] },
+    outro: 'La migration est terminée, sans interruption de service.',
+  },
+  {
+    match: /code|script|corrige/i,
+    intro: 'J’ai trouvé l’origine du bug : la date était lue dans le mauvais fuseau horaire.',
+    tools: [
+      ['code', { filename: 'src/booking.ts', language: 'diff', start: 41, code: ' export function startOfDay(date: Date) {\n-  return new Date(date.setHours(0, 0, 0, 0));\n+  const d = new Date(date);\n+  d.setUTCHours(0, 0, 0, 0);\n+  return d;\n }', highlight: ['2-5'] }],
+    ],
+    outro: 'Le correctif ne modifie plus la date passée en paramètre. Je lance les tests ?',
+  },
+  {
+    match: /supprim|nettoy/i,
+    intro: 'Je suis prêt à nettoyer les anciennes sauvegardes.',
+    blocking: ['confirm', { title: 'Supprimer 14 sauvegardes de plus de 90 jours ?', text: 'Cela libère **38 Go** sur le serveur. Les 3 plus récentes sont conservées. Cette action est définitive.', danger: true, yes: 'Supprimer', no: 'Garder' }],
+  },
+  {
+    match: /voyage|réserv|reserv|planifi/i,
+    intro: 'Pour préparer ce déplacement, j’ai besoin de quelques précisions.',
+    blocking: ['form', { title: 'Préparer le déplacement', text: 'Je réserve dès que vous validez.', submit: 'Lancer la recherche', fields: [
+      { name: 'dest', label: 'Destination', placeholder: 'Ville', required: true },
+      { name: 'date', label: 'Départ', kind: 'date', required: true },
+      { name: 'class', label: 'Confort', kind: 'select', options: ['Économique', 'Confort', 'Affaires'], default: 'Confort' },
+      { name: 'bag', label: 'Bagage en soute', kind: 'checkbox' },
+    ] }],
+  },
+];
+
+const FALLBACK = { intro: 'Bien reçu ! Dites-moi *ventes*, *comparatif*, *itinéraire*, *migration*, *code*, *supprimer* ou *voyage* pour voir les widgets.' };
+
+const widgetText = (type, args) => `\n\n\`\`\`widget\n${JSON.stringify({ type, arguments: args })}\n\`\`\`\n`;
+
+async function play(conversationId, runId, text) {
+  const ev = (event) => send({ type: 'event', conversationId, runId, event });
+  const sc = SCENARIOS.find((s) => s.match.test(text)) ?? FALLBACK;
+  ev({ type: 'reasoning.delta', text: 'Je regarde ce qu’il faut afficher.' });
+  await sleep(300);
+  let out = '';
+  const say = async (t) => { for (const w of t.split(/(?<= )/)) { out += w; ev({ type: 'message.delta', text: w }); await sleep(12); } };
+  await say(sc.intro);
+  for (const [kind, args] of sc.tools ?? []) {
+    const id = `t${hex()}`; const tok = `[[agentui:${hex()}]]`;
+    ev({ type: 'tool.started', id, name: `agentui_${kind}`, args });
+    await sleep(250);
+    ev({ type: 'tool.completed', id, name: `agentui_${kind}`, result: JSON.stringify({ widget: tok }) });
+    await say(`\n\n${tok}`);
+  }
+  if (sc.progress) {
+    const id = `t${hex()}`; const tok = `[[agentui:${hex()}]]`;
+    const steps = (done, detail) => sc.progress.steps.map(([label, d], i) => ({ label, status: i < done ? 'done' : i === done ? 'running' : 'pending', ...((i === done ? detail ?? d : d) ? { detail: i === done ? detail ?? d : d } : {}) }));
+    ev({ type: 'tool.started', id, name: 'agentui_progress', args: { title: sc.progress.title, steps: steps(0) } });
+    await sleep(150);
+    ev({ type: 'tool.completed', id, name: 'agentui_progress', result: JSON.stringify({ widget: tok }) });
+    await say(`\n\n${tok}\n\n`);
+    for (let i = 1; i <= sc.progress.steps.length; i++) {
+      await sleep(i === 3 ? 2200 : 900);
+      const uid = `t${hex()}`;
+      const args = { title: sc.progress.title, update: tok, steps: i === sc.progress.steps.length ? steps(i) : steps(i) };
+      ev({ type: 'tool.started', id: uid, name: 'agentui_progress', args });
+      ev({ type: 'tool.completed', id: uid, name: 'agentui_progress', result: JSON.stringify({ widget: tok, updated: true }) });
+    }
+  }
+  if (sc.blocking) {
+    const qid = `q${hex()}`;
+    ev({ type: 'question.requested', id: qid });
+    out += widgetText(...sc.blocking);
+    ev({ type: 'message.delta', text: widgetText(...sc.blocking) });
+    ev({ type: 'message.final', text: out });
+    return; // le run reste ouvert : la capture se fait pendant l'attente de la réponse
+  }
+  if (sc.outro) await say(`\n\n${sc.outro}`);
+  ev({ type: 'message.final', text: out });
+  ev({ type: 'run.completed' });
+}
+
+ws.on('message', (raw) => {
+  const m = JSON.parse(String(raw));
+  if (m.type === 'ping') send({ type: 'pong' });
+  else if (m.type === 'inbound') void play(m.conversationId, m.runId, m.text);
+  else if (m.type === 'reply') { send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'message.final', text: 'Compris, c’est noté. Je m’en occupe !' } }); send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'run.completed' } }); }
+  else if (m.type === 'rpc') send({ type: 'rpc.result', id: m.id, error: 'non supporté' });
+});
+ws.on('close', () => process.exit(0));
