@@ -92,7 +92,7 @@ export default function App() {
 
   const refreshLists = useCallback(() => {
     api.agents().then(setAgents).catch(guard);
-    api.conversations().then((c) => { setConvs(c); setConvsLoaded(true); }).catch(guard);
+    return api.conversations().then((c) => { setConvs(c); setConvsLoaded(true); }).catch(guard);
   }, [guard]);
 
   const loadMessages = useCallback((id: string) => {
@@ -132,8 +132,9 @@ export default function App() {
       if (e.data?.type !== 'open-conversation') return;
       const u = new URL(e.data.url, location.origin);
       const id = u.searchParams.get('c');
-      navigate(id ? `/c/${id}` : u.pathname + u.search);
-      refreshLists();
+      const to = id ? `/c/${id}` : u.pathname + u.search;
+      // Liste à jour d'abord : une discussion créée par un cron n'y figure pas encore, et serait écartée comme inconnue
+      void Promise.resolve(refreshLists()).then(() => navigate(to));
     };
     navigator.serviceWorker?.addEventListener('message', onMsg);
     return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
