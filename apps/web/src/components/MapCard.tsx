@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { t as tr } from '../i18n';
 
 interface Point { lat: number; lon: number; title: string; text?: string; maps: boolean }
 interface MapData { title?: string; maps: boolean; points: Point[] }
@@ -46,7 +47,7 @@ function PopupBody({ p }: { p: Point }) {
     <Box sx={{ fontSize: 13, lineHeight: 1.45, '& p': { m: '0 0 4px' }, '& ul, & ol': { m: '0 0 4px', pl: 2.25 }, '& a': { color: 'primary.main' } }}>
       {p.title && <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{p.title}</Typography>}
       {p.text && <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node: _n, ...a }) => <a {...a} target="_blank" rel="noreferrer" /> }}>{p.text}</ReactMarkdown>}
-      {p.maps && <Button size="small" variant="outlined" component="a" href={mapsUrl([p])} target="_blank" rel="noreferrer" startIcon={<OpenInNew sx={{ fontSize: 14 }} />} sx={{ mt: 0.5, py: 0, fontSize: 12 }}>Ouvrir dans Maps</Button>}
+      {p.maps && <Button size="small" variant="outlined" component="a" href={mapsUrl([p])} target="_blank" rel="noreferrer" startIcon={<OpenInNew sx={{ fontSize: 14 }} />} sx={{ mt: 0.5, py: 0, fontSize: 12 }}>{tr('map.openMaps')}</Button>}
     </Box>);
 }
 
@@ -61,7 +62,7 @@ export default function MapCard({ map: m }: { map: MapData }) {
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>' }).addTo(map);
     const roots: ReturnType<typeof createRoot>[] = [];
     m.points.forEach((p) => {
-      const marker = L.marker([p.lat, p.lon], { icon: pin(t.palette.primary.main), title: p.title, alt: p.title || 'Point' }).addTo(map);
+      const marker = L.marker([p.lat, p.lon], { icon: pin(t.palette.primary.main), title: p.title, alt: p.title || tr('map.point') }).addTo(map);
       if (!p.title && !p.text && !p.maps) return;
       const node = document.createElement('div');
       const root = createRoot(node);
@@ -77,7 +78,7 @@ export default function MapCard({ map: m }: { map: MapData }) {
   return (
     <Box sx={{ my: 1, p: 1.5, minWidth: 'min(480px, 72vw)', border: 1, borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.default' }}>
       {m.title && <Typography sx={{ fontWeight: 600 }}>{m.title}</Typography>}
-      {m.points.length > 1 && <Typography variant="caption" color="text.secondary">{m.points.length} points</Typography>}
+      {m.points.length > 1 && <Typography variant="caption" color="text.secondary">{tr('map.points', { count: m.points.length })}</Typography>}
       <Box ref={el} sx={{
         mt: 1, height: { xs: 240, sm: 300 }, borderRadius: '10px', overflow: 'hidden', border: 1, borderColor: 'divider', isolation: 'isolate',
         // tuiles OSM assombries en thème sombre
@@ -91,7 +92,7 @@ export default function MapCard({ map: m }: { map: MapData }) {
         '& .leaflet-bar a': { bgcolor: 'background.paper', color: 'text.primary', borderColor: 'divider' },
       }} />
       {m.maps && (
-        <Button size="small" variant="contained" component="a" href={mapsUrl(m.points)} target="_blank" rel="noreferrer" startIcon={<OpenInNew />} sx={{ mt: 1, '&&': { color: 'primary.contrastText' } }}>Ouvrir dans Maps</Button>)}
+        <Button size="small" variant="contained" component="a" href={mapsUrl(m.points)} target="_blank" rel="noreferrer" startIcon={<OpenInNew />} sx={{ mt: 1, '&&': { color: 'primary.contrastText' } }}>{tr('map.openMaps')}</Button>)}
     </Box>
   );
 }

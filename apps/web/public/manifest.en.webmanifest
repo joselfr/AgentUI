@@ -1,0 +1,14 @@
+{
+  "name": "AgentUI",
+  "short_name": "AgentUI",
+  "description": "Chat with your AI agents (OpenClaw, Hermes…)",
+  "lang": "en",
+  "theme_color": "#0e1015",
+  "background_color": "#0e1015",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fmtDuration, parseProgress } from './ProgressCard';
 import { widgetOfTool } from './widget';
+import { setLangPref } from '../i18n';
 
 const ok = { title: 'T', steps: [{ label: 'A', status: 'done' }, { label: 'B', status: 'running', detail: '2/3' }], update: '[[agentui:ab12cd]]' };
 
@@ -24,10 +25,16 @@ describe('parseProgress', () => {
 
 describe('fmtDuration', () => {
   it('formate en français selon l\'ordre de grandeur', () => {
+    setLangPref('fr');
     expect(fmtDuration(3200)).toBe('3,2 s');
     expect(fmtDuration(42_400)).toBe('42 s');
     expect(fmtDuration(125_000)).toBe('2 min 05 s');
     expect(fmtDuration(3_900_000)).toBe('1 h 05 min');
     expect(fmtDuration(-5)).toBe('0,0 s');
+  });
+  it('utilise le point décimal en anglais', () => {
+    setLangPref('en');
+    expect(fmtDuration(3200)).toBe('3.2 s');
+    setLangPref('fr');
   });
 });

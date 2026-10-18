@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, Button, Checkbox, FormControlLabel, TextField, Typography } from '@mui/material';
 import ArticleOutlined from '@mui/icons-material/ArticleOutlined';
 import Markdown from './Markdown';
+import { fmtNumber, t } from '../i18n';
 
 type Kind = 'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox';
 interface Field { name: string; label: string; kind: Kind; required: boolean; def?: string | number | boolean; placeholder?: string; hint?: string; options: string[]; min?: number; max?: number; unit?: string }
@@ -30,7 +31,7 @@ export function parseForm(a: Record<string, unknown>): Parsed | undefined {
       def: typeof d === 'string' || typeof d === 'number' || typeof d === 'boolean' ? d : undefined,
     });
   }
-  return { title: str(a.title), text: str(a.text), submit: str(a.submit) ?? 'Envoyer', fields };
+  return { title: str(a.title), text: str(a.text), submit: str(a.submit) ?? t('common.send'), fields };
 }
 
 type Values = Record<string, string | boolean>;
@@ -40,7 +41,7 @@ const initial = (p: Parsed): Values => Object.fromEntries(p.fields.map((f) => [f
 function serialize(p: Parsed, v: Values) {
   return p.fields.map((f) => {
     const x = v[f.name];
-    const s = f.kind === 'checkbox' ? (x ? 'Oui' : 'Non') : String(x).trim().replace(/\s*\n\s*/g, ' / ') || EMPTY;
+    const s = f.kind === 'checkbox' ? (x ? t('common.yes') : t('common.no')) : String(x).trim().replace(/\s*\n\s*/g, ' / ') || EMPTY;
     return `${f.label}: ${s}`;
   }).join('\n');
 }
@@ -53,21 +54,21 @@ function deserialize(p: Parsed, answer: string): Values {
     const line = lines.find((l) => l.startsWith(`${f.label}: `));
     if (line === undefined) { v[f.name] = f.kind === 'checkbox' ? false : ''; continue; }
     const s = line.slice(f.label.length + 2);
-    v[f.name] = f.kind === 'checkbox' ? s === 'Oui' : s === EMPTY ? '' : s;
+    v[f.name] = f.kind === 'checkbox' ? s === 'Oui' || s === 'Yes' : s === EMPTY ? '' : s;
   }
   return v;
 }
 
 function validate(f: Field, x: string | boolean): string | undefined {
-  if (f.kind === 'checkbox') return f.required && !x ? 'À cocher' : undefined;
+  if (f.kind === 'checkbox') return f.required && !x ? t('form.mustCheck') : undefined;
   const s = String(x).trim();
-  if (!s) return f.required ? 'Champ obligatoire' : undefined;
+  if (!s) return f.required ? t('form.required') : undefined;
   if (f.kind === 'number') {
     const n = Number(s.replace(',', '.'));
-    if (!isFinite(n)) return 'Nombre invalide';
-    if (f.min != null && f.max != null && (n < f.min || n > f.max)) return `Entre ${f.min} et ${f.max}`;
-    if (f.min != null && n < f.min) return `Au moins ${f.min}`;
-    if (f.max != null && n > f.max) return `Au plus ${f.max}`;
+    if (!isFinite(n)) return t('form.invalidNumber');
+    if (f.min != null && f.max != null && (n < f.min || n > f.max)) return t('form.between', { min: f.min, max: f.max });
+    if (f.min != null && n < f.min) return t('form.atLeast', { min: f.min });
+    if (f.max != null && n > f.max) return t('form.atMost', { max: f.max });
   }
   return undefined;
 }
@@ -91,7 +92,7 @@ export default function FormCard({ form, answer, onAnswer }: { form: Parsed; ans
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 1.25 }}>
         <ArticleOutlined fontSize="small" color={live ? 'primary' : 'action'} sx={{ mt: 0.25 }} />
         <Box>
-          <Typography sx={{ fontWeight: 600 }}>{form.title ?? (form.text ? '' : 'Formulaire')}</Typography>
+          <Typography sx={{ fontWeight: 600 }}>{form.title ?? (form.text ? '' : t('form.default'))}</Typography>
           {form.text && <Box sx={{ color: 'text.secondary', fontSize: '0.875rem' }}><Markdown>{form.text}</Markdown></Box>}
         </Box>
       </Box>
@@ -110,7 +111,7 @@ export default function FormCard({ form, answer, onAnswer }: { form: Parsed; ans
             type={f.kind === 'number' ? 'number' : f.kind === 'date' ? 'date' : 'text'} multiline={f.kind === 'textarea'} minRows={f.kind === 'textarea' ? 2 : undefined}
             select={f.kind === 'select'} SelectProps={f.kind === 'select' ? { native: true } : undefined} placeholder={f.placeholder}
             inputProps={{ 'aria-label': f.label, ...(f.kind === 'number' ? { min: f.min, max: f.max, step: 'any' } : {}) }}>
-            {f.kind === 'select' && [<option key="" value="">{f.required ? 'Choisir…' : EMPTY}</option>, ...f.options.map((o) => <option key={o} value={o}>{o}</option>)]}
+            {f.kind === 'select' && [<option key="" value="">{f.required ? t('form.choose') : EMPTY}</option>, ...f.options.map((o) => <option key={o} value={o}>{o}</option>)]}
           </TextField>);
         return (
           <Box key={f.name} sx={{ mb: 1.25 }}>
@@ -120,7 +121,7 @@ export default function FormCard({ form, answer, onAnswer }: { form: Parsed; ans
           </Box>);
       })}
       {live && <Button type="submit" variant="contained" size="small" sx={{ mt: 0.5 }}>{form.submit}</Button>}
-      {answer !== undefined && <Typography variant="caption" color="text.secondary">✓ Envoyé</Typography>}
+      {answer !== undefined && <Typography variant="caption" color="text.secondary">{t('form.sent')}</Typography>}
     </Box>
   );
 }

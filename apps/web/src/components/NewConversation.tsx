@@ -4,6 +4,7 @@ import type { AgentInfo, SubAgent } from '@agentui/shared';
 import { api } from '../api';
 import { useBackClose } from '../useBackClose';
 import StatusDot from './StatusDot';
+import { t } from '../i18n';
 
 export default function NewConversation(props: {
   open: boolean; agents: AgentInfo[]; agentId?: string; sub?: string;
@@ -35,10 +36,10 @@ export default function NewConversation(props: {
 
   return (
     <Dialog open={open} onClose={props.onClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ fontWeight: 650 }}>Nouvelle conversation</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 650 }}>{t('chat.new')}</DialogTitle>
       <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
         <Box>
-          <Label>Agent</Label>
+          <Label>{t('new.agent')}</Label>
           <Box sx={{ display: 'grid', gap: 0.5 }}>
             {agents.map((a) => (
               <ListItemButton key={a.id} selected={a.id === agentId} onClick={() => pick(a.id)} sx={{ gap: 1.5, border: 1, borderColor: a.id === agentId ? 'primary.main' : 'divider' }}>
@@ -50,13 +51,13 @@ export default function NewConversation(props: {
         </Box>
         {(loading || err || subs.length > 0) && (
           <Box>
-            <Label>Sous-agent</Label>
+            <Label>{t('new.subagent')}</Label>
             {loading && <Box sx={{ p: 2, textAlign: 'center' }}><CircularProgress size={22} /></Box>}
             {err && <Alert severity="warning">{err}</Alert>}
             <Box sx={{ display: 'grid', gap: 0.5 }}>
               {!loading && subs.length > 0 && (
                 <ListItemButton selected={!sub} onClick={() => setSub(undefined)} sx={{ border: 1, borderColor: !sub ? 'primary.main' : 'divider' }}>
-                  <ListItemText primary="Par défaut" primaryTypographyProps={{ fontWeight: 600 }} /></ListItemButton>)}
+                  <ListItemText primary={t('common.default')} primaryTypographyProps={{ fontWeight: 600 }} /></ListItemButton>)}
               {subs.map((s) => (
                 <ListItemButton key={s.id} selected={s.id === sub} onClick={() => setSub(s.id)} sx={{ border: 1, borderColor: s.id === sub ? 'primary.main' : 'divider' }}>
                   <ListItemText primary={s.name} secondary={s.description} primaryTypographyProps={{ fontWeight: 600, noWrap: true }} secondaryTypographyProps={{ fontSize: 12 }} /></ListItemButton>))}
@@ -64,8 +65,8 @@ export default function NewConversation(props: {
           </Box>)}
       </DialogContent>
       <DialogActions>
-        <Button onClick={props.onClose}>Annuler</Button>
-        <Button variant="contained" disabled={!agentId} onClick={() => agentId && props.onStart(agentId, sub)}>Démarrer</Button>
+        <Button onClick={props.onClose}>{t('common.cancel')}</Button>
+        <Button variant="contained" disabled={!agentId} onClick={() => agentId && props.onStart(agentId, sub)}>{t('new.start')}</Button>
       </DialogActions>
     </Dialog>
   );

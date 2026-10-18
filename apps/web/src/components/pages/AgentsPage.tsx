@@ -3,13 +3,14 @@ import type { AgentInfo, SubAgent } from '@agentui/shared';
 import { api } from '../../api';
 import StatusDot from '../StatusDot';
 import { card, useLoad, Page } from './shared';
+import { t } from '../../i18n';
 
 export function AgentsPage({ agents, onStart }: { agents: AgentInfo[]; onStart: (agentId: string, sub?: string) => void }) {
   return (
-    <Page title="Agents">
+    <Page title={t('agents.title')}>
       <Box sx={{ display: 'grid', gap: 1.5 }}>
         {agents.map((a) => <AgentCard key={a.id} agent={a} onStart={onStart} />)}
-        {!agents.length && <Typography color="text.secondary">Aucun agent configuré.</Typography>}
+        {!agents.length && <Typography color="text.secondary">{t('common.noAgent')}</Typography>}
       </Box>
     </Page>
   );
@@ -25,19 +26,19 @@ function AgentCard({ agent, onStart }: { agent: AgentInfo; onStart: (agentId: st
           <Typography variant="subtitle1" noWrap>{agent.name}</Typography>
           <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>{agent.status === 'connected' ? agent.type : agent.statusDetail ?? agent.status}</Typography>
         </Box>
-        <Button size="small" variant="outlined" onClick={() => onStart(agent.id)}>Discuter</Button>
+        <Button size="small" variant="outlined" onClick={() => onStart(agent.id)}>{t('common.discuss')}</Button>
       </Box>
       {subs.loading && <Box sx={{ p: 1.5, textAlign: 'center' }}><CircularProgress size={18} /></Box>}
       {!!subs.data?.length && (
         <Box sx={{ borderTop: 1, borderColor: 'divider', p: 1.5, display: 'grid', gap: 1 }}>
-          <Typography variant="overline" color="text.secondary">Sous-agents</Typography>
+          <Typography variant="overline" color="text.secondary">{t('agents.subagents')}</Typography>
           {subs.data.map((s) => (
             <Box key={s.id} sx={{ ...card, bgcolor: 'background.default' }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{s.name}{s.isDefault && <Chip size="small" label="défaut" sx={{ ml: 1 }} />}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{s.name}{s.isDefault && <Chip size="small" label={t('agents.default')} sx={{ ml: 1 }} />}</Typography>
                 {s.description && <Typography variant="caption" color="text.secondary">{s.description}</Typography>}
               </Box>
-              <Button size="small" onClick={() => onStart(agent.id, s.id)}>Discuter</Button>
+              <Button size="small" onClick={() => onStart(agent.id, s.id)}>{t('common.discuss')}</Button>
             </Box>))}
         </Box>)}
     </Box>

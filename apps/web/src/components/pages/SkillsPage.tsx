@@ -4,6 +4,7 @@ import type { AgentInfo, Skill } from '@agentui/shared';
 import { api } from '../../api';
 import Markdown from '../Markdown';
 import { useBackClose } from '../../useBackClose';
+import { t } from '../../i18n';
 import { card, useLoad, Page, Status, Pickers, useScope } from './shared';
 
 /** Popup de lecture d'une skill : son SKILL.md (sans l'en-tête YAML) rendu en Markdown. */
@@ -26,7 +27,7 @@ function SkillDialog({ agentId, sub, skill, onClose }: { agentId?: string; sub?:
           : state.content === undefined ? <CircularProgress size={20} />
           : <Markdown>{state.content}</Markdown>}
       </DialogContent>
-      <DialogActions><Button onClick={onClose}>Fermer</Button></DialogActions>
+      <DialogActions><Button onClick={onClose}>{t('common.close')}</Button></DialogActions>
     </Dialog>);
 }
 
@@ -35,7 +36,7 @@ export function SkillsPage({ agents }: { agents: AgentInfo[] }) {
   const skills = useLoad<Skill[]>(() => (sc.agent ? api.skills(sc.agent.id, sc.sub) : Promise.resolve([])), [sc.agent?.id, sc.sub]);
   const [open, setOpen] = useState<Skill>();
   return (
-    <Page title="Skills" actions={<Pickers agents={sc.ok} agentId={sc.agent?.id} sub={sc.sub} onAgent={sc.setAgent} onSub={sc.setSub} subs={sc.subs} />}>
+    <Page title={t('skills.title')} actions={<Pickers agents={sc.ok} agentId={sc.agent?.id} sub={sc.sub} onAgent={sc.setAgent} onSub={sc.setSub} subs={sc.subs} />}>
       <Status loading={skills.loading} err={skills.err} empty={!sc.agent || !skills.data?.length} />
       <Box sx={{ display: 'grid', gap: 1 }}>
         {skills.data?.map((s) => (

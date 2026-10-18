@@ -5,6 +5,7 @@ import Check from '@mui/icons-material/Check';
 import Memory from '@mui/icons-material/Memory';
 import type { ModelOption, Usage } from '@agentui/shared';
 import { useBackClose } from '../useBackClose';
+import { t } from '../i18n';
 
 /**
  * Modèle de la discussion, dans la zone de saisie. Cliquable quand l'agent sait changer de modèle : le menu liste les
@@ -33,9 +34,9 @@ export default function ModelChip({ usage, canPick, disabled, load, onPick }: {
   return (
     <>
       <Chip size="small" variant="outlined" icon={<Memory />} clickable={clickable} onClick={clickable ? (e) => setAnchor(e.currentTarget) : undefined}
-        title={!canPick ? 'Modèle de cette discussion' : disabled ? 'Changement de modèle possible après la réponse en cours' : 'Changer de modèle'}
+        title={!canPick ? t('model.current') : disabled ? t('model.afterRun') : t('model.change')}
         label={<Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{usage?.model ?? 'Modèle par défaut'}</Box>
+          <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{usage?.model ?? t('model.default')}</Box>
           {clickable && <ArrowDropDown fontSize="small" sx={{ ml: 0.25, mr: -0.5, flexShrink: 0 }} />}
         </Box>}
         sx={{ height: 28, fontWeight: 500, maxWidth: 'min(280px, 100%)', '& .MuiChip-label': { px: 0.75 } }} />

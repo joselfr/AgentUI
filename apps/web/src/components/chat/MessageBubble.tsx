@@ -20,6 +20,7 @@ import ProgressCard, { parseProgress } from '../ProgressCard';
 import ImageCard, { isRemote, parseImage, type Resolved } from '../ImageCard';
 import CodeCard, { parseCode } from '../CodeCard';
 import FormCard, { parseForm } from '../FormCard';
+import { t } from '../../i18n';
 
 const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
 const halo = keyframes`0% { box-shadow: 0 0 0 0 var(--halo) } 70%, 100% { box-shadow: 0 0 0 7px transparent }`;
@@ -27,7 +28,7 @@ const halo = keyframes`0% { box-shadow: 0 0 0 0 var(--halo) } 70%, 100% { box-sh
 /** Indicateur « l'agent travaille » : points animés + activité en cours. */
 function Working({ m }: { m: Message }) {
   const tool = [...(m.toolCalls ?? [])].reverse().find((t) => t.status === 'running');
-  const label = tool ? `Utilise ${tool.name}` : m.text ? 'Rédige' : 'Réfléchit';
+  const label = tool ? t('chat.working.tool', { tool: tool.name }) : m.text ? t('chat.working.writing') : t('chat.working.thinking');
   return (
     <Box role="status" aria-label={`${label}…`} sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: m.text || m.toolCalls?.length ? 1 : 0, color: 'text.secondary' }}>
       <Box sx={{ display: 'flex', gap: '4px' }}>
@@ -147,7 +148,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
           : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{text}</ReactMarkdown>}
         {!mine && <Attachments m={m} />}
         {working && <Working m={m} />}
-        {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">⏹ interrompu</Typography>}
+        {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">{t('chat.aborted')}</Typography>}
       </Paper>
     </Box>
   );

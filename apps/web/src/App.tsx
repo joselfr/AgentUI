@@ -22,8 +22,10 @@ import { AgentsPage } from './components/pages/AgentsPage';
 import { JobsPage } from './components/pages/JobsPage';
 import { SkillsPage } from './components/pages/SkillsPage';
 import { toOutgoing, type AttachmentView } from './attachments';
+import { t, useLang } from './i18n';
 
 export default function App() {
+  useLang(); // redessine tout l'arbre au changement de langue : les composants appellent `t()` directement
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
   const [themeMode, setThemeMode] = usePersisted<ThemeMode>('themeMode', 'dark');
   const [expandTools, setExpandTools] = usePersisted<boolean>('expandTools', false);
@@ -234,7 +236,7 @@ export default function App() {
   const pickModel = async (o: ModelOption) => {
     let id = currentId;
     if (!id) {
-      if (!newAgent) throw new Error('Aucun agent configuré');
+      if (!newAgent) throw new Error(t('common.noAgentError'));
       const c = await api.createConversation(newAgent, sub);
       setConvs((cs) => [c, ...cs]);
       currentRef.current = createdRef.current = id = c.id;
@@ -272,7 +274,7 @@ export default function App() {
             sx={{ width: wide ? DRAWER : 0, flexShrink: 0, '& .MuiDrawer-paper': { width: wide ? DRAWER : `min(${NAV + DRAWER}px, 90vw)`, overflowX: 'hidden', position: wide ? 'relative' : 'fixed', borderWidth: '0 1px 0 0', borderStyle: 'solid' } }}>{drawerContent}</Drawer>)}
         {view === 'chats' ? (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <ChatHeader title={current?.title ?? 'Nouvelle conversation'} agent={agent} showListButton={!wide || !listOpen} onShowList={() => (wide ? setListOpen(true) : setDrawer(true))} />
+          <ChatHeader title={current?.title ?? t('chat.new')} agent={agent} showListButton={!wide || !listOpen} onShowList={() => (wide ? setListOpen(true) : setDrawer(true))} />
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {agent ? (
               <Chat title={current?.title ?? ''} agentName={agent.name} messages={messages} loading={loadingMsgs} isNew={!currentId} running={running} awaiting={running && awaitingReply(messages)} expandTools={expandTools}
@@ -280,7 +282,7 @@ export default function App() {
                 unreadMark={unreadMark} canAbort={agent.capabilities.abort} attach={agent.capabilities.attachments} error={error} approval={approval}
                 onApprove={(ok) => currentId && approval && api.approval(currentId, approval.id, ok).then(() => setApproval(undefined)).catch(guard)}
                 onSend={send} onAbort={() => currentId && api.abort(currentId).catch(guard)} />
-            ) : <Typography sx={{ p: 4 }} color="text.secondary">Aucun agent configuré.</Typography>}
+            ) : <Typography sx={{ p: 4 }} color="text.secondary">{t('common.noAgent')}</Typography>}
           </Box>
         </Box>
         ) : (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Box, Button, Paper, TextField, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { api } from '../api';
+import { t } from '../i18n';
 
 export default function Login({ onDone }: { onDone: () => void }) {
   const [username, setU] = useState('');
@@ -28,13 +29,13 @@ export default function Login({ onDone }: { onDone: () => void }) {
           <Box component="img" src="/icon.svg" alt="" sx={{ width: 40, height: 40, borderRadius: '11px' }} />
           <Box>
             <Typography variant="h5" sx={{ lineHeight: 1.1 }}>AgentUI</Typography>
-            <Typography variant="caption" color="text.secondary">Connectez-vous pour accéder à vos agents</Typography>
+            <Typography variant="caption" color="text.secondary">{t('login.subtitle')}</Typography>
           </Box>
         </Box>
         {err && <Alert severity="error" variant="outlined">{err}</Alert>}
-        <TextField label="Utilisateur" value={username} onChange={(e) => setU(e.target.value)} autoComplete="username" autoFocus />
-        <TextField label="Mot de passe" type="password" value={password} onChange={(e) => setP(e.target.value)} autoComplete="current-password" />
-        <Button type="submit" variant="contained" size="large" disabled={busy || !username || !password}>Se connecter</Button>
+        <TextField label={t('login.username')} value={username} onChange={(e) => setU(e.target.value)} autoComplete="username" autoFocus />
+        <TextField label={t('login.password')} type="password" value={password} onChange={(e) => setP(e.target.value)} autoComplete="current-password" />
+        <Button type="submit" variant="contained" size="large" disabled={busy || !username || !password}>{t('login.submit')}</Button>
       </Paper>
     </Box>
   );

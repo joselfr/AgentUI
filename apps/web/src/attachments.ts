@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { AttachmentMeta, Capabilities, OutgoingAttachment } from '@agentui/shared';
 
 /** Pièce jointe affichée : celles qui viennent d'être envoyées gardent une URL locale (blob:) en attendant le rechargement. */
@@ -15,17 +16,17 @@ const isTextLike = (f: File) =>
   /^(text\/|application\/(json|xml|x-yaml|yaml|toml|javascript|x-sh|sql))/.test(f.type) ||
   TEXT_EXT.has((f.name.split('.').pop() ?? f.name).toLowerCase());
 
-export const formatSize = (n: number) => (n < 1024 ? `${n} o` : n < 1048576 ? `${Math.round(n / 1024)} Ko` : `${(n / 1048576).toFixed(1)} Mo`);
+export const formatSize = (n: number) => (n < 1024 ? `${n} ${t('size.b')}` : n < 1048576 ? `${Math.round(n / 1024)} ${t('size.kb')}` : `${(n / 1048576).toFixed(1)} ${t('size.mb')}`);
 
 /** Contrôle côté client (confort) ; le serveur revalide tout. Retourne un message d'erreur ou null. */
 export function checkFile(f: File, current: File[], caps: Capabilities['attachments']): string | null {
-  if (current.length >= MAX_FILES) return `Maximum ${MAX_FILES} fichiers par message.`;
-  if (f.size === 0) return `« ${f.name} » est vide.`;
-  if (f.size > caps.maxBytes) return `« ${f.name} » dépasse ${formatSize(caps.maxBytes)}.`;
-  if (current.reduce((n, x) => n + x.size, f.size) > MAX_TOTAL) return 'Pièces jointes trop volumineuses (25 Mo au total).';
-  if (isImage(f.type)) return caps.images ? (f.size > 6 * 1048576 ? `Image « ${f.name} » trop grande (6 Mo maximum).` : null) : `Cet agent n'accepte pas les images.`;
-  if (isTextLike(f)) return f.size > 200_000 ? `Fichier texte « ${f.name} » trop long (200 Ko maximum).` : null;
-  return caps.files ? null : `« ${f.name} » : cet agent n'accepte que les images et les fichiers texte.`;
+  if (current.length >= MAX_FILES) return t('file.maxFiles', { max: MAX_FILES });
+  if (f.size === 0) return t('file.empty', { name: f.name });
+  if (f.size > caps.maxBytes) return t('file.tooBig', { name: f.name, size: formatSize(caps.maxBytes) });
+  if (current.reduce((n, x) => n + x.size, f.size) > MAX_TOTAL) return t('file.totalTooBig');
+  if (isImage(f.type)) return caps.images ? (f.size > 6 * 1048576 ? t('file.imageTooBig', { name: f.name }) : null) : t('file.noImages');
+  if (isTextLike(f)) return f.size > 200_000 ? t('file.textTooLong', { name: f.name }) : null;
+  return caps.files ? null : t('file.onlyText', { name: f.name });
 }
 
 async function toBase64(f: File): Promise<string> {

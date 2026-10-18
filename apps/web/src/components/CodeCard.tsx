@@ -12,6 +12,7 @@ import sql from 'highlight.js/lib/languages/sql';
 import xml from 'highlight.js/lib/languages/xml';
 import css from 'highlight.js/lib/languages/css';
 import { MONO } from '../theme';
+import { t as tr } from '../i18n';
 
 hljs.registerLanguage('javascript', javascript);
 hljs.registerLanguage('typescript', typescript);
@@ -88,7 +89,7 @@ export default function CodeCard({ code: c }: { code: Code }) {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pl: 1.5, pr: 1, py: 0.75, borderBottom: 1, borderColor: 'divider', bgcolor: 'action.hover' }}>
         <Typography noWrap sx={{ flex: 1, minWidth: 0, fontFamily: MONO, fontSize: 12, fontWeight: 600 }}>{c.filename ?? ''}</Typography>
         {c.language && <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{c.language}</Typography>}
-        <Button size="small" variant="outlined" color={copied ? 'success' : 'inherit'} onClick={copy} sx={{ py: 0, fontSize: 12, borderColor: copied ? undefined : 'divider' }}>{copied ? '✓ Copié' : 'Copier'}</Button>
+        <Button size="small" variant="outlined" color={copied ? 'success' : 'inherit'} onClick={copy} sx={{ py: 0, fontSize: 12, borderColor: copied ? undefined : 'divider' }}>{copied ? tr('code.copied') : tr('code.copy')}</Button>
       </Box>
       <Box sx={{
         position: 'relative', overflow: folded ? 'hidden' : 'auto', maxHeight: folded ? `calc(${FOLD_LINES} * 1.55em + 20px)` : undefined,

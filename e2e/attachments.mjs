@@ -17,7 +17,7 @@ function png(n, [r, g, b]) {
 const RED = png(64, [255, 0, 0]);
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'fr-FR' })).newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(base);

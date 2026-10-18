@@ -6,6 +6,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import Star from '@mui/icons-material/Star';
 import type { SearchHit } from '@agentui/shared';
 import { api } from '../../api';
+import { fmtDate, t } from '../../i18n';
 
 /** Recherche plein texte (titres et messages) : active dès 2 caractères, requêtes espacées de 250 ms. */
 export function useSearch() {
@@ -36,15 +37,15 @@ export function SearchField({ query, onChange, searching }: { query: string; onC
   }, []);
   return (
     <Box sx={{ px: 1.5, pt: 1, pb: 0.5 }}>
-      <TextField fullWidth size="small" placeholder="Rechercher…" value={query} inputRef={input}
+      <TextField fullWidth size="small" placeholder={t('search.placeholder')} value={query} inputRef={input}
         onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') onChange(''); }}
-        inputProps={{ 'aria-label': 'Rechercher dans les discussions', enterKeyHint: 'search' }}
+        inputProps={{ 'aria-label': t('search.label'), enterKeyHint: 'search' }}
         InputProps={{
           startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
           endAdornment: query ? (
             <InputAdornment position="end">
               {searching ? <CircularProgress size={14} sx={{ mr: 0.5 }} /> : null}
-              <IconButton size="small" edge="end" aria-label="Effacer la recherche" onClick={() => { onChange(''); input.current?.focus(); }}><Close fontSize="small" /></IconButton>
+              <IconButton size="small" edge="end" aria-label={t('search.clear')} onClick={() => { onChange(''); input.current?.focus(); }}><Close fontSize="small" /></IconButton>
             </InputAdornment>) : undefined,
         }} />
     </Box>
@@ -69,21 +70,21 @@ export function SearchResults({ hits, searching, q, currentId, agentName, onPick
 }) {
   return (
     <>
-      <List dense disablePadding sx={{ mt: 1 }} aria-label="Résultats de la recherche">
+      <List dense disablePadding sx={{ mt: 1 }} aria-label={t('search.results')}>
         {hits?.map((h) => (
           <ListItemButton key={h.id} selected={h.id === currentId} onClick={() => onPick(h.id)} sx={{ gap: 1, px: 1.5, alignItems: 'flex-start' }}>
-            {h.favorite && <Star aria-label="Favori" sx={{ fontSize: 16, color: 'warning.main', flexShrink: 0, mt: 0.5 }} />}
+            {h.favorite && <Star aria-label={t('chat.favorite')} sx={{ fontSize: 16, color: 'warning.main', flexShrink: 0, mt: 0.5 }} />}
             <ListItemText sx={{ minWidth: 0 }} primary={h.title} primaryTypographyProps={{ noWrap: true, fontWeight: 600 }}
               secondaryTypographyProps={{ component: 'div', fontSize: 12 }}
               secondary={<>
                 {h.snippet && <Box sx={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere', color: 'text.primary', opacity: 0.85 }}>
                   <Snippet text={h.snippet} marks={h.marks ?? []} /></Box>}
-                <Box sx={{ color: 'text.secondary', mt: 0.25 }}>{agentName(h.agentId)} · {new Date(h.updatedAt).toLocaleDateString()}{h.archived ? ' · archivée' : ''}</Box>
+                <Box sx={{ color: 'text.secondary', mt: 0.25 }}>{agentName(h.agentId)} · {fmtDate(h.updatedAt)}{h.archived ? ` · ${t('chat.archivedSuffix')}` : ''}</Box>
               </>} />
           </ListItemButton>))}
       </List>
       {hits?.length === 0 && !searching && (
-        <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 2, textAlign: 'center' }}>Aucun résultat pour « {q} »</Typography>)}
+        <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 2, textAlign: 'center' }}>{t('search.none', { q })}</Typography>)}
     </>
   );
 }

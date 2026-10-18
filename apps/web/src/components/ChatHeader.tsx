@@ -3,6 +3,7 @@ import { alpha } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
 import type { AgentInfo } from '@agentui/shared';
 import StatusDot from './StatusDot';
+import { t } from '../i18n';
 
 /** Barre du haut du chat : bouton d'affichage de la liste, titre de la discussion, agent et son état de connexion. */
 export default function ChatHeader({ title, agent, showListButton, onShowList }: { title: string; agent?: AgentInfo; showListButton: boolean; onShowList: () => void }) {
@@ -10,7 +11,7 @@ export default function ChatHeader({ title, agent, showListButton, onShowList }:
     <AppBar position="static" color="transparent" elevation={0}
       sx={{ border: 0, borderBottom: 1, borderColor: 'divider', backdropFilter: 'blur(12px)', bgcolor: (t) => alpha(t.palette.background.default, 0.8) }}>
       <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, md: 64 } }}>
-        {showListButton && <IconButton edge="start" onClick={onShowList} aria-label="Afficher les discussions" title="Afficher les discussions"><MenuIcon /></IconButton>}
+        {showListButton && <IconButton edge="start" onClick={onShowList} aria-label={t('header.showChats')} title={t('header.showChats')}><MenuIcon /></IconButton>}
         <Typography variant="subtitle1" noWrap sx={{ flex: 1 }}>{title}</Typography>
         {agent && (
           <Chip size="small" variant="outlined"

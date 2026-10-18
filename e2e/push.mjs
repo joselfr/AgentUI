@@ -24,7 +24,7 @@ const ecdh = crypto.createECDH('prime256v1'); ecdh.generateKeys();
 const sub = { endpoint, keys: { p256dh: b64u(ecdh.getPublicKey()), auth: b64u(crypto.randomBytes(16)) } };
 
 const browser = await chromium.launch({ executablePath: process.env.BROWSER ?? '/usr/bin/chromium', args: ['--no-sandbox'] });
-const ctx = await browser.newContext({ permissions: ['notifications'], baseURL: base });
+const ctx = await browser.newContext({ permissions: ['notifications'], baseURL: base, locale: 'fr-FR' });
 // Le navigateur de test ne peut pas créer d'abonnement réel : on fournit un abonnement vers le faux service.
 await ctx.addInitScript((s) => {
   let current = null;

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { AgentInfo, Job, Message, ModelOption, OutgoingAttachment, SearchHit, Skill, SubAgent, Usage } from '@agentui/shared';
 
 export interface Conversation {
@@ -29,7 +30,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     credentials: 'same-origin',
     headers: { 'X-Requested-With': 'agentui', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
-  }).catch(() => { throw new Error('Pas de connexion au serveur'); });
+  }).catch(() => { throw new Error(t('api.offline')); });
   if (res.status === 401 && !path.startsWith('/auth/login')) throw new UnauthorizedError();
   if (!res.ok) {
     const e = (await res.json().catch(() => ({}))) as { error?: string; message?: string };

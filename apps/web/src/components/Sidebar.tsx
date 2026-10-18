@@ -5,6 +5,7 @@ import MenuOpen from '@mui/icons-material/MenuOpen';
 import type { AgentInfo } from '@agentui/shared';
 import type { Conversation } from '../api';
 import { load, save } from '../storage';
+import { t } from '../i18n';
 import AgentFilter from './sidebar/AgentFilter';
 import ConversationItem from './sidebar/ConversationItem';
 import ConversationMenu, { RenameDialog } from './sidebar/ConversationMenu';
@@ -67,11 +68,11 @@ export default function Sidebar(props: {
           onDelete={() => { void props.onDeleteMany(selection.chosen).then((done) => { if (done) selection.clear(); }); }} />
       ) : (
         <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pr: 1, height: 64, flexShrink: 0 }}>
-          <Typography variant="subtitle1" sx={{ flex: 1 }}>Discussions</Typography>
-          <IconButton size="small" onClick={props.onClose} aria-label="Masquer les discussions" title="Masquer les discussions"><MenuOpen fontSize="small" /></IconButton>
+          <Typography variant="subtitle1" sx={{ flex: 1 }}>{t('nav.chats')}</Typography>
+          <IconButton size="small" onClick={props.onClose} aria-label={t('header.hideChats')} title={t('header.hideChats')}><MenuOpen fontSize="small" /></IconButton>
         </Box>)}
       <Box sx={{ px: 1.5, pb: 0.5 }}>
-        <Button fullWidth variant="contained" startIcon={<Add />} onClick={props.onNew}>Nouvelle conversation</Button>
+        <Button fullWidth variant="contained" startIcon={<Add />} onClick={props.onNew}>{t('chat.new')}</Button>
       </Box>
       <SearchField query={search.query} onChange={search.setQuery} searching={search.searching} />
       {agents.length > 1 && !search.active && (
@@ -81,11 +82,11 @@ export default function Sidebar(props: {
           <SearchResults hits={search.hits} searching={search.searching} q={search.q} currentId={props.currentId} agentName={agentName}
             onPick={(id) => { search.setQuery(''); props.onSelectConv(id); }} />
         ) : (<>
-          {crons.length > 0 && <Section title="Tâches cron" count={crons.length} open={cronOpen} onToggle={toggleCron} unread={crons.some((c) => c.unread)}>{crons.map(item)}</Section>}
+          {crons.length > 0 && <Section title={t('chat.cron')} count={crons.length} open={cronOpen} onToggle={toggleCron} unread={crons.some((c) => c.unread)}>{crons.map(item)}</Section>}
           <List dense disablePadding sx={{ mt: 1 }}>{mains.map(item)}</List>
-          {archivedList.length > 0 && <Section title="Archivées" count={archivedList.length} open={archOpen} onToggle={toggleArch}>{archivedList.map(item)}</Section>}
+          {archivedList.length > 0 && <Section title={t('chat.archived')} count={archivedList.length} open={archOpen} onToggle={toggleArch}>{archivedList.map(item)}</Section>}
           {active.length === 0 && archivedList.length === 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 2, textAlign: 'center' }}>Aucune discussion</Typography>)}
+            <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 2, textAlign: 'center' }}>{t('chat.empty')}</Typography>)}
         </>)}
         <ConversationMenu menu={itemMenu.menu} onRequestClose={itemMenu.requestClose} onClose={itemMenu.close}
           onToggleFavorite={props.onToggleFavorite} onRename={setRenaming} onArchive={props.onArchive} onSelect={(c) => selection.start(c.id)} onDelete={props.onDelete} />

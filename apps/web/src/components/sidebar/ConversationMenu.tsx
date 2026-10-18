@@ -10,6 +10,7 @@ import Unarchive from '@mui/icons-material/Unarchive';
 import type { Conversation } from '../../api';
 import { useBackClose } from '../../useBackClose';
 import type { ItemMenu } from './useItemMenu';
+import { t } from '../../i18n';
 
 /** Menu clic droit / appui long d'une discussion. Chaque action ferme le menu avant de s'exécuter. */
 export default function ConversationMenu({ menu, onRequestClose, onClose, onToggleFavorite, onRename, onArchive, onSelect, onDelete }: {
@@ -25,20 +26,20 @@ export default function ConversationMenu({ menu, onRequestClose, onClose, onTogg
       onContextMenu={(e) => e.preventDefault()}>
       <MenuItem onClick={run(onToggleFavorite)}>
         <ListItemIcon>{c?.favorite ? <StarBorder fontSize="small" /> : <Star fontSize="small" />}</ListItemIcon>
-        {c?.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+        {c?.favorite ? t('menu.removeFavorite') : t('menu.addFavorite')}
       </MenuItem>
       <MenuItem onClick={run(onRename)}>
-        <ListItemIcon><Edit fontSize="small" /></ListItemIcon>Renommer
+        <ListItemIcon><Edit fontSize="small" /></ListItemIcon>{t('common.rename')}
       </MenuItem>
       <MenuItem onClick={run((x) => onArchive(x, !x.archived))}>
         <ListItemIcon>{c?.archived ? <Unarchive fontSize="small" /> : <Archive fontSize="small" />}</ListItemIcon>
-        {c?.archived ? 'Désarchiver' : 'Archiver'}
+        {c?.archived ? t('menu.unarchive') : t('menu.archive')}
       </MenuItem>
       <MenuItem onClick={run(onSelect)}>
-        <ListItemIcon><CheckCircleOutline fontSize="small" /></ListItemIcon>Sélectionner
+        <ListItemIcon><CheckCircleOutline fontSize="small" /></ListItemIcon>{t('menu.select')}
       </MenuItem>
       <MenuItem onClick={run(onDelete)} sx={{ color: 'error.main' }}>
-        <ListItemIcon sx={{ color: 'inherit' }}><Delete fontSize="small" /></ListItemIcon>Supprimer
+        <ListItemIcon sx={{ color: 'inherit' }}><Delete fontSize="small" /></ListItemIcon>{t('common.delete')}
       </MenuItem>
     </Menu>
   );
@@ -57,14 +58,14 @@ export function RenameDialog({ conv, onSubmit, onClose }: { conv?: Conversation;
   return (
     <Dialog open={!!conv} onClose={onClose} fullWidth maxWidth="xs">
       <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
-        <DialogTitle sx={{ fontWeight: 650 }}>Renommer la discussion</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 650 }}>{t('rename.title')}</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
-          <TextField autoFocus fullWidth size="small" label="Nom" value={title} inputProps={{ maxLength: 200 }}
+          <TextField autoFocus fullWidth size="small" label={t('rename.name')} value={title} inputProps={{ maxLength: 200 }}
             onFocus={(e) => e.target.select()} onChange={(e) => setTitle(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Annuler</Button>
-          <Button type="submit" variant="contained" disabled={!title.trim()}>Renommer</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="submit" variant="contained" disabled={!title.trim()}>{t('common.rename')}</Button>
         </DialogActions>
       </form>
     </Dialog>

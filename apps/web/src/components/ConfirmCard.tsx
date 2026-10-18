@@ -3,6 +3,7 @@ import { alpha } from '@mui/material/styles';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import HelpOutline from '@mui/icons-material/HelpOutline';
 import Markdown from './Markdown';
+import { t } from '../i18n';
 
 export interface Parsed { title: string; text: string; danger: boolean; yes: string; no: string }
 
@@ -10,7 +11,7 @@ export interface Parsed { title: string; text: string; danger: boolean; yes: str
 export function parseConfirm(j: Record<string, unknown>): Parsed | undefined {
   if (typeof j.title !== 'string') return undefined;
   const s = (v: unknown, d: string) => (typeof v === 'string' && v.trim() ? v : d);
-  return { title: j.title, text: s(j.text, ''), danger: j.danger === true, yes: s(j.yes, 'Confirmer'), no: s(j.no, 'Annuler') };
+  return { title: j.title, text: s(j.text, ''), danger: j.danger === true, yes: s(j.yes, t('common.confirm')), no: s(j.no, t('common.cancel')) };
 }
 
 /** `answer` : réponse déjà envoyée (libellé du bouton choisi), `onAnswer` absent : demande plus répondable. */
@@ -39,7 +40,7 @@ export default function ConfirmCard({ confirm: { title, text, danger, yes, no },
               sx={chosen ? { '&.Mui-disabled': { bgcolor: ok ? `${color}.main` : 'action.selected', color: ok ? `${color}.contrastText` : 'text.primary' } } : undefined}>{label}</Button>);
         })}
       </Box>
-      {done && !live && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 5.25 }}>✓ Répondu : {answer}</Typography>}
+      {done && !live && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 5.25 }}>{t('confirm.answered', { answer })}</Typography>}
     </Box>
   );
 }

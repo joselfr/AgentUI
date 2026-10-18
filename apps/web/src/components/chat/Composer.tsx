@@ -7,6 +7,7 @@ import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
 import { formatSize } from '../../attachments';
 import type { useAttachments } from './useAttachments';
+import { t } from '../../i18n';
 
 /** Zone de saisie : texte (Entrée envoie, Maj+Entrée saute une ligne), fichiers joints (bouton, collage), envoi / arrêt. */
 export default function Composer({ agentName, running, awaiting, canAbort, attachments, onSubmit, onAbort, modelPicker }: {
@@ -36,15 +37,15 @@ export default function Composer({ agentName, running, awaiting, canAbort, attac
           </Box>)}
         <Box sx={{ p: 1, display: 'flex', gap: 0.5, alignItems: 'flex-end' }}>
           <input ref={picker} type="file" multiple hidden data-testid="file-input" onChange={(e) => { if (e.target.files) attachments.add(e.target.files); e.target.value = ''; }} />
-          <Tooltip title="Joindre des fichiers"><span><IconButton onClick={() => picker.current?.click()} aria-label="Joindre un fichier" disabled={running} sx={{ borderRadius: '50%' }}><AttachFile /></IconButton></span></Tooltip>
-          <TextField fullWidth multiline size="small" maxRows={8} placeholder={`Message à ${agentName}`} value={text}
+          <Tooltip title={t('composer.attach')}><span><IconButton onClick={() => picker.current?.click()} aria-label={t('composer.attachLabel')} disabled={running} sx={{ borderRadius: '50%' }}><AttachFile /></IconButton></span></Tooltip>
+          <TextField fullWidth multiline size="small" maxRows={8} placeholder={t('composer.placeholder', { agent: agentName })} value={text}
             sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'transparent' }, '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 0 } }}
             onChange={(e) => setText(e.target.value)}
             onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); attachments.add(e.clipboardData.files); } }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
           {running && canAbort && !canSend
-            ? <Fab color="error" size="small" onClick={onAbort} aria-label="Arrêter" sx={{ flexShrink: 0, boxShadow: 'none' }}><StopIcon /></Fab>
-            : <IconButton onClick={() => void send()} disabled={!canSend} aria-label="Envoyer"
+            ? <Fab color="error" size="small" onClick={onAbort} aria-label={t('composer.stop')} sx={{ flexShrink: 0, boxShadow: 'none' }}><StopIcon /></Fab>
+            : <IconButton onClick={() => void send()} disabled={!canSend} aria-label={t('composer.send')}
                 sx={{ flexShrink: 0, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}><SendIcon /></IconButton>}
         </Box>
         {modelPicker && <Box sx={{ px: 1.25, pb: 1, display: 'flex' }}>{modelPicker}</Box>}

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useBackClose } from '../useBackClose';
+import { t } from '../i18n';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import HelpOutline from '@mui/icons-material/HelpOutline';
 
@@ -41,8 +42,8 @@ export function useConfirm() {
       </DialogTitle>
       {o?.text && <DialogContent sx={{ pt: 0 }}><Typography variant="body2" color="text.secondary">{o.text}</Typography></DialogContent>}
       <DialogActions>
-        <Button onClick={() => close(false)}>Annuler</Button>
-        <Button variant="contained" color={color} autoFocus onClick={() => close(true)}>{o?.confirmLabel ?? 'Confirmer'}</Button>
+        <Button onClick={() => close(false)}>{t('common.cancel')}</Button>
+        <Button variant="contained" color={color} autoFocus onClick={() => close(true)}>{o?.confirmLabel ?? t('common.confirm')}</Button>
       </DialogActions>
     </Dialog>
   );

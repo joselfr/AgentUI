@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import type { StepTime } from './widget';
+import { fmtDecimal, t } from '../i18n';
 
 export type StepStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
 interface Step { label: string; status: StepStatus; detail?: string }
@@ -24,10 +25,10 @@ export function parseProgress(a: Record<string, unknown>): Progress | undefined 
   return { ...(typeof a.title === 'string' && a.title ? { title: a.title } : {}), steps: out };
 }
 
-/** Durée en français : « 3,2 s », « 42 s », « 2 min 05 s », « 1 h 05 min ». */
+/** Durée selon la langue : « 3,2 s », « 42 s », « 2 min 05 s », « 1 h 05 min ». */
 export function fmtDuration(ms: number): string {
   const s = Math.max(0, ms) / 1000;
-  if (s < 10) return `${s.toFixed(1).replace('.', ',')} s`;
+  if (s < 10) return `${fmtDecimal(s)} s`;
   if (s < 60) return `${Math.round(s)} s`;
   const m = Math.floor(s / 60), r = Math.round(s % 60);
   if (m < 60) return `${m} min ${String(r).padStart(2, '0')} s`;
@@ -80,8 +81,8 @@ export default function ProgressCard({ progress: p, ended = false, times = [] }:
   return (
     <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.default', minWidth: 0 }}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25 }}>
-        <Typography sx={{ fontWeight: 600, flex: 1 }}>{p.title ?? 'Progression'}</Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>{all ? '✓ Terminé' : `${done}/${counted.length}`}</Typography>
+        <Typography sx={{ fontWeight: 600, flex: 1 }}>{p.title ?? t('progress.title')}</Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>{all ? t('progress.done') : `${done}/${counted.length}`}</Typography>
       </Box>
       <Box role="progressbar" aria-valuemin={0} aria-valuemax={counted.length} aria-valuenow={done} sx={{ height: 6, borderRadius: '3px', bgcolor: 'action.hover', overflow: 'hidden', my: 1 }}>
         <Box sx={{ height: '100%', width: `${counted.length ? (100 * done) / counted.length : 0}%`, bgcolor: barColor, borderRadius: '3px', transition: 'width .3s' }} />
@@ -89,7 +90,7 @@ export default function ProgressCard({ progress: p, ended = false, times = [] }:
       <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: '2px' }}>
         {folded > 0 && (
           <Box component="li" sx={{ display: 'flex', gap: 1.25, py: 0.5, alignItems: 'flex-start' }}>
-            <Icon status="done" /><Typography sx={{ color: 'text.secondary' }}>{folded} étapes terminées</Typography>
+            <Icon status="done" /><Typography sx={{ color: 'text.secondary' }}>{t('progress.folded', { count: folded })}</Typography>
           </Box>
         )}
         {steps.slice(folded).map((s, i) => (
@@ -103,7 +104,7 @@ export default function ProgressCard({ progress: p, ended = false, times = [] }:
               {s.label}
               {(s.detail || s.shown === 'interrupted') && (
                 <Typography component="span" variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 400, textDecoration: 'none' }}>
-                  {[s.detail, s.shown === 'interrupted' ? 'interrompu' : ''].filter(Boolean).join(' · ')}
+                  {[s.detail, s.shown === 'interrupted' ? t('progress.interrupted') : ''].filter(Boolean).join(' · ')}
                 </Typography>
               )}
             </Typography>

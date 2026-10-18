@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fmtNumber, t as tr } from '../i18n';
 import { Box, Button, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { ArcElement, BarController, BarElement, CategoryScale, Chart as ChartJS, DoughnutController, LinearScale, LineController, LineElement, PointElement, Tooltip, type Plugin } from 'chart.js';
@@ -22,7 +23,7 @@ function niceCeil(v: number) {
   const p = 10 ** Math.floor(Math.log10(v));
   return ([1, 2, 2.5, 5, 10].find((m) => m * p >= v) ?? 10) * p;
 }
-const fmt = (v: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(v);
+const fmt = (v: number) => fmtNumber(v, 2);
 
 type Colors = { line: string; text: string; bg: string; fg: string; paper: string };
 
@@ -173,9 +174,9 @@ export default function ChartCard({ chart: c }: { chart: Chart }) {
   return (
     <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.default' }}>
       {c.title && <Typography sx={{ fontWeight: 600 }}>{c.title}</Typography>}
-      {c.unit && c.kind !== 'pie' && <Typography variant="caption" color="text.secondary">en {c.unit}</Typography>}
+      {c.unit && c.kind !== 'pie' && <Typography variant="caption" color="text.secondary">{tr('chart.unit', { unit: c.unit })}</Typography>}
       <Box sx={{ mt: 1 }}>{c.kind === 'pie' ? <Pie c={c} colors={colors} color={color} /> : <Plot c={c} colors={colors} color={color} />}</Box>
-      <Button size="small" variant="outlined" onClick={copy} sx={{ mt: 1, py: 0, fontSize: 12 }}>{copied ? 'Copié ✓' : 'Copier les données'}</Button>
+      <Button size="small" variant="outlined" onClick={copy} sx={{ mt: 1, py: 0, fontSize: 12 }}>{copied ? tr('chart.copied') : tr('chart.copy')}</Button>
     </Box>
   );
 }

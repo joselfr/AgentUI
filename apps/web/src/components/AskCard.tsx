@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, Button, Checkbox, FormControlLabel, Typography } from '@mui/material';
 import QuestionAnswerOutlined from '@mui/icons-material/QuestionAnswerOutlined';
 import Markdown from './Markdown';
+import { t } from '../i18n';
 
 export interface Parsed { question: string; choices: string[]; multiple: boolean }
 
@@ -32,7 +33,7 @@ export default function AskCard({ ask: { question, choices, multiple }, answer, 
     <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: live ? 'primary.main' : 'divider', borderRadius: '10px', bgcolor: 'background.default', opacity: live || answer ? 1 : 0.7 }}>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
         <QuestionAnswerOutlined fontSize="small" color={live ? 'primary' : 'action'} sx={{ mt: 0.25 }} />
-        <Box sx={{ fontWeight: 600, minWidth: 0 }}><Markdown>{question || 'Question de l\'agent'}</Markdown></Box>
+        <Box sx={{ fontWeight: 600, minWidth: 0 }}><Markdown>{question || t('ask.default')}</Markdown></Box>
       </Box>
       {choices.length > 0 && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.25, ml: 3.5 }}>
@@ -42,13 +43,13 @@ export default function AskCard({ ask: { question, choices, multiple }, answer, 
                 <FormControlLabel key={c} disabled={!live} label={c}
                   control={<Checkbox size="small" checked={live ? picked.includes(c) : answered(c)} onChange={(e) => setPicked(e.target.checked ? [...picked, c] : picked.filter((x) => x !== c))} />} />))}
               {live && <Button variant="contained" size="small" sx={{ justifySelf: 'start', mt: 0.5 }} disabled={!picked.length}
-                onClick={() => onAnswer(choices.filter((c) => picked.includes(c)).join(', '))}>Envoyer</Button>}
+                onClick={() => onAnswer(choices.filter((c) => picked.includes(c)).join(', '))}>{t('common.send')}</Button>}
             </Box>
           ) : choices.map((c) => (
             <Button key={c} size="small" variant={answered(c) ? 'contained' : 'outlined'} disabled={!live} onClick={() => onAnswer?.(c)}
               sx={answered(c) ? { '&.Mui-disabled': { bgcolor: 'primary.main', color: 'primary.contrastText' } } : undefined}>{c}</Button>))}
         </Box>)}
-      {live && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 3.5 }}>{choices.length ? 'Ou répondez librement dans le champ ci-dessous.' : 'Répondez dans le champ ci-dessous.'}</Typography>}
+      {live && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 3.5 }}>{choices.length ? t('ask.orFree') : t('ask.free')}</Typography>}
     </Box>
   );
 }

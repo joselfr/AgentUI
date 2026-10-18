@@ -6,26 +6,27 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import PsychologyOutlined from '@mui/icons-material/PsychologyOutlined';
 import type { SubAgentRun, ToolCall } from '@agentui/shared';
 import { MONO } from '../../theme';
+import { fmtDecimal, t } from '../../i18n';
 
 const rotate = keyframes`to { transform: rotate(360deg) }`;
 const pulse = keyframes`0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--pulse) } 50% { opacity: .6; box-shadow: 0 0 0 4px transparent }`;
 
 /** Anneau de chargement discret (activité en cours). */
 const Spin = () => (
-  <Box component="span" role="progressbar" aria-label="En cours"
+  <Box component="span" role="progressbar" aria-label={t('activity.running')}
     sx={{ width: 12, height: 12, border: 2, borderColor: 'text.disabled', borderTopColor: 'primary.main', borderRadius: '50%', animation: `${rotate} .8s linear infinite`, flexShrink: 0 }} />
 );
 
-/** Durée en français : « 0,1 s ». */
-const dur = (a: number, b?: number) => (b ? `${(Math.max(0, b - a) / 1000).toFixed(1).replace('.', ',')} s` : '');
+/** Durée selon la langue : « 0,1 s » / « 0.1 s ». */
+const dur = (a: number, b?: number) => (b ? `${fmtDecimal(Math.max(0, b - a) / 1000)} s` : '');
 const pretty = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2));
-const STATUS_LABEL = { running: 'En cours', done: 'Terminé', failed: 'Échec' } as const;
+const statusLabel = (s: ToolCall['status']) => t(`activity.${s}`);
 
 /** Pastille d'état : vert = réussi, orange animé = en cours, rouge = échec, violet = sous-agent terminé. */
 function Dot({ status, sub = false }: { status: ToolCall['status']; sub?: boolean }) {
   const color = status === 'running' ? 'warning.main' : status === 'failed' ? 'error.main' : sub ? 'secondary.main' : 'success.main';
   return (
-    <Box component="span" role="img" aria-label={STATUS_LABEL[status]} title={STATUS_LABEL[status]}
+    <Box component="span" role="img" aria-label={statusLabel(status)} title={statusLabel(status)}
       sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0, ...(status === 'running' && { '--pulse': (t: any) => alpha(t.palette.warning.main, 0.5), animation: `${pulse} 1.3s infinite` }) }} />
   );
 }
@@ -55,11 +56,11 @@ function ToolRow({ tool }: { tool: ToolCall }) {
       </ButtonBase>
       <Collapse in={open} unmountOnExit>
         <Box sx={{ pl: 2.25, pb: 0.75, fontSize: 12, '&& pre': { fontFamily: MONO, fontSize: 12, m: 0, mb: 0.5, p: 0.75, px: 1, border: 0, borderRadius: '6px', bgcolor: 'action.hover', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 300, overflow: 'auto' } }}>
-          {tool.args !== undefined && (<><Typography variant="caption" color="text.secondary">Arguments</Typography><pre>{pretty(tool.args)}</pre></>)}
-          {result && (<><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: tool.args !== undefined ? 0.5 : 0 }}>Résultat</Typography><pre>{shown}</pre>
+          {tool.args !== undefined && (<><Typography variant="caption" color="text.secondary">{t('activity.arguments')}</Typography><pre>{pretty(tool.args)}</pre></>)}
+          {result && (<><Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: tool.args !== undefined ? 0.5 : 0 }}>{t('activity.result')}</Typography><pre>{shown}</pre>
             {(result.length >= 1500 || tool.resultTruncated) && !full && (
-              <ButtonBase onClick={() => setFull(true)} sx={{ fontSize: 12, color: 'primary.main', py: 0.25 }}>{tool.resultTruncated ? 'Résultat tronqué' : 'Voir plus'}</ButtonBase>)}</>)}
-          {tool.args === undefined && !result && <Typography variant="caption" color="text.secondary">Pas de détails exposés par l'agent.</Typography>}
+              <ButtonBase onClick={() => setFull(true)} sx={{ fontSize: 12, color: 'primary.main', py: 0.25 }}>{tool.resultTruncated ? t('activity.truncated') : t('activity.more')}</ButtonBase>)}</>)}
+          {tool.args === undefined && !result && <Typography variant="caption" color="text.secondary">{t('activity.noDetails')}</Typography>}
         </Box>
       </Collapse>
     </Box>
@@ -74,7 +75,7 @@ function SubRunRow({ run, tools, expandAll }: { run: SubAgentRun; tools: ToolCal
     <Box>
       <ButtonBase onClick={() => setManual(!open)} aria-expanded={open} sx={rowSx}>
         <Dot status={run.status} sub />
-        <Typography component="span" noWrap sx={{ fontSize: 12.5, flex: 1, minWidth: 0 }}>Sous-agent : {run.name}</Typography>
+        <Typography component="span" noWrap sx={{ fontSize: 12.5, flex: 1, minWidth: 0 }}>{t('activity.subagentName', { name: run.name })}</Typography>
         <Chevron open={open} />
       </ButtonBase>
       <Collapse in={open} unmountOnExit>
@@ -107,8 +108,8 @@ export default function ActivityBlock({ reasoning, tools, subRuns, expandAll }: 
   const top = visible.filter((t) => !t.parentSubAgentRunId);
 
   const hasWork = tools.length > 0 || subRuns.length > 0;
-  const count = tools.length ? `${tools.length} outil${tools.length > 1 ? 's' : ''}` : `${subRuns.length} sous-agent${subRuns.length > 1 ? 's' : ''}`;
-  const label = running ? `${runningTool?.name ?? 'sous-agent'}…` : count;
+  const count = tools.length ? t('activity.tools', { count: tools.length }) : t('activity.subagents', { count: subRuns.length });
+  const label = running ? `${runningTool?.name ?? t('activity.subagent')}…` : count;
   const ended = tools.length > 0 && tools.every((t) => t.endedAt);
   const total = ended ? dur(Math.min(...tools.map((t) => t.startedAt)), Math.max(...tools.map((t) => t.endedAt!))) : '';
 
@@ -117,7 +118,7 @@ export default function ActivityBlock({ reasoning, tools, subRuns, expandAll }: 
       <ButtonBase onClick={() => setOpen(!open)} aria-expanded={showAll}
         sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-start', gap: 0.75, py: 0.25, ml: -0.25, px: 0.25, borderRadius: '6px', color: 'text.secondary', fontSize: 12.5, textAlign: 'left',
           '&:hover': { color: 'text.primary' }, '&.Mui-focusVisible': { outline: 2, outlineColor: 'primary.main' } }}>
-        {reasoning && (<><PsychologyOutlined sx={{ fontSize: 15 }} /><span>Raisonnement</span></>)}
+        {reasoning && (<><PsychologyOutlined sx={{ fontSize: 15 }} /><span>{t('activity.reasoning')}</span></>)}
         {reasoning && hasWork && sep}
         {hasWork && (<>
           {running ? <Spin /> : <BuildOutlined sx={{ fontSize: 15 }} />}

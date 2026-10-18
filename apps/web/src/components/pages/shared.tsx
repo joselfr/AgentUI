@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Alert, Box, CircularProgress, MenuItem, Select, Typography } from '@mui/material';
 import type { AgentInfo, SubAgent } from '@agentui/shared';
 import { api } from '../../api';
+import { t } from '../../i18n';
 
 export const card = { display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '12px', bgcolor: 'background.paper' } as const;
 
@@ -39,7 +40,7 @@ export function Status({ loading, err, empty }: { loading: boolean; err: string;
     <>
       {loading && <Box sx={{ p: 3, textAlign: 'center' }}><CircularProgress size={24} /></Box>}
       {err && <Alert severity="warning" sx={{ mb: 1 }}>{err}</Alert>}
-      {!loading && !err && empty && <Typography sx={{ p: 3 }} color="text.secondary" align="center">Aucun élément</Typography>}
+      {!loading && !err && empty && <Typography sx={{ p: 3 }} color="text.secondary" align="center">{t('common.noItems')}</Typography>}
     </>
   );
 }
@@ -55,7 +56,7 @@ export function Pickers({ agents, agentId, sub, onAgent, onSub, subs }: {
       </Select>
       {onSub && !!subs?.length && (
         <Select size="small" displayEmpty value={sub ?? ''} onChange={(e) => onSub(e.target.value || undefined)} sx={{ minWidth: 140 }}>
-          <MenuItem value="">Par défaut</MenuItem>
+          <MenuItem value="">{t('common.default')}</MenuItem>
           {subs.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
         </Select>)}
     </>

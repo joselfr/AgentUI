@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { fmtNumber, getLang, t as tr } from '../i18n';
 import { Box, Button, Typography } from '@mui/material';
 
 type Cell = string | number | boolean | null;
@@ -29,17 +30,15 @@ export function parseTable(a: Record<string, unknown>): Table | undefined {
   };
 }
 
-const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 3 });
-
 function show(v: Cell, col: Column): string {
   if (v === null) return '—';
-  if (typeof v === 'boolean') return v ? 'Oui' : 'Non';
-  return typeof v === 'number' && col.kind === 'number' ? nf.format(v) : String(v);
+  if (typeof v === 'boolean') return v ? tr('common.yes') : tr('common.no');
+  return typeof v === 'number' && col.kind === 'number' ? fmtNumber(v, 3) : String(v);
 }
 
 const csvField = (s: string) => (/[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 const csv = (t: Table) =>
-  [t.columns.map((c) => c.label), ...t.rows.map((r) => r.map((v) => (v === null ? '' : typeof v === 'boolean' ? (v ? 'Oui' : 'Non') : String(v))))]
+  [t.columns.map((c) => c.label), ...t.rows.map((r) => r.map((v) => (v === null ? '' : typeof v === 'boolean' ? (v ? tr('common.yes') : tr('common.no')) : String(v))))]
     .map((r) => r.map(csvField).join(','))
     .join('\n');
 
@@ -57,7 +56,7 @@ export default function TableCard({ table: t }: { table: Table }) {
       const u = x[col], v = y[col];
       if (u === null) return v === null ? 0 : 1;
       if (v === null) return -1;
-      return (num && typeof u === 'number' && typeof v === 'number' ? u - v : String(u).localeCompare(String(v), 'fr')) * dir;
+      return (num && typeof u === 'number' && typeof v === 'number' ? u - v : String(u).localeCompare(String(v), getLang())) * dir;
     });
   }, [t, sort]);
 
@@ -111,10 +110,10 @@ export default function TableCard({ table: t }: { table: Table }) {
         </Box>
       </Box>
       <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center' }}>
-        {folded && <Button size="small" variant="outlined" onClick={() => setOpen(true)} sx={{ py: 0, fontSize: 12 }}>Afficher les {sorted.length - PEEK_ROWS} autres lignes</Button>}
-        {open && sorted.length > FOLD_ROWS && <Button size="small" variant="outlined" onClick={() => setOpen(false)} sx={{ py: 0, fontSize: 12 }}>Replier</Button>}
-        <Button size="small" variant="outlined" onClick={copy} sx={{ py: 0, fontSize: 12 }}>{copied ? 'Copié ✓' : 'Copier (CSV)'}</Button>
-        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>{t.rows.length} ligne{t.rows.length > 1 ? 's' : ''}</Typography>
+        {folded && <Button size="small" variant="outlined" onClick={() => setOpen(true)} sx={{ py: 0, fontSize: 12 }}>{tr('table.showMore', { count: sorted.length - PEEK_ROWS })}</Button>}
+        {open && sorted.length > FOLD_ROWS && <Button size="small" variant="outlined" onClick={() => setOpen(false)} sx={{ py: 0, fontSize: 12 }}>{tr('table.fold')}</Button>}
+        <Button size="small" variant="outlined" onClick={copy} sx={{ py: 0, fontSize: 12 }}>{copied ? tr('table.copied') : tr('table.copy')}</Button>
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>{tr('table.rows', { count: t.rows.length })}</Typography>
       </Box>
     </Box>
   );
