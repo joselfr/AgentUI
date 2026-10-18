@@ -365,6 +365,11 @@ export class GatewayAdapter implements AgentAdapter {
     return this.rpc<Skill[]>('listSkills', subAgentId ? { subAgentId } : {});
   }
 
+  async readSkill(skillId: string, subAgentId?: string): Promise<string> {
+    if (!this.capabilities().skills) throw Object.assign(new Error('Non supporté par ce plugin'), { statusCode: 501 });
+    return (await this.rpc<{ content: string }>('readSkill', { skillId, ...(subAgentId ? { subAgentId } : {}) })).content;
+  }
+
   async listJobs(subAgentId?: string): Promise<Job[]> {
     if (!this.capabilities().jobs) return [];
     return this.rpc<Job[]>('listJobs', subAgentId ? { subAgentId } : {});

@@ -51,6 +51,7 @@ export const api = {
   agents: () => call<AgentInfo[]>('GET', '/agents'),
   subAgents: (id: string) => call<SubAgent[]>('GET', `/agents/${id}/subagents`),
   skills: (id: string, sub?: string) => call<Skill[]>('GET', `/agents/${id}/skills${q(sub)}`),
+  skill: (id: string, skillId: string, sub?: string) => call<{ content: string }>('GET', `/agents/${id}/skills/${encodeURIComponent(skillId)}${q(sub)}`),
   jobs: (id: string, sub?: string) => call<Job[]>('GET', `/agents/${id}/jobs${q(sub)}`),
   jobAction: (id: string, jobId: string, action: string, sub?: string) =>
     call<{ ok: true }>('POST', `/agents/${id}/jobs/${encodeURIComponent(jobId)}/${action}${q(sub)}`),

@@ -32,6 +32,8 @@ export interface AgentAdapter {
 
   listSubAgents(): Promise<SubAgent[]>;
   listSkills(subAgentId?: string): Promise<Skill[]>;
+  /** Contenu (Markdown) d'une skill ; absent = l'agent ne sait pas la lire. */
+  readSkill?(skillId: string, subAgentId?: string): Promise<string>;
   listJobs(subAgentId?: string): Promise<Job[]>;
   jobAction?(jobId: string, action: 'pause' | 'resume' | 'run' | 'delete', subAgentId?: string): Promise<void>;
   /** Supprime la session de la plateforme (adaptateurs canal) ; absent = l'agent ne sait pas le faire. */

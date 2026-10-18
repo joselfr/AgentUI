@@ -169,6 +169,17 @@ def _list_skills() -> List[dict]:
     ]
 
 
+def _read_skill(skill_id: str) -> dict:
+    """Contenu de SKILL.md (comme l'outil skill_view de l'agent)."""
+    import json
+    from tools.skills_tool import skill_view
+
+    res = json.loads(skill_view(skill_id, preprocess=False))
+    if not res.get("success"):
+        raise ValueError(res.get("error") or f"skill illisible : {skill_id}")
+    return {"content": str(res.get("content") or "")}
+
+
 def _hello(token: str, name: str, mode: Optional[str] = None, active_runs: Optional[list] = None) -> dict:
     msg = {
         "type": "hello",
@@ -671,6 +682,7 @@ class AgentUIAdapter(BasePlatformAdapter):
             "listSubAgents": _sub_agents,
             "listJobs": _list_jobs,
             "listSkills": _list_skills,
+            "readSkill": lambda: _read_skill(str(params.get("skillId", ""))),
             "jobAction": lambda: _job_action(str(params.get("jobId", "")), str(params.get("action", ""))),
             "deleteSession": lambda: self._delete_session(str(params.get("conversationId", ""))),
         }

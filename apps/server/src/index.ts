@@ -145,6 +145,11 @@ async function main() {
   app.get<{ Params: { id: string }; Querystring: { sub?: string } }>('/api/agents/:id/skills', async (req) =>
     adapterOf(req.params.id).listSkills(req.query.sub),
   );
+  app.get<{ Params: { id: string; skillId: string }; Querystring: { sub?: string } }>('/api/agents/:id/skills/:skillId', async (req, reply) => {
+    const a = adapterOf(req.params.id);
+    if (!a.readSkill) return reply.code(501).send({ error: 'Non supporté' });
+    return { content: await a.readSkill(req.params.skillId, req.query.sub) };
+  });
   app.get<{ Params: { id: string }; Querystring: { sub?: string } }>('/api/agents/:id/jobs', async (req) =>
     // Lien vers la discussion qui reçoit les résultats de chaque tâche, quand elle existe déjà.
     (await adapterOf(req.params.id).listJobs(req.query.sub)).map((j) => {
