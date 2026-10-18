@@ -34,6 +34,7 @@ export function widgetError(key: string, args: Args): string | undefined {
 /** Checks of the interactive tools (ask / confirm / form), like `widgetError` for display widgets. */
 export function askError(key: string, args: Args): string | undefined {
   if (key === 'ask' && !String(args.question ?? '').trim()) return 'The question is empty.';
+  if (key === 'ask' && !(Array.isArray(args.options) ? args.options : []).some((o) => String(o).trim())) return 'Options are required: propose at least one choice (add an "Other" choice for a free answer), or ask your question in your reply.';
   if (key === 'confirm' && !String(args.title ?? '').trim()) return 'The title is empty.';
   if (key === 'form') {
     const names = new Set<string>();
