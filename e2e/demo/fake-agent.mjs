@@ -15,11 +15,24 @@ ws.on('open', () => send({
   capabilities: { sessions: true, abort: true, approvals: false, subagents: false, reasoning: true, toolDetails: true, skills: false, jobs: true, jobControl: true, sessionDelete: false, models: false, attachments: { images: true, files: true, maxBytes: 20971520 } },
 }));
 
+import { DEMO_MINIAPPS } from './miniapps.mjs';
 import * as fr from './content.fr.mjs';
 import * as en from './content.en.mjs';
 
 // DEMO_LANG=en plays the English content (captures for docs/en/); French by default.
 const { JOBS, CRON_MESSAGES, SCENARIOS, FALLBACK, REASONING, ACK } = process.env.DEMO_LANG === 'en' ? en : fr;
+
+// Miniapps: created like a real plugin does, with `miniapp.op` frames (the server answers with `miniapp.result`).
+const pending = new Map();
+const miniappOp = (op, args) => new Promise((resolve) => { const id = `m${hex()}${hex()}`; pending.set(id, resolve); send({ type: 'miniapp.op', id, op, args }); });
+async function createMiniapps() {
+  for (const a of DEMO_MINIAPPS(process.env.DEMO_LANG)) {
+    const c = await miniappOp('create', { id: a.id, name: a.name, icon: a.icon, description: a.description });
+    const w = await miniappOp('write', { id: a.id, files: a.files });
+    if (!c.ok || !w.ok || w.result?.ok === false) console.error('miniapp', a.id, JSON.stringify(c.error ?? w.error ?? w.result?.errors));
+    for (const d of a.seed) await miniappOp('data', { id: a.id, action: 'insert', ...d });
+  }
+}
 
 const widgetText = (type, args) => `\n\n\`\`\`widget\n${JSON.stringify({ type, arguments: args })}\n\`\`\`\n`;
 
@@ -68,7 +81,8 @@ async function play(conversationId, runId, text) {
 
 ws.on('message', (raw) => {
   const m = JSON.parse(String(raw));
-  if (m.type === 'welcome') CRON_MESSAGES.forEach((c, i) => setTimeout(() => send({ type: 'outbound', id: `o${hex()}`, ...c }), 600 + i * 400));
+  if (m.type === 'miniapp.result') pending.get(m.id)?.(m);
+  else if (m.type === 'welcome') { void createMiniapps(); CRON_MESSAGES.forEach((c, i) => setTimeout(() => send({ type: 'outbound', id: `o${hex()}`, ...c }), 600 + i * 400)); }
   else if (m.type === 'ping') send({ type: 'pong' });
   else if (m.type === 'inbound') void play(m.conversationId, m.runId, m.text);
   else if (m.type === 'reply') { send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'message.final', text: ACK } }); send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'run.completed' } }); }

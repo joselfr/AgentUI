@@ -88,6 +88,7 @@
   .shot { position: relative; }
   .shot .phone { width: 24%; right: -3%; bottom: -8%; }
   .row.flip .shot .phone { right: auto; left: -3%; }
+  .copy code, .card code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: 1px 6px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line); color: #c8cfdd; }
   .tag { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 3px 9px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); color: #c8cfdd; margin: 0 6px 6px 0; }
 
   /* Thèmes */
@@ -176,6 +177,7 @@
     <a class="brand" href="#"><img src="img/icon.svg" alt="" width="30" height="30">AgentUI</a>
     <nav>
       <a href="#widgets">Widgets</a>
+      <a href="#miniapps">Miniapps</a>
       <a href="#taches">Tâches cron</a>
       <a href="#themes">Interface</a>
       <a href="#fonctions">Fonctions</a>
@@ -310,6 +312,51 @@
     </div>
   </section>
 
+  <!-- MINIAPPS -->
+  <section id="miniapps">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">Miniapps</span>
+        <h2>Vos agents ne se contentent plus de répondre. Ils construisent vos outils.</h2>
+        <p class="sub">Un suivi de dépenses, un tableau de bord, une liste partagée : demandez-le à l’agent, il écrit une <strong>miniapp</strong> — un front React et ses handlers côté serveur — qui apparaît dans l’onglet Miniapps, aux couleurs d’AgentUI.</p>
+      </div>
+
+      <div class="row reveal">
+        <div class="copy">
+          <span class="kicker">Aux couleurs d’AgentUI</span>
+          <h3>Une vraie application, pas une page web collée à côté.</h3>
+          <p>L’agent dispose d’un kit de composants React et des variables CSS du thème : la miniapp suit le <strong>mode clair ou sombre</strong>, la langue et le format mobile de l’application, sans une ligne de style en dur.</p>
+          <ul><li>Composants prêts à l’emploi : formulaires, listes, tableaux, graphiques</li><li>Pensées d’abord pour le téléphone</li><li>Mise à jour en direct quand l’agent modifie la miniapp</li></ul>
+          <span class="tag">agentui_miniapp_write</span>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-miniapp.webp" alt="Miniapp de suivi des dépenses : totaux, graphique par catégorie et liste" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-miniapp.webp" alt="La même miniapp sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="card reveal"><h3>L’agent écrit</h3><p>Il lit le guide fourni par le plugin, puis envoie ses fichiers avec des outils <code>agentui_miniapp_*</code>. Les erreurs de compilation lui reviennent avec le fichier et la ligne : il corrige tout seul.</p></div>
+        <div class="card reveal"><h3>AgentUI compile et isole</h3><p>Le front tourne dans une iframe sandbox, sans accès à votre session. Les handlers s’exécutent dans un worker isolé, avec leurs propres données, protégés par l’authentification d’AgentUI.</p></div>
+        <div class="card reveal"><h3>La miniapp apparaît</h3><p>Elle est dans l’onglet Miniapps, tout de suite. Un cron ou l’agent peut y pousser de nouvelles données : la miniapp ouverte se rafraîchit seule.</p></div>
+      </div>
+
+      <div class="row flip reveal">
+        <div class="copy">
+          <span class="kicker">Données et API</span>
+          <h3>Un backend par miniapp, sans rien à héberger.</h3>
+          <p>Chaque miniapp a ses collections de documents et son stockage clé/valeur, isolés des autres. Ses handlers peuvent appeler des <strong>API publiques</strong> pour afficher des données en direct ; les adresses internes de votre serveur restent inaccessibles.</p>
+          <ul><li>Routes protégées par la session AgentUI, un espace de noms par miniapp</li><li>Appels HTTP sortants bornés (durée, taille, adresses publiques uniquement)</li><li>L’agent lit et écrit les données avec <code>agentui_miniapp_data</code></li></ul>
+          <div class="note">Une miniapp n’accède qu’à ses propres routes et données : ni à vos conversations, ni aux autres miniapps.</div>
+        </div>
+        <div class="shot">
+          <div class="frame"><img class="crop" src="img/desktop-dark-miniapps.webp" alt="Onglet Miniapps : deux miniapps créées par l’agent" width="1600" height="600" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-miniapps.webp" alt="Liste des miniapps sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- TACHES PLANIFIEES -->
   <section id="taches">
     <div class="wrap">
@@ -390,6 +437,7 @@
       </div>
       <div class="features">
         <div class="card reveal"><div class="ico">🔔</div><h3>Notifications push</h3><p>Soyez prévenu quand un agent répond ou qu’une tâche planifiée se termine — un clic ouvre la bonne discussion.</p></div>
+        <div class="card reveal"><div class="ico">🧩</div><h3>Miniapps créées par l’agent</h3><p>Suivi, tableau de bord, liste : l’agent écrit une petite application qui apparaît dans AgentUI, aux couleurs de l’interface.</p></div>
         <div class="card reveal"><div class="ico">⏰</div><h3>Tâches planifiées</h3><p>Visualisez les crons de vos agents, leur dernier statut et leurs erreurs. Mettez en pause, lancez ou supprimez.</p></div>
         <div class="card reveal"><div class="ico">🧠</div><h3>Skills lisibles</h3><p>Parcourez les skills de chaque agent et lisez leur contenu directement dans l’application.</p></div>
         <div class="card reveal"><div class="ico">🤖</div><h3>Plusieurs agents</h3><p>Hermes, OpenClaw ou les vôtres, côte à côte. Filtrez la liste par agent et reprenez n’importe quelle discussion.</p></div>

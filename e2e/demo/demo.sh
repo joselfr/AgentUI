@@ -15,9 +15,10 @@ case "$1" in
     "$0" down
     mkdir -p "$DIR"; rm -rf "$DIR/data"; mkdir "$DIR/data"
     printf 'agents:\n  - id: atlas\n    type: gateway\n    name: Atlas\n    token: %s\n' "$TOKEN" > "$DIR/agents.yaml"
-    (cd "$ROOT/apps/web" && npx vite build >"$DIR/build.log" 2>&1)
+    (cd "$ROOT" && npm -w @agentui/app-runtime run build >"$DIR/build.log" 2>&1)
+    (cd "$ROOT/apps/web" && npx vite build >>"$DIR/build.log" 2>&1)
     cd "$ROOT/apps/server"
-    AGENTS_CONFIG="$DIR/agents.yaml" DATA_DIR="$DIR/data" WEB_DIST="$ROOT/apps/web/dist" ADMIN_USER=demo ADMIN_PASSWORD=demo-pass-123 \
+    AGENTS_CONFIG="$DIR/agents.yaml" DATA_DIR="$DIR/data" WEB_DIST="$ROOT/apps/web/dist" APP_RUNTIME_DIST="$ROOT/packages/app-runtime/dist" ADMIN_USER=demo ADMIN_PASSWORD=demo-pass-123 \
       COOKIE_SECRET=0123456789abcdef0123456789abcdef INSECURE_COOKIES=1 PORT="$PORT" nohup npx tsx src/index.ts >"$DIR/server.log" 2>&1 &
     echo $! > "$DIR/server.pid"
     for i in $(seq 1 30); do curl -s -o /dev/null "http://localhost:$PORT/" && break; sleep 1; done

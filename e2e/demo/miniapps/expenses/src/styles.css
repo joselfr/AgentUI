@@ -1,0 +1,8 @@
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stats .label { color: var(--au-muted); font-size: .857rem; }
+.stats .value { font-size: 1.6rem; font-weight: 650; letter-spacing: -0.02em; line-height: 1.3; }
+.stats .value.accent { color: var(--au-accent); }
+.add { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 700px) { .add { grid-template-columns: 1fr 140px 160px auto; align-items: end; } }
+.row-amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+.cat-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }

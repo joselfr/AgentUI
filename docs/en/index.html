@@ -88,6 +88,7 @@
   .shot { position: relative; }
   .shot .phone { width: 24%; right: -3%; bottom: -8%; }
   .row.flip .shot .phone { right: auto; left: -3%; }
+  .copy code, .card code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: 1px 6px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line); color: #c8cfdd; }
   .tag { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 3px 9px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); color: #c8cfdd; margin: 0 6px 6px 0; }
 
   /* Themes */
@@ -176,6 +177,7 @@
     <a class="brand" href="#"><img src="../img/icon.svg" alt="" width="30" height="30">AgentUI</a>
     <nav>
       <a href="#widgets">Widgets</a>
+      <a href="#miniapps">Miniapps</a>
       <a href="#taches">Scheduled tasks</a>
       <a href="#themes">Interface</a>
       <a href="#fonctions">Features</a>
@@ -310,6 +312,51 @@
     </div>
   </section>
 
+  <!-- MINIAPPS -->
+  <section id="miniapps">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">Miniapps</span>
+        <h2>Your agents no longer just answer. They build your tools.</h2>
+        <p class="sub">An expense tracker, a dashboard, a shared list: ask the agent and it writes a <strong>miniapp</strong> — a React front and its server-side handlers — that shows up in the Miniapps tab, in AgentUI’s own look.</p>
+      </div>
+
+      <div class="row reveal">
+        <div class="copy">
+          <span class="kicker">In AgentUI’s look</span>
+          <h3>A real app, not a web page glued next to it.</h3>
+          <p>The agent gets a kit of React components and the theme’s CSS variables: the miniapp follows the app’s <strong>light or dark mode</strong>, language and mobile layout, without a single hardcoded style.</p>
+          <ul><li>Ready-made components: forms, lists, tables, charts</li><li>Designed phone-first</li><li>Live update when the agent changes the miniapp</li></ul>
+          <span class="tag">agentui_miniapp_write</span>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="../img/en/desktop-dark-miniapp.webp" alt="Expense tracker miniapp: totals, chart by category and list" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-miniapp.webp" alt="The same miniapp on mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="card reveal"><h3>The agent writes</h3><p>It reads the guide shipped with the plugin, then sends its files with <code>agentui_miniapp_*</code> tools. Build errors come back with the file and line: it fixes them on its own.</p></div>
+        <div class="card reveal"><h3>AgentUI builds and isolates</h3><p>The front runs in a sandboxed iframe with no access to your session. Handlers run in an isolated worker, with their own data, behind AgentUI’s authentication.</p></div>
+        <div class="card reveal"><h3>The miniapp appears</h3><p>It is in the Miniapps tab right away. A cron or the agent can push new data: the open miniapp refreshes by itself.</p></div>
+      </div>
+
+      <div class="row flip reveal">
+        <div class="copy">
+          <span class="kicker">Data and API</span>
+          <h3>A backend per miniapp, nothing to host.</h3>
+          <p>Each miniapp has its own document collections and key/value store, isolated from the others. Its handlers can call <strong>public APIs</strong> to show live data; your server’s internal addresses stay unreachable.</p>
+          <ul><li>Routes behind the AgentUI session, one namespace per miniapp</li><li>Outgoing HTTP calls are bounded (time, size, public addresses only)</li><li>The agent reads and writes data with <code>agentui_miniapp_data</code></li></ul>
+          <div class="note">A miniapp only reaches its own routes and data: not your conversations, not other miniapps.</div>
+        </div>
+        <div class="shot">
+          <div class="frame"><img class="crop" src="../img/en/desktop-dark-miniapps.webp" alt="Miniapps tab: two miniapps created by the agent" width="1600" height="600" loading="lazy"></div>
+          <div class="phone"><img src="../img/en/mobile-dark-miniapps.webp" alt="Miniapps list on mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- TACHES PLANIFIEES -->
   <section id="taches">
     <div class="wrap">
@@ -390,6 +437,7 @@
       </div>
       <div class="features">
         <div class="card reveal"><div class="ico">🔔</div><h3>Push notifications</h3><p>Get notified when an agent replies or a scheduled task finishes — one tap opens the right conversation.</p></div>
+        <div class="card reveal"><div class="ico">🧩</div><h3>Agent-built miniapps</h3><p>Tracker, dashboard, list: the agent writes a small app that shows up in AgentUI, in the interface’s own look.</p></div>
         <div class="card reveal"><div class="ico">⏰</div><h3>Scheduled tasks</h3><p>See your agents’ cron jobs, their last status and their errors. Pause, run or delete them.</p></div>
         <div class="card reveal"><div class="ico">🧠</div><h3>Readable skills</h3><p>Browse each agent’s skills and read their content right in the app.</p></div>
         <div class="card reveal"><div class="ico">🤖</div><h3>Multiple agents</h3><p>Hermes, OpenClaw or your own, side by side. Filter the list by agent and pick up any conversation.</p></div>

@@ -12,14 +12,14 @@ const TEXT = {
   fr: {
     locale: 'fr-FR', username: 'Utilisateur', password: 'Mot de passe', signIn: 'Se connecter', newChat: 'Nouvelle conversation', start: 'Démarrer',
     composer: (a) => `Message à ${a}`, stop: 'Arrêter', cronSection: /^Tâches cron/, jobsNav: /^Tâches/, chats: /discussions|menu/i,
-    morning: '⏰ Résumé du matin', backup: 'Sauvegarde nocturne',
+    morning: '⏰ Résumé du matin', backup: 'Sauvegarde nocturne', expenses: 'Dépenses', byCategory: 'Par catégorie',
     prompts: { chart: 'Montre-moi l’évolution des ventes de cette année', table: 'Fais-moi un comparatif des offres', map: 'Prépare l’itinéraire de ma visite de jeudi', progress: 'Lance la migration vers la nouvelle base', code: 'Corrige le bug de date dans le script', confirm: 'Supprime les anciennes sauvegardes', form: 'Organise mon voyage à Lyon' },
     ready: { confirm: 'text=Garder', form: 'text=Lancer la recherche' },
   },
   en: {
     locale: 'en-US', username: 'Username', password: 'Password', signIn: 'Sign in', newChat: 'New conversation', start: 'Start',
     composer: (a) => `Message ${a}`, stop: 'Stop', cronSection: /^Cron tasks/, jobsNav: /^Tasks/, chats: /chats|menu/i,
-    morning: '⏰ Morning briefing', backup: 'Nightly backup',
+    morning: '⏰ Morning briefing', backup: 'Nightly backup', expenses: 'Expenses', byCategory: 'By category',
     prompts: { chart: 'Show me this year’s sales trend', table: 'Make me a comparison of the plans', map: 'Plan the route for my Thursday visit', progress: 'Start the migration to the new database', code: 'Fix the date bug in the script', confirm: 'Delete the old backups', form: 'Organize my trip to Lyon' },
     ready: { confirm: 'text=Keep', form: 'text=Start the search' },
   },
@@ -40,7 +40,11 @@ const SCENARIOS = [
 const EXTRA = [
   { id: 'cron', ready: 'table' },
   { id: 'jobs', ready: `text=${TEXT.backup}`, path: '/jobs' },
+  // Miniapps (created by the fake agent at connection): the list, then one miniapp rendered in its iframe
+  { id: 'miniapps', ready: `text=${TEXT.expenses}`, path: '/miniapps' },
+  { id: 'miniapp', ready: `text=${TEXT.byCategory}`, path: '/miniapps/expenses', frame: true },
 ];
+const waitReady = (page, s) => (s.frame ? page.frameLocator('iframe').locator(s.ready) : page.locator(s.ready)).first().waitFor({ timeout: 30000 });
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] });
 
@@ -93,13 +97,20 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${out}/desktop-dark-jobs.png` });
   console.log('desktop-dark cron/jobs', ids.cron);
+  for (const s of EXTRA.filter((x) => ['miniapps', 'miniapp'].includes(x.id))) {
+    await page.goto(`${base}${s.path}`);
+    await waitReady(page, s);
+    await page.waitForTimeout(2500); // chart animation
+    await page.screenshot({ path: `${out}/desktop-dark-${s.id}.png` });
+    console.log('desktop-dark', s.id);
+  }
   await ctx.close();
 }
 
 // 2. Other variants: reopen the existing chats
 for (const [name, theme, only] of [
-  ['desktop-light', 'light', ['chart', 'table', 'map', 'code', 'confirm', 'form', 'progress', 'cron', 'jobs']],
-  ['mobile-dark', 'dark', ['chart', 'table', 'map', 'progress', 'code', 'confirm', 'form', 'cron', 'jobs']],
+  ['desktop-light', 'light', ['chart', 'table', 'map', 'code', 'confirm', 'form', 'progress', 'cron', 'jobs', 'miniapps', 'miniapp']],
+  ['mobile-dark', 'dark', ['chart', 'table', 'map', 'progress', 'code', 'confirm', 'form', 'cron', 'jobs', 'miniapps', 'miniapp']],
   ['mobile-light', 'light', ['chart', 'table', 'progress']],
 ]) {
   const ctx = await themed(await browser.newContext(ctxOpts(name)), theme);
@@ -107,7 +118,7 @@ for (const [name, theme, only] of [
   await login(page);
   for (const s of [...SCENARIOS, ...EXTRA].filter((x) => only.includes(x.id))) {
     await page.goto(s.path ? `${base}${s.path}` : `${base}/c/${ids[s.id]}`);
-    if (s.ready) await page.locator(s.ready).first().waitFor({ timeout: 30000 });
+    if (s.ready) await waitReady(page, s);
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${out}/${name}-${s.id}.png` });
     console.log(name, s.id);
