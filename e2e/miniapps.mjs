@@ -44,15 +44,17 @@ const op = (o, args) => new Promise((resolve) => { const id = `o${++n}`; pending
 check('welcome announces miniapps support', welcome.miniapps === true);
 
 const MAIN = `import { useState } from 'react';
-import { Page, Card, Stack, Row, Button, TextField, List, ListItem, IconButton, Spinner, EmptyState, Chart, Chip, useApi, api, useTheme } from '@agentui/ui';
+import { Page, Card, Stack, Row, Button, TextField, List, ListItem, IconButton, Spinner, EmptyState, Chart, Chip, Tabs, useApi, api, useTheme } from '@agentui/ui';
 export default function App() {
   const todos = useApi('todos');
   const [title, setTitle] = useState('');
   const { mode } = useTheme();
+  const [tab, setTab] = useState('a');
   const add = async () => { if (!title.trim()) return; await api.post('todos', { title }); setTitle(''); todos.reload(); };
   return (
     <Page title="Todos" actions={<Chip label={mode} color="primary" />}>
       <Stack>
+        <Tabs value={tab} onChange={setTab} tabs={['a','b','c','d','e','f','g','h'].map((v) => ({ value: v, label: 'Tab number ' + v }))} />
         <Row><TextField style={{ flex: 1 }} placeholder="New task" value={title} onChange={setTitle} onEnter={add} /><Button icon="add" onClick={add}>Add</Button></Row>
         {todos.loading && <Spinner center />}
         {todos.data?.length === 0 && <EmptyState icon="checklist" title="Nothing to do" />}
@@ -110,6 +112,9 @@ try {
   const bg = async () => frame.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor);
   const dark = await bg();
   await page.screenshot({ path: join(shots, 'app-dark.png') });
+  // Tabs scroll horizontally only: the tab strip must not scroll vertically
+  const tabs = await frame.locator('[role=tablist]').evaluate((el) => ({ x: el.scrollWidth > el.clientWidth, y: el.scrollHeight - el.clientHeight, overflowY: getComputedStyle(el).overflowY }));
+  check('tabs: scroll horizontally, never vertically', tabs.y <= 0 && tabs.overflowY === 'hidden', JSON.stringify(tabs));
   // the agent pushes data with the `data` op: the open iframe refreshes by itself
   const pushed = await op('data', { id: 'todo', action: 'insert', collection: 'todos', doc: { title: 'From the agent' } });
   check('agent data op inserts', pushed.ok === true && pushed.result.title === 'From the agent', JSON.stringify(pushed).slice(0, 120));

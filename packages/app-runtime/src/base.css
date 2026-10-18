@@ -77,8 +77,10 @@ button { font-family: inherit; }
 .au-table tr.au-click { cursor: pointer; } .au-table tr.au-click:hover td { background: color-mix(in srgb, var(--au-muted) 8%, transparent); }
 .au-r { text-align: right !important; }
 
-.au-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--au-line); overflow-x: auto; }
-.au-tab { padding: 10px 16px; border: 0; background: none; color: var(--au-muted); font-size: 1rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+/* Scrolls horizontally only: overflow-y is explicit (overflow-x alone makes it `auto`), and the baseline is an inset shadow so no child overflows the box. */
+.au-tabs { display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; box-shadow: inset 0 -1px 0 var(--au-line); scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.au-tabs::-webkit-scrollbar { display: none; }
+.au-tab { flex: none; padding: 10px 16px; border: 0; background: none; color: var(--au-muted); font-size: 1rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
 .au-tab:hover { color: var(--au-text); } .au-tab.au-on { color: var(--au-accent); border-bottom-color: var(--au-accent); }
 
 .au-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; font-size: .929rem; font-weight: 500; background: color-mix(in srgb, var(--au-muted) 18%, transparent); color: var(--au-text); }
