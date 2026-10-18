@@ -18,6 +18,12 @@ const SCENARIOS = [
   { id: 'form', prompt: 'Organise mon voyage à Lyon', ready: 'text=Lancer la recherche', blocking: true },
 ];
 
+// Hors scénarios joués : discussion d'une tâche cron (créée par le message proactif) et page « Tâches ».
+const EXTRA = [
+  { id: 'cron', ready: 'table' },
+  { id: 'jobs', ready: 'text=Sauvegarde nocturne', path: '/jobs' },
+];
+
 const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] });
 
 async function login(page) {
@@ -56,20 +62,33 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
     await page.screenshot({ path: `${out}/desktop-dark-${s.id}.png` });
     console.log('desktop-dark', s.id, ids[s.id]);
   }
+  // Discussion de cron : section « Tâches cron » de la liste, puis page « Tâches »
+  await page.getByRole('button', { name: /^Tâches cron/ }).click();
+  await page.getByText('⏰ Résumé du matin').first().click();
+  await page.locator('table').first().waitFor({ timeout: 15000 });
+  await page.waitForTimeout(2000);
+  ids.cron = idOf(page);
+  await page.screenshot({ path: `${out}/desktop-dark-cron.png` });
+  await page.getByRole('button', { name: /^Tâches/ }).first().click();
+  await page.getByText('Sauvegarde nocturne').first().waitFor({ timeout: 15000 });
+  await page.mouse.move(900, 900); // l'info-bulle du menu ne doit pas apparaître
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${out}/desktop-dark-jobs.png` });
+  console.log('desktop-dark cron/jobs', ids.cron);
   await ctx.close();
 }
 
 // 2. Autres variantes : on rouvre les discussions existantes
 for (const [name, theme, only] of [
-  ['desktop-light', 'light', ['chart', 'table', 'map', 'code', 'confirm', 'form', 'progress']],
-  ['mobile-dark', 'dark', ['chart', 'table', 'map', 'progress', 'code', 'confirm', 'form']],
+  ['desktop-light', 'light', ['chart', 'table', 'map', 'code', 'confirm', 'form', 'progress', 'cron', 'jobs']],
+  ['mobile-dark', 'dark', ['chart', 'table', 'map', 'progress', 'code', 'confirm', 'form', 'cron', 'jobs']],
   ['mobile-light', 'light', ['chart', 'table', 'progress']],
 ]) {
   const ctx = await themed(await browser.newContext(ctxOpts(name)), theme);
   const page = await ctx.newPage();
   await login(page);
-  for (const s of SCENARIOS.filter((x) => only.includes(x.id))) {
-    await page.goto(`${base}/c/${ids[s.id]}`);
+  for (const s of [...SCENARIOS, ...EXTRA].filter((x) => only.includes(x.id))) {
+    await page.goto(s.path ? `${base}${s.path}` : `${base}/c/${ids[s.id]}`);
     if (s.ready) await page.locator(s.ready).first().waitFor({ timeout: 30000 });
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${out}/${name}-${s.id}.png` });

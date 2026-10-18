@@ -12,8 +12,23 @@ const ws = new WebSocket(url);
 const send = (o) => ws.send(JSON.stringify(o));
 ws.on('open', () => send({
   type: 'hello', protocol: 1, token, agent: { type: 'demo', name, version: '1.0' },
-  capabilities: { sessions: true, abort: true, approvals: false, subagents: false, reasoning: true, toolDetails: true, skills: false, jobs: false, jobControl: false, sessionDelete: false, models: false, attachments: { images: true, files: true, maxBytes: 20971520 } },
+  capabilities: { sessions: true, abort: true, approvals: false, subagents: false, reasoning: true, toolDetails: true, skills: false, jobs: true, jobControl: true, sessionDelete: false, models: false, attachments: { images: true, files: true, maxBytes: 20971520 } },
 }));
+
+/** Tâches planifiées de démonstration (page « Tâches ») : leur discussion dédiée reçoit les messages de cron. */
+const now = Date.now();
+const JOBS = [
+  { id: 'j1', name: 'Résumé du matin', schedule: 'tous les jours à 7 h 30', mode: 'agent', prompt: 'Résume mon agenda, mes mails importants et la météo du jour.', enabled: true, nextRunAt: now + 14 * 3600e3, lastRunAt: now - 10 * 3600e3, lastStatus: 'ok', deliverTo: 'cron-resume-matin' },
+  { id: 'j2', name: 'Veille concurrents', schedule: 'toutes les heures', mode: 'agent', prompt: 'Surveille les annonces des concurrents et ne me préviens que s’il y a du nouveau.', enabled: true, nextRunAt: now + 35 * 60e3, lastRunAt: now - 25 * 60e3, lastStatus: 'ok', deliverTo: 'cron-veille' },
+  { id: 'j3', name: 'Sauvegarde nocturne', schedule: 'tous les jours à 3 h', mode: 'script', script: 'backup.sh --all', enabled: true, nextRunAt: now + 12 * 3600e3, lastRunAt: now - 12 * 3600e3, lastStatus: 'error', lastError: 'Script exited with code 1\nstderr:\nrsync: write failed: No space left on device (28)', deliverTo: 'cron-sauvegarde' },
+];
+
+/** Messages proactifs de cron envoyés à la connexion : chacun arrive dans la discussion dédiée « ⏰ nom ». */
+const CRON_MESSAGES = [
+  { conversationId: 'cron-veille', title: '⏰ Veille concurrents', text: 'Rien de nouveau chez vos concurrents depuis la dernière vérification.' },
+  { conversationId: 'cron-sauvegarde', title: '⏰ Sauvegarde nocturne', text: '⚠️ **La sauvegarde a échoué** : plus d’espace disponible sur le disque (98 %).\n\nJe peux libérer de la place en supprimant les anciennes sauvegardes — dites-moi si vous voulez que je m’en charge.' },
+  { conversationId: 'cron-resume-matin', title: '⏰ Résumé du matin', text: '**Bonjour ! Voici votre journée.**\n\n- 🗓️ **9 h 30** — Réunion client Aerotech (salle Clément Ader)\n- ✉️ 3 mails importants, dont une réponse du comptable\n- ☀️ 21 °C et ensoleillé à Toulouse\n\n```widget\n{"type":"table","arguments":{"title":"Agenda du jour","columns":[{"label":"Heure"},{"label":"Rendez-vous"},{"label":"Lieu"}],"rows":[["09:30","Réunion client Aerotech","Salle Clément Ader"],["12:30","Déjeuner avec Sigma","Le Bibent"],["15:00","Point projet","Visio"]]}}\n```' },
+];
 
 /** Scénarios : le premier dont le mot-clé figure dans le message de l'utilisateur est joué. */
 const SCENARIOS = [
@@ -132,9 +147,10 @@ async function play(conversationId, runId, text) {
 
 ws.on('message', (raw) => {
   const m = JSON.parse(String(raw));
-  if (m.type === 'ping') send({ type: 'pong' });
+  if (m.type === 'welcome') CRON_MESSAGES.forEach((c, i) => setTimeout(() => send({ type: 'outbound', id: `o${hex()}`, ...c }), 600 + i * 400));
+  else if (m.type === 'ping') send({ type: 'pong' });
   else if (m.type === 'inbound') void play(m.conversationId, m.runId, m.text);
   else if (m.type === 'reply') { send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'message.final', text: 'Compris, c’est noté. Je m’en occupe !' } }); send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'run.completed' } }); }
-  else if (m.type === 'rpc') send({ type: 'rpc.result', id: m.id, error: 'non supporté' });
+  else if (m.type === 'rpc') send(m.method === 'listJobs' ? { type: 'rpc.result', id: m.id, result: JOBS } : { type: 'rpc.result', id: m.id, error: 'non supporté' });
 });
 ws.on('close', () => process.exit(0));

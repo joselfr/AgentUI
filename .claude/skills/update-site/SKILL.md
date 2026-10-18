@@ -34,6 +34,9 @@ e2e/demo/demo.sh webp <scratchpad>/shots docs/img   # WebP : desktop 1600 px, mo
 - Nom des fichiers = `<desktop|mobile>-<dark|light>-<scénario>.webp` ; `docs/index.html` les référence par ce nom, et vérifier qu'aucun n'est manquant :
   `grep -o 'img/[a-z0-9-]*\.[a-z]*' docs/index.html | sort -u | while read f; do [ -f docs/$f ] || echo MANQUANT $f; done`
 
+### Tâches cron
+La section `#taches` de la page s'appuie sur deux choses du faux agent : `JOBS` (réponse au RPC `listJobs`, donc la page « Tâches » : une tâche en erreur, avec `lastError`) et `CRON_MESSAGES` (messages proactifs `outbound` envoyés à la connexion ; un `conversationId` en `cron-…` crée la discussion « ⏰ titre » dans la section « Tâches cron »). `capture.mjs` les photographie via `EXTRA` (`cron` = discussion « Résumé du matin », `jobs` = page `/jobs`). Pour changer le contenu des messages ou des tâches, éditer ces deux constantes puis refaire les captures.
+
 ## 3. Présenter un nouveau widget
 
 1. **Scénario** : dans `e2e/demo/fake-agent.mjs`, ajouter un objet à `SCENARIOS` (`match` : regex sur le message, `intro`, `tools: [[type, arguments]]`, `outro`). Widget bloquant (`ask`/`confirm`/`form`) : champ `blocking: [type, arguments]` (le run reste ouvert pendant la capture). Les arguments suivent `plugins/protocol/widget-tools.json`.

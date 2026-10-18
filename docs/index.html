@@ -102,6 +102,14 @@
   .card h3 { margin: 0; font-size: 19px; letter-spacing: -.01em; }
   .card p { margin: 8px 0 0; color: var(--muted); font-size: 15.5px; }
 
+
+  /* Tâches planifiées */
+  .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; counter-reset: f; }
+  .flow .card { position: relative; padding-top: 30px; }
+  .flow .card::before { counter-increment: f; content: counter(f); position: absolute; top: -16px; left: 22px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 15px; background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px var(--accent); }
+  .crop { aspect-ratio: 1600 / 600; object-fit: cover; object-position: top; width: 100%; }
+  .note { margin-top: 22px; padding: 16px 18px; border-left: 3px solid var(--accent); background: var(--bg-2); border-radius: 0 12px 12px 0; color: #c8cfdd; font-size: 15.5px; }
+
   /* Fonctionnement */
   .how { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; margin-top: 56px; }
   .steps { display: grid; gap: 26px; counter-reset: s; }
@@ -129,6 +137,7 @@
     .row, .row.flip, .how, .themes-grid { grid-template-columns: 1fr; gap: 36px; margin-top: 80px; }
     .row.flip .copy { order: 0; }
     .features { grid-template-columns: 1fr 1fr; }
+    .flow { grid-template-columns: 1fr; gap: 30px; }
     .nav nav a:not([data-repo-link]) { display: none; }
     .hero { padding-top: 56px; }
     .phone, .shot .phone, .row.flip .shot .phone { right: 2%; left: auto; bottom: -6%; width: 30%; }
@@ -149,6 +158,7 @@
     <a class="brand" href="#"><img src="img/icon.svg" alt="" width="30" height="30">AgentUI</a>
     <nav>
       <a href="#widgets">Widgets</a>
+      <a href="#taches">Tâches cron</a>
       <a href="#themes">Interface</a>
       <a href="#fonctions">Fonctions</a>
       <a href="#fonctionnement">Fonctionnement</a>
@@ -275,6 +285,50 @@
         <div class="shot">
           <div class="frame"><img src="img/desktop-dark-form.webp" alt="Widget formulaire : préparer un déplacement" width="1600" height="1067" loading="lazy"></div>
           <div class="phone"><img src="img/mobile-dark-confirm.webp" alt="Widget de confirmation sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TACHES PLANIFIEES -->
+  <section id="taches">
+    <div class="wrap">
+      <div class="center reveal">
+        <span class="kicker">Tâches planifiées</span>
+        <h2>Vos agents travaillent la nuit. Vous retrouvez tout au réveil.</h2>
+        <p class="sub">Résumés du matin, veilles, sauvegardes… Chaque tâche cron de vos agents a sa <strong>propre discussion</strong> : le résultat arrive comme un vrai message, widgets compris.</p>
+      </div>
+
+      <div class="row reveal">
+        <div class="copy">
+          <span class="kicker">Messages de cron</span>
+          <h3>Le résultat arrive dans la discussion de la tâche.</h3>
+          <p>L’agent n’attend pas que vous lui parliez : à chaque exécution, il poste un <strong>message proactif</strong> dans la discussion « ⏰ nom de la tâche ». Vous pouvez y répondre et continuer la conversation à partir de ce résultat.</p>
+          <ul><li>Une discussion par tâche, rangée dans la section « Tâches cron »</li><li>Pastille « non lu » et repère « Nouveau message »</li><li>Tableaux, listes et autres widgets dans le message</li></ul>
+        </div>
+        <div class="shot">
+          <div class="frame"><img src="img/desktop-dark-cron.webp" alt="Discussion d’une tâche cron : résumé du matin avec un tableau d’agenda" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-cron.webp" alt="Message de cron sur mobile" width="600" height="1300" loading="lazy"></div>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="card reveal"><h3>La tâche s’exécute</h3><p>Le planificateur de la plateforme (Hermes, OpenClaw…) lance la tâche à l’heure prévue — prompt confié à l’agent, ou simple script.</p></div>
+        <div class="card reveal"><h3>Le message arrive</h3><p>Le plugin le transmet à AgentUI, qui le range dans la discussion dédiée. Elle est créée automatiquement à la première exécution.</p></div>
+        <div class="card reveal"><h3>Vous êtes prévenu</h3><p>Une notification push s’affiche ; un clic ouvre directement la bonne discussion, même si l’application était fermée.</p></div>
+      </div>
+
+      <div class="row flip reveal">
+        <div class="copy">
+          <span class="kicker">Page « Tâches »</span>
+          <h3>Ce qui a marché, ce qui a échoué — et pourquoi.</h3>
+          <p>Planification, prochaine exécution, dernier statut : tout est sur une page. En cas d’échec, le message d’erreur complet est à un clic, sans aller fouiller les journaux du serveur.</p>
+          <ul><li>Statut et erreur de la dernière exécution</li><li>Accès direct à la discussion de la tâche</li><li>Pause, reprise, « Exécuter maintenant », suppression</li></ul>
+          <div class="note">Une tâche poste dans AgentUI quand elle est configurée pour y livrer ses résultats ; ses échecs peuvent suivre le même chemin.</div>
+        </div>
+        <div class="shot">
+          <div class="frame"><img class="crop" src="img/desktop-dark-jobs.webp" alt="Page Tâches : trois tâches planifiées dont une en erreur" width="1600" height="600" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-jobs.webp" alt="Page Tâches sur mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
     </div>
