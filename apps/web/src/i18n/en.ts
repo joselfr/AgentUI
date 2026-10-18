@@ -163,7 +163,7 @@ export const en: Record<FullKey, string> = {
   // Widgets
   'ask.default': "Agent's question",
   'ask.orFree': 'Or answer freely in the field below.',
-  'ask.free': 'Answer in the field below.',
+  'ask.placeholder': 'Your answer…',
   'confirm.answered': '✓ Answered: {answer}',
   'form.default': 'Form',
   'form.sent': '✓ Sent',

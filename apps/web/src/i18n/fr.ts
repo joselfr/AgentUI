@@ -161,7 +161,7 @@ export const fr = {
   // Widgets
   'ask.default': "Question de l'agent",
   'ask.orFree': 'Ou répondez librement dans le champ ci-dessous.',
-  'ask.free': 'Répondez dans le champ ci-dessous.',
+  'ask.placeholder': 'Votre réponse…',
   'confirm.answered': '✓ Répondu : {answer}',
   'form.default': 'Formulaire',
   'form.sent': '✓ Envoyé',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Button, Checkbox, FormControlLabel, Typography } from '@mui/material';
+import { Box, Button, Checkbox, FormControlLabel, TextField, Typography } from '@mui/material';
 import QuestionAnswerOutlined from '@mui/icons-material/QuestionAnswerOutlined';
 import Markdown from './Markdown';
 import { t } from '../i18n';
@@ -27,6 +27,7 @@ export function parseLegacyAsk(raw: string): Parsed {
 /** `answer`: answer already sent (next user message), `onAnswer` absent: question can no longer be answered. */
 export default function AskCard({ ask: { question, choices, multiple }, answer, onAnswer }: { ask: Parsed; answer?: string; onAnswer?: (text: string) => void }) {
   const [picked, setPicked] = useState<string[]>([]);
+  const [free, setFree] = useState('');
   const live = !!onAnswer;
   const answered = (c: string) => (answer ? answer.split(/,\s*/).includes(c) || answer === c : false);
   return (
@@ -49,7 +50,13 @@ export default function AskCard({ ask: { question, choices, multiple }, answer, 
             <Button key={c} size="small" variant={answered(c) ? 'contained' : 'outlined'} disabled={!live} onClick={() => onAnswer?.(c)}
               sx={answered(c) ? { '&.Mui-disabled': { bgcolor: 'primary.main', color: 'primary.contrastText' } } : undefined}>{c}</Button>))}
         </Box>)}
-      {live && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 3.5 }}>{choices.length ? t('ask.orFree') : t('ask.free')}</Typography>}
+      {live && !choices.length && (
+        <Box component="form" onSubmit={(e) => { e.preventDefault(); if (free.trim()) onAnswer(free.trim()); }} sx={{ display: 'flex', gap: 1, mt: 1.25, ml: 3.5, alignItems: 'flex-end' }}>
+          <TextField value={free} onChange={(e) => setFree(e.target.value)} placeholder={t('ask.placeholder')} size="small" multiline maxRows={6} fullWidth autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (free.trim()) onAnswer(free.trim()); } }} />
+          <Button type="submit" variant="contained" size="small" disabled={!free.trim()}>{t('common.send')}</Button>
+        </Box>)}
+      {live && !!choices.length && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 3.5 }}>{t('ask.orFree')}</Typography>}
     </Box>
   );
 }
