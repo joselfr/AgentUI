@@ -73,6 +73,16 @@ export class MiniAppStore {
     return r && toDto(r);
   }
 
+  /** Notified when the data of an app changed (agent tool or backend handler): open iframes refresh. */
+  onData?: (id: string) => void;
+  dataChanged(id: string): void {
+    this.onData?.(id);
+  }
+
+  assertOwner(id: string, agentId: string): void {
+    this.owned(id, agentId);
+  }
+
   /** The agent can only touch its own apps. */
   private owned(id: string, agentId: string): MiniApp {
     const a = this.get(id);

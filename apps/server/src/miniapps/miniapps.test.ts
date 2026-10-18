@@ -111,3 +111,60 @@ describe('tokens', () => {
     expect(verifyAppToken('s', 'a', signAppToken('s', 1, 'a', Date.now() - 13 * 3600 * 1000))).toBe(false);
   });
 });
+
+describe('network', () => {
+  const serve = async (h: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void) => {
+    const { createServer } = await import('node:http');
+    const srv = createServer(h);
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    return { srv, url: `http://127.0.0.1:${(srv.address() as import('node:net').AddressInfo).port}` };
+  };
+
+  it('classifies private addresses', async () => {
+    const { isPrivateAddress } = await import('./net.js');
+    for (const a of ['127.0.0.1', '10.1.2.3', '172.18.0.5', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:10.0.0.1']) expect(isPrivateAddress(a), a).toBe(true);
+    for (const a of ['8.8.8.8', '1.1.1.1', '172.32.0.1', '2606:4700::1111']) expect(isPrivateAddress(a), a).toBe(false);
+  });
+
+  it('appFetch: body, json, redirects (auth stripped across origins), size cap', async () => {
+    const { appFetch } = await import('./net.js');
+    const seen: Record<string, string | undefined>[] = [];
+    const { srv, url } = await serve((req, res) => {
+      seen.push({ auth: req.headers.authorization as string | undefined, url: req.url });
+      if (req.url === '/r') { res.writeHead(302, { location: '/ok' }).end(); return; }
+      if (req.url === '/big') { res.end(Buffer.alloc(3 * 1024 * 1024)); return; }
+      let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ got: b, m: req.method })));
+    });
+    try {
+      const r = await appFetch(`${url}/r`, { method: 'POST', body: { a: 1 }, headers: { Authorization: 'Bearer k' } }, true);
+      expect(r.ok).toBe(true);
+      expect(JSON.parse(r.text)).toEqual({ got: '', m: 'GET' }); // 302 after POST → GET, body dropped
+      expect(seen[0]!.auth).toBe('Bearer k');
+      await expect(appFetch(`${url}/big`, {}, true)).rejects.toThrow(/too large/);
+      await expect(appFetch('file:///etc/passwd', {}, true)).rejects.toThrow(/http/);
+      await expect(appFetch(url, { method: 'TRACE' }, true)).rejects.toThrow(/not allowed/);
+    } finally { srv.close(); }
+  });
+
+  it('handlers cannot reach private or internal addresses', async () => {
+    store.create('a1', { id: 'net', name: 'net' });
+    await store.writeFiles('net', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/index.js', content: `export async function GET(req, ctx) {
+      const out = {};
+      for (const u of ['http://127.0.0.1:1/', 'http://169.254.169.254/latest/meta-data', 'http://localhost/', 'http://[::1]/']) {
+        try { await ctx.fetch(u); out[u] = 'reached'; } catch (e) { out[u] = e.message; }
+      }
+      return out;
+    }` }]);
+    const r = await call('net', 'index', 'GET');
+    expect(r.status).toBe(200);
+    for (const v of Object.values(r.body as Record<string, string>)) expect(v).toMatch(/private or internal/);
+  });
+
+  it('ctx.fetch works from a handler without being counted as CPU time', async () => {
+    const { SANDBOX_LIMITS } = await import('./sandbox.js');
+    expect(SANDBOX_LIMITS.maxTotalMs).toBeGreaterThan(SANDBOX_LIMITS.timeoutMs);
+    store.create('a1', { id: 'net2', name: 'net2' });
+    await store.writeFiles('net2', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/index.js', content: `export function GET(req, ctx) { return typeof ctx.fetch; }` }]);
+    expect((await call('net2', 'index', 'GET')).body).toBe('function');
+  });
+});

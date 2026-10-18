@@ -62,6 +62,7 @@ export default function App() {
   const [sub, setSub] = useState<string | undefined>(() => load<string | null>('newSub', null) ?? undefined);
   const [newAgent, setNewAgent] = useState<string | undefined>(() => load<string | null>('newAgent', null) ?? undefined);
   const [convsLoaded, setConvsLoaded] = useState(false);
+  const [dataTick, setDataTick] = useState<{ appId: string; n: number }>({ appId: '', n: 0 }); // data of a mini-app changed
   const [appsTick, setAppsTick] = useState(0); // bumped when a mini-app changes (refresh of the Apps pages)
   const currentRef = useRef<string>();
   currentRef.current = currentId;
@@ -200,6 +201,7 @@ export default function App() {
     onEvent,
     onStatus: (id, status, detail) => setAgents((as) => as.map((a) => (a.id === id ? { ...a, status, statusDetail: detail } : a))),
     onAppChanged: () => setAppsTick((n) => n + 1),
+    onAppData: (appId) => setDataTick((d) => ({ appId, n: d.n + 1 })),
     onRead: (id) => setConvs((cs) => cs.map((c) => (c.id === id ? { ...c, unread: false } : c))),
     onOpen: () => { refreshLists(); if (currentRef.current) loadMessages(currentRef.current); },
     onUnauthorized: onUnauth,
@@ -294,7 +296,7 @@ export default function App() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); navigate('/'); }} />}
             {view === 'skills' && <SkillsPage agents={agents} />}
-            {view === 'apps' && (appId ? <AppView key={appId} id={appId} refreshKey={appsTick} onBack={() => navigate('/apps')} /> : <AppsPage agents={agents} refreshKey={appsTick} onOpen={(id) => navigate(`/apps/${id}`)} />)}
+            {view === 'apps' && (appId ? <AppView key={appId} id={appId} refreshKey={appsTick} dataKey={dataTick.appId === appId ? dataTick.n : 0} onBack={() => navigate('/apps')} /> : <AppsPage agents={agents} refreshKey={appsTick} onOpen={(id) => navigate(`/apps/${id}`)} />)}
             {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => navigate(`/c/${id}`)} />}
           </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}

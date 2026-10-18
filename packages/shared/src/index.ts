@@ -245,7 +245,9 @@ export type ServerPush =
   /** Chat marked read (from another device): remove its "unread" indicator. */
   | { type: 'conversation.read'; conversationId: string }
   /** A mini-app was created, rebuilt or removed: refresh the Apps tab / reload the open iframe. */
-  | { type: 'app.changed'; appId: string; removed?: boolean };
+  | { type: 'app.changed'; appId: string; removed?: boolean }
+  /** The data of a mini-app changed: its open iframe refetches. */
+  | { type: 'app.data'; appId: string };
 export * from './theme.js';
 
 /** Mini-app created by an agent, shown in the Apps tab. */

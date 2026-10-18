@@ -108,6 +108,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         user: { id: user.id, username: user.username },
         data,
         log: (l) => store.log(a.id, `[${name}] ${l}`),
+        onData: () => store.dataChanged(a.id),
       });
       return reply.code(res.status).send(res.body);
     },

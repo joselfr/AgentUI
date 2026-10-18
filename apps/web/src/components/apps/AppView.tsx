@@ -9,7 +9,7 @@ import { AppIcon } from './appIcons';
 import AppFrame from './AppFrame';
 
 /** One app, full area: a thin native header, then the sandboxed iframe. */
-export default function AppView({ id, refreshKey, onBack }: { id: string; refreshKey: number; onBack: () => void }) {
+export default function AppView({ id, refreshKey, dataKey, onBack }: { id: string; refreshKey: number; dataKey: number; onBack: () => void }) {
   const app = useLoad(() => api.app(id), [id]);
   useEffect(() => { if (refreshKey) app.refresh().catch(() => onBack()); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const a = app.data;
@@ -21,7 +21,7 @@ export default function AppView({ id, refreshKey, onBack }: { id: string; refres
         <Typography variant="subtitle1" sx={{ flex: 1, minWidth: 0 }} noWrap>{a?.name ?? ''}</Typography>
         <Tooltip title={t('apps.reload')}><IconButton aria-label={t('apps.reload')} onClick={() => app.refresh().catch(() => {})}><Refresh /></IconButton></Tooltip>
       </Box>
-      {app.err ? <Typography sx={{ p: 3 }} color="text.secondary">{t('apps.notFound')}</Typography> : a && <AppFrame app={a} />}
+      {app.err ? <Typography sx={{ p: 3 }} color="text.secondary">{t('apps.notFound')}</Typography> : a && <AppFrame app={a} dataKey={dataKey} />}
     </Box>
   );
 }

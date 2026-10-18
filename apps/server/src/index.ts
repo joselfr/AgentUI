@@ -293,9 +293,15 @@ async function main() {
   // ---------- Mini-apps (created by the agents, shown in the Apps tab) ----------
   const apps = new MiniAppStore(db, env.dataDir);
   apps.onChange = (id, kind) => runs.broadcast({ type: 'app.changed', appId: id, removed: kind === 'removed' });
+  const appData = new AppData(db);
+  const dataTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  apps.onData = (id) => {
+    if (dataTimers.has(id)) return; // coalesced: one push per 300 ms and app
+    dataTimers.set(id, setTimeout(() => { dataTimers.delete(id); runs.broadcast({ type: 'app.data', appId: id }); }, 300));
+  };
   registerMiniApps(app, {
     store: apps,
-    data: new AppData(db),
+    data: appData,
     secret,
     userOf,
     runtimeDir: resolve(process.env.APP_RUNTIME_DIST ?? '../../packages/app-runtime/dist'),
@@ -339,7 +345,7 @@ async function main() {
   for (const g of gateways) {
     g.onAppOp = async (op, args) => {
       if (!isAppOp(op)) throw new AppError(`Unknown app operation "${op}".`);
-      return handleAppOp(apps, g.id, op, args);
+      return handleAppOp(apps, appData, g.id, op, args);
     };
     g.onAppOpError = opError;
     g.onOutbound = (m) => {

@@ -555,7 +555,8 @@
                 "list",
                 "delete_file",
                 "remove",
-                "logs"
+                "logs",
+                "data"
               ]
             },
             "args": {}

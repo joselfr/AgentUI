@@ -1,11 +1,12 @@
 /** Link with the AgentUI host (parent window): theme, language and authenticated requests to the app backend. */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type Mode = 'light' | 'dark';
 export interface HostTheme { mode: Mode; lang: string; vars: Record<string, string> }
 
 let theme: HostTheme = { mode: 'dark', lang: (typeof navigator !== 'undefined' && navigator.language?.slice(0, 2)) || 'en', vars: {} };
 const subs = new Set<() => void>();
+const dataSubs = new Set<() => void>();
 
 function applyTheme(t: HostTheme) {
   theme = t;
@@ -24,6 +25,7 @@ if (typeof window !== 'undefined') {
     if (e.source !== window.parent) return;
     const m = e.data as { type?: string; [k: string]: any } | null;
     if (m?.type === 'agentui:theme') applyTheme({ mode: m.mode, lang: m.lang, vars: m.vars ?? {} });
+    else if (m?.type === 'agentui:data') dataSubs.forEach((f) => f());
     else if (m?.type === 'agentui:fetch.result') {
       const done = pending.get(m.id);
       pending.delete(m.id);
@@ -73,6 +75,9 @@ export function useTheme(): HostTheme {
   return theme;
 }
 
+/** Calls `f` when the app's data changed outside this iframe (agent tool, cron, another device). Returns the unsubscribe. */
+export const onDataChange = (f: () => void) => { dataSubs.add(f); return () => { dataSubs.delete(f); }; };
+
 /** UI language of AgentUI (`fr`, `en`…). */
 export const useLang = (): string => useTheme().lang;
 export const getTheme = () => theme;
@@ -84,13 +89,17 @@ export function useApi<T = any>(path: string | null, deps: unknown[] = []) {
   const [error, setError] = useState<Error>();
   const [loading, setLoading] = useState(path !== null);
   const [n, setN] = useState(0);
+  const [quiet, setQuiet] = useState(0);
+  const silent = useRef(false); // refetch after an external data change: no spinner
+  useEffect(() => (path === null ? undefined : onDataChange(() => { silent.current = true; setQuiet((x) => x + 1); })), [path]);
   useEffect(() => {
     if (path === null) return;
     let alive = true;
-    setLoading(true);
+    if (!silent.current) setLoading(true);
+    silent.current = false;
     api.get<T>(path).then((d) => alive && (setData(d), setError(undefined))).catch((e) => alive && setError(e)).finally(() => alive && setLoading(false));
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, n, ...deps]);
+  }, [path, n, quiet, ...deps]);
   return { data, error, loading, reload: () => setN((x) => x + 1), setData };
 }

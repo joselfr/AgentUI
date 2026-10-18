@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AppData } from './data.js';
 import { AppError, type MiniAppStore } from './store.js';
 
 const id = z.string().min(1).max(60);
@@ -12,13 +13,26 @@ const SCHEMAS = {
   delete_file: z.object({ id, path }),
   remove: z.object({ id }),
   logs: z.object({ id }),
+  data: z.object({
+    id,
+    action: z.enum(['find', 'get', 'insert', 'update', 'remove', 'kv_get', 'kv_set', 'kv_delete']),
+    collection: z.string().max(40).optional(),
+    doc_id: z.string().max(100).optional(),
+    doc: z.record(z.unknown()).optional(),
+    filter: z.record(z.unknown()).optional(),
+    limit: z.number().int().min(1).max(5000).optional(),
+    sort: z.string().max(60).optional(),
+    desc: z.boolean().optional(),
+    key: z.string().max(200).optional(),
+    value: z.unknown().optional(),
+  }),
 };
 
 export type AppOp = keyof typeof SCHEMAS;
 export const isAppOp = (s: unknown): s is AppOp => typeof s === 'string' && s in SCHEMAS;
 
 /** Operations a plugin can request on behalf of its agent (frame `app.op`). Throws `AppError` / `ZodError` for the agent. */
-export async function handleAppOp(store: MiniAppStore, agentId: string, op: AppOp, rawArgs: unknown): Promise<unknown> {
+export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: string, op: AppOp, rawArgs: unknown): Promise<unknown> {
   const a = SCHEMAS[op].parse(rawArgs ?? {}) as any;
   switch (op) {
     case 'create': {
@@ -42,6 +56,23 @@ export async function handleAppOp(store: MiniAppStore, agentId: string, op: AppO
       return { ok: true };
     case 'logs':
       return { lines: store.getLogs(a.id, agentId) };
+    case 'data': {
+      store.assertOwner(a.id, agentId);
+      const need = (v: unknown, name: string) => {
+        if (v === undefined) throw new AppError(`"${name}" is required for action ${a.action}.`);
+        return v;
+      };
+      switch (a.action) {
+        case 'find': return data.find(a.id, need(a.collection, 'collection'), a.filter, { limit: a.limit, sort: a.sort, desc: a.desc });
+        case 'get': return data.get(a.id, need(a.collection, 'collection'), need(a.doc_id, 'doc_id'));
+        case 'insert': { const r = data.insert(a.id, need(a.collection, 'collection'), need(a.doc, 'doc')); store.dataChanged(a.id); return r; }
+        case 'update': { const r = data.update(a.id, need(a.collection, 'collection'), need(a.doc_id, 'doc_id'), need(a.doc, 'doc')); store.dataChanged(a.id); return r ?? { error: 'No such document.' }; }
+        case 'remove': { const r = data.remove(a.id, need(a.collection, 'collection'), need(a.doc_id, 'doc_id')); store.dataChanged(a.id); return { removed: r }; }
+        case 'kv_get': return { value: data.kvGet(a.id, need(a.key, 'key')) };
+        case 'kv_set': { data.kvSet(a.id, need(a.key, 'key'), a.value); store.dataChanged(a.id); return { ok: true }; }
+        case 'kv_delete': { data.kvDelete(a.id, need(a.key, 'key')); store.dataChanged(a.id); return { ok: true }; }
+      }
+    }
   }
 }
 

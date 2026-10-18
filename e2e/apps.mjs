@@ -104,6 +104,11 @@ try {
   const bg = async () => frame.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor);
   const dark = await bg();
   await page.screenshot({ path: join(shots, 'app-dark.png') });
+  // the agent pushes data with the `data` op: the open iframe refreshes by itself
+  const pushed = await op('data', { id: 'todo', action: 'insert', collection: 'todos', doc: { title: 'From the agent' } });
+  check('agent data op inserts', pushed.ok === true && pushed.result.title === 'From the agent', JSON.stringify(pushed).slice(0, 120));
+  await frame.getByText('From the agent').waitFor({ timeout: 5000 }).then(() => check('open iframe refreshes after an agent data push', true), () => check('open iframe refreshes after an agent data push', false));
+  check('agent data op: other agent refused / unknown app', (await op('data', { id: 'nope', action: 'find', collection: 'todos' })).ok === false);
   // theme switch from the host
   await page.getByRole('button', { name: 'Settings' }).or(page.getByLabel('Settings')).first().click();
   await page.getByRole('combobox').first().click();

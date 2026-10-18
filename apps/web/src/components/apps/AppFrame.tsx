@@ -14,7 +14,7 @@ const safePath = (p: unknown): string | undefined =>
  * The only way out is this postMessage bridge: the host replays the app's requests on its own backend namespace
  * (`/api/apps/<id>/x/…`) with the user's session, and pushes the theme and language.
  */
-export default function AppFrame({ app }: { app: MiniApp }) {
+export default function AppFrame({ app, dataKey = 0 }: { app: MiniApp; dataKey?: number }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const muiTheme = useTheme();
   const lang = useLang() && getLang();
@@ -35,6 +35,8 @@ export default function AppFrame({ app }: { app: MiniApp }) {
     frame.current?.contentWindow?.postMessage({ type: 'agentui:theme', mode, lang, vars: themeCssVars(mode) }, '*');
   }, [mode, lang]);
   useEffect(postTheme, [postTheme]);
+  // The app's data changed (agent or another tab): the app refetches what it displays.
+  useEffect(() => { if (dataKey) frame.current?.contentWindow?.postMessage({ type: 'agentui:data' }, '*'); }, [dataKey]);
 
   useEffect(() => {
     const onMsg = async (e: MessageEvent) => {

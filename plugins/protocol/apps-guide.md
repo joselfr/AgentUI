@@ -7,7 +7,7 @@ An **app** is a small web application you write (React frontend + optional backe
 1. `agentui_app_create` — `id` (lowercase, digits, dashes, e.g. `habit-tracker`), `name`, `icon`, `description`.
 2. `agentui_app_write` — send all the files (several per call). The result tells you if the build succeeded; on `ok: false` read `errors` (file, line), fix, write again. The last working version stays online meanwhile.
 3. Tell the user the app is in the **Apps** tab (link: `/apps/<id>`). The app updates live for anyone who has it open.
-4. Iterate: `agentui_app_read` / `agentui_app_list` to see what exists, `agentui_app_logs` to see `console.log` output and backend errors, `agentui_app_delete_file`, `agentui_app_remove` (only on the user's request).
+4. Iterate: `agentui_app_read` / `agentui_app_list` to see what exists, `agentui_app_data` to read or push data (see below), `agentui_app_logs` to see `console.log` output and backend errors, `agentui_app_delete_file`, `agentui_app_remove` (only on the user's request).
 
 Icons for `icon`: apps, checklist, chart, calendar, notes, timer, shopping, finance, home, star, book, fitness, music, code, map, mail, photo, game, food, travel, weather, idea, health, tools.
 
@@ -103,7 +103,7 @@ The app must look native. **Use the components above and the CSS variables; neve
 - Custom CSS goes in a `.css` file imported from a module, referencing those variables: `border: 1px solid var(--au-line); background: var(--au-paper); border-radius: var(--au-radius);`.
 - Base font size is 14px; spacing multiples of 4/8px. Mobile first: the app is also used on a phone (≥ 320px wide) — use `wrap`, avoid fixed widths, keep touch targets ≥ 40px.
 - The page itself does not scroll: `Page` scrolls internally. Do not use `100vh` tricks; fill the available space.
-- No external resources (images, fonts, scripts, CDN, `fetch` to the internet): the iframe is sandboxed and its CSP blocks them. Use inline SVG or `data:` URLs.
+- No external resources in the frontend (images, fonts, scripts, CDN, direct `fetch` to the internet): the iframe is sandboxed and its CSP blocks them. Use inline SVG or `data:` URLs; fetch external data through `ctx.fetch` in the backend. For live data, refresh with `setInterval` + `api.get(...)` or `useApi`.
 - No `localStorage`/cookies (opaque origin): persist through the backend.
 
 ## Backend (`server/*.js`)
@@ -133,9 +133,12 @@ export function DELETE(req, ctx) {
 - `req`: `{ method, path, query, body }` (`path` is relative to the route file: `/` or `/42`; in `server/index.js` it is the whole path).
 - `ctx.db.collection(name)` — JSON documents, **synchronous** (no `await` needed): `find(filter?, { limit?, sort?, desc? })` (equality filter on top-level fields), `get(id)`, `insert(doc)` → doc with generated `id`, `_createdAt`, `_updatedAt`; `update(id, patch)` (merge, returns doc or `null`), `remove(id)` → boolean. Collection names: letters/digits/`_`/`-`. Data is private to the app.
 - `ctx.kv.get(key)`, `ctx.kv.set(key, value)`, `ctx.kv.delete(key)` — small settings/state.
+- From outside the app (cron, your own fetches), `agentui_app_data` reads and writes the same collections and `kv` store; open apps refresh by themselves (`useApi` refetches silently).
 - `ctx.user` — `{ id, username }` of the logged-in AgentUI user. All requests are authenticated by AgentUI.
 - `ctx.log(...)` / `console.log(...)` — visible with `agentui_app_logs`.
-- Sandbox: plain JavaScript (async/await allowed), 3 s per request, no `require`/`import` of modules, no `fetch`/network, no filesystem, no timers, no `eval`. Keep handlers small and deterministic; do heavy or external work yourself (as the agent) and store results via the app's data.
+- `await ctx.fetch(url, { method?, headers?, body? })` — calls an external HTTP(S) API from the backend → `{ status, ok, url, headers, text, json() }`. `body` may be an object (sent as JSON) or a string. Public addresses only: localhost, private networks and internal services are refused. Redirects are followed (3 max; `Authorization` is dropped when the origin changes). Limits: 15 s per call, 10 calls per request, 2 MB response. This is the **only** way to reach the internet: the frontend itself cannot (`api.get/post` only reach your own `server/*.js`), so a live-data app fetches in its backend and returns the result.
+- Secrets: never write an API key in `src/` (it ships to the browser). Keep it out of the frontend: store it with `ctx.kv.set('apiKey', …)` from a backend route (or ask the user to provide it) and read it in `server/*.js` only.
+- Sandbox: plain JavaScript (async/await allowed), no `require`/`import` of modules, no filesystem, no timers, no `eval`. CPU time is limited to 3 s per request (time waiting for the network does not count), 30 s in total. For slow or heavy work, poll from the frontend rather than holding one request open.
 - Limits: documents ≤ 256 KB, 20 000 documents per app, responses ≤ 2 MB.
 
 ## Checklist before telling the user it is ready

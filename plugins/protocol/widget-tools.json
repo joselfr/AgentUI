@@ -594,6 +594,68 @@
           "id"
         ]
       }
+    },
+    "data": {
+      "description": "Reads or writes the data of one of your apps (the same collections and key/value store its backend handlers see through ctx.db / ctx.kv). Use it to push data into an app from outside a user request — typically from a cron job or after fetching something yourself — and to inspect what the app stored. Open iframes refresh automatically. Actions: find (collection, filter?, limit?, sort?, desc?), get (collection, doc_id), insert (collection, doc), update (collection, doc_id, doc = fields to merge), remove (collection, doc_id), kv_get / kv_delete (key), kv_set (key, value).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "App id."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "find",
+              "get",
+              "insert",
+              "update",
+              "remove",
+              "kv_get",
+              "kv_set",
+              "kv_delete"
+            ]
+          },
+          "collection": {
+            "type": "string",
+            "description": "Collection name (letters, digits, _ and -)."
+          },
+          "doc_id": {
+            "type": "string",
+            "description": "Document id (returned by insert / find)."
+          },
+          "doc": {
+            "type": "object",
+            "description": "Document (insert) or fields to merge (update)."
+          },
+          "filter": {
+            "type": "object",
+            "description": "Equality filter on top-level fields."
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "sort": {
+            "type": "string",
+            "description": "Field to sort by (e.g. _createdAt)."
+          },
+          "desc": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string",
+            "description": "Key for kv_* actions."
+          },
+          "value": {
+            "description": "Any JSON value for kv_set."
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ]
+      }
     }
   }
 }

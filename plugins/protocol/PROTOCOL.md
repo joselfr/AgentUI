@@ -89,7 +89,7 @@ vivent sur le serveur AgentUI ; le plugin n'est qu'un relais : chaque outil `age
 `widget-tools.json`) envoie une trame `app.op` et attend l'`app.result` correspondant (délai conseillé : 60 s). Exception :
 `agentui_app_guide`, local, renvoie le guide `apps-guide.md` (embarqué par `sync-widget-tools.mjs` sous `appGuide`, et publié
 aussi comme skill `.claude/skills/agentui-apps`). Le serveur compile (esbuild), isole le backend (worker + vm) et sert
-l'app dans une iframe sandbox ; voir `apps-guide.md` pour la contrainte côté agent.
+l'app dans une iframe sandbox. Le backend d'une app n'a pas de réseau direct : `ctx.fetch` passe par le serveur, qui refuse les adresses privées/internes. Voir `apps-guide.md` pour la contrainte côté agent.
 
 ## Règles
 
