@@ -105,7 +105,10 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
       const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
       // While streaming, only the image gallery is already shown (the block comes from an expanded token, hence complete): its local files arrive one by one.
       const early = lang === 'widget' && m.status === 'streaming' && parseWidget(raw)?.type === 'image';
-      if ((m.status !== 'streaming' || isAwaiting(m) || early) && (lang === 'widget' || lang === 'ask')) {
+      // An interactive block is added whole to the text by the plugin: once its fence is closed it stays a widget (frozen, with its answer)
+      // while the run goes on after the user's reply, instead of falling back to raw JSON until the end of the run.
+      const answered = (lang === 'widget' || lang === 'ask') && interactiveBlocks(m.text).includes(raw);
+      if ((m.status !== 'streaming' || isAwaiting(m) || early || answered) && (lang === 'widget' || lang === 'ask')) {
         // A message can ask several questions in a row (question.requested then answer): the k-th gets the k-th answer, only the first unanswered one is active.
         const k = interactiveBlocks(m.text).indexOf(raw);
         const answer = k >= 0 ? answers[k] : undefined;

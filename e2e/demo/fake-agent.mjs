@@ -34,6 +34,7 @@ async function createMiniapps() {
   }
 }
 
+const questions = new Map(); // conversationId → open question (resolved when the user's answer arrives)
 const widgetText = (type, args) => `\n\n\`\`\`widget\n${JSON.stringify({ type, arguments: args })}\n\`\`\`\n`;
 
 async function play(conversationId, runId, text) {
@@ -68,6 +69,7 @@ async function play(conversationId, runId, text) {
   }
   if (sc.blocking) {
     const qid = `q${hex()}`;
+    questions.set(conversationId, qid);
     ev({ type: 'question.requested', id: qid });
     out += widgetText(...sc.blocking);
     ev({ type: 'message.delta', text: widgetText(...sc.blocking) });
@@ -85,7 +87,13 @@ ws.on('message', (raw) => {
   else if (m.type === 'welcome') { void createMiniapps(); CRON_MESSAGES.forEach((c, i) => setTimeout(() => send({ type: 'outbound', id: `o${hex()}`, ...c }), 600 + i * 400)); }
   else if (m.type === 'ping') send({ type: 'pong' });
   else if (m.type === 'inbound') void play(m.conversationId, m.runId, m.text);
-  else if (m.type === 'reply') { send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'message.final', text: ACK } }); send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event: { type: 'run.completed' } }); }
+  else if (m.type === 'reply') void (async () => {
+    const ev = (event) => send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event });
+    if (questions.has(m.conversationId)) ev({ type: 'question.resolved', id: questions.get(m.conversationId) }); // like the real plugins
+    // DEMO_REPLY_DELAY (ms): the run keeps going after the user's answer, as a real agent does (e2e/ui-answered.mjs)
+    if (Number(process.env.DEMO_REPLY_DELAY)) { ev({ type: 'message.delta', text: '\n\n' + ACK }); await sleep(Number(process.env.DEMO_REPLY_DELAY)); }
+    ev({ type: 'message.final', text: ACK }); ev({ type: 'run.completed' });
+  })();
   else if (m.type === 'rpc') send(m.method === 'listJobs' ? { type: 'rpc.result', id: m.id, result: JOBS } : { type: 'rpc.result', id: m.id, error: 'not supported' });
 });
 ws.on('close', () => process.exit(0));
