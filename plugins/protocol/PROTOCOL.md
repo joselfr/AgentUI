@@ -78,6 +78,11 @@ result `files` = `{ path → attachment name }`. The front end links the path to
 a second time as an attachment. A missing or too large file, or one that is not an image, makes the tool fail
 (the error goes back to the agent).
 
+**When to use the tools** (`usageGuide` in `widget-tools.json`): the tool descriptions say how each one works, not when to prefer it
+over plain text, and models rarely pick a widget on their own. The plugins therefore add this short guide to the system prompt of
+AgentUI chats only: Hermes through `platform_hint`, OpenClaw through a `before_prompt_build` hook (`appendSystemContext`) filtered on
+AgentUI sessions.
+
 `agentui_ui` is the **dynamic** display widget: its `code` argument is a single TSX module (default-exported React component)
 that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js` only). Plugins only validate it (non-empty, ≤ 64 KB, has an
 `export default`); the front end sends the code to `POST /api/widgets`, which compiles it (esbuild, cached by hash) and returns the

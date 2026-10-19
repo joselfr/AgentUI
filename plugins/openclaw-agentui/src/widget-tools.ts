@@ -58,6 +58,19 @@ export function conversationOf(ctx: { sessionKey?: string; nativeChannelId?: str
   return /:agentui:direct:(.+)$/.exec(ctx.sessionKey ?? '')?.[1] ?? ctx.nativeChannelId;
 }
 
+/**
+ * Usage guide added to the system prompt of AgentUI runs only: the tool descriptions say how each tool works, this says
+ * when to reach for them (without it, models rarely pick a widget on their own).
+ */
+export function registerUsageGuide(api: OpenClawPluginApi): void {
+  if (typeof (api as { on?: unknown }).on !== 'function') return; // host without prompt hooks
+  (api as unknown as { on: (hook: string, fn: (event: unknown, ctx: { sessionKey?: string; channelId?: string; messageChannel?: string }) => unknown) => void })
+    .on('before_prompt_build', (_event, ctx) => {
+      const agentui = ctx.channelId === 'agentui' || ctx.messageChannel === 'agentui' || /:agentui:direct:/.test(ctx.sessionKey ?? '');
+      return agentui ? { appendSystemContext: spec.usageGuide } : undefined;
+    });
+}
+
 export function registerWidgetTools(api: OpenClawPluginApi): void {
   api.registerTool((ctx) => {
     // The tools only exist in runs started from AgentUI (elsewhere, they would clutter the prompt).

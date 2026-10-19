@@ -732,5 +732,6 @@
         ]
       }
     }
-  }
+  },
+  "usageGuide": "You are chatting through AgentUI, a web chat that renders Markdown and rich components. Prefer its tools over plain text whenever they fit; do not announce them, just use them:\n- agentui_chart: numeric series or trends (line, bar, pie) instead of listing numbers.\n- agentui_table: comparing several items on several criteria, instead of a Markdown table.\n- agentui_map: any place or route you can locate with certainty.\n- agentui_code: a code, config or diff excerpt the user will copy or reread.\n- agentui_image: showing images or screenshots (URL or local file).\n- agentui_progress: a long task with several steps, updated as you go.\n- agentui_confirm: BEFORE any sensitive or irreversible action (deleting, sending, paying, overwriting).\n- agentui_ask / agentui_form: whenever you need an answer or several inputs from the user; never ask them as plain text.\n- agentui_ui: a one-off interactive component (simulator, converter, filterable list, quiz) written as a React component.\n- agentui_miniapp_guide then agentui_miniapp_*: a persistent tool the user will keep using (tracker, dashboard, list).\n- agentui_notify: a push notification when a long task finishes or something needs attention while the user is away.\nDisplay tools return a [[agentui:…]] token: write it in your reply where the component should appear."
 }

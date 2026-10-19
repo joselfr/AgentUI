@@ -1229,6 +1229,16 @@ def _read_local_image(path: str) -> dict:
     return _media(name, data, mime)
 
 
+def _usage_guide() -> str:
+    """System-prompt hint of AgentUI chats: when to reach for the `agentui_*` tools (the tool descriptions say how)."""
+    try:
+        spec = json.loads((Path(__file__).parent / "widget_tools.json").read_text(encoding="utf-8"))
+        return spec["usageGuide"]
+    except Exception:
+        logger.warning("AgentUI: usage guide unavailable", exc_info=True)
+        return "You are chatting through AgentUI, a web chat client that renders full Markdown (code blocks, tables, images). Long answers are fine."
+
+
 def _register_widget_tools(ctx) -> None:
     """One tool per widget (`agentui_chart`, `agentui_map`, `agentui_code`, `agentui_table`): the model validates its arguments with the tool's
     schema instead of writing a ```widget block. The tool returns a `[[agentui:<id>]]` token that the agent places in its
@@ -1364,10 +1374,7 @@ def register(ctx):
         max_message_length=100_000,
         emoji="🖥️",
         pii_safe=False,
-        platform_hint=(
-            "You are chatting through AgentUI, a web chat client that renders full Markdown "
-            "(code blocks, tables, images). Long answers are fine."
-        ),
+        platform_hint=_usage_guide(),
     )
     for name in ("pre_tool_call", "post_tool_call", "subagent_start", "subagent_stop", "post_llm_call"):
         ctx.register_hook(name, _hook(name))

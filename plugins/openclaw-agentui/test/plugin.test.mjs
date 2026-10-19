@@ -443,6 +443,10 @@ test('widget tools: agentui_chart / map / code, reserved for AgentUI runs', asyn
   await assert.rejects(tools[0].execute('t3', { kind: 'pie', x: ['a'], series: [{ name: 's', y: [1] }, { name: 't', y: [2] }] }), /pie chart/);
   await assert.rejects(tools[1].execute('t4', { points: [] }), /At least one point/);
   await assert.rejects(tools[2].execute('t5', { code: ' ' }), /empty/);
+  const hooks = {};
+  entry.registerFull({ registerService: () => {}, registerTool: () => {}, on: (name, fn) => (hooks[name] = fn) });
+  assert.match(hooks.before_prompt_build({}, { sessionKey: 'agent:main:agentui:direct:c1' }).appendSystemContext, /agentui_ui/);
+  assert.equal(hooks.before_prompt_build({}, { sessionKey: 'agent:main:telegram:direct:1' }), undefined);
   const ui = tools.find((t) => t.name === 'agentui_ui');
   assert.match((await ui.execute('u1', { code: 'export default function W() { return <div />; }' })).details.token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
   await assert.rejects(ui.execute('u2', { code: 'const W = () => null;' }), /default-export/);
