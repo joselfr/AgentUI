@@ -9,7 +9,7 @@ export const WIDGET_LIMITS = { maxCodeBytes: 64 * 1024, maxCached: 300 };
 const HASH_RE = /^[0-9a-f]{24}$/;
 
 /**
- * Widgets of the `agentui_ui` tool: a single TSX module written by the agent in the chat, compiled on demand and
+ * Widgets of the `agentui_custom_widget` tool: a single TSX module written by the agent in the chat, compiled on demand and
  * served to a sandboxed iframe with the same runtime as the miniapps (`@agentui/ui`). The code travels with the tool
  * call (so the widget survives a reload); the server only caches the compiled output by content hash.
  */

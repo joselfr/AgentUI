@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, CssBaseline, Drawer, ThemeProvider, Typography, useMediaQuery } from '@mui/material';
-import type { AgentInfo, Message, ModelOption, Usage } from '@agentui/shared';
+import type { AgentInfo, Message, ModelOption, Usage, WidgetEvent } from '@agentui/shared';
 import { api, UnauthorizedError, type Conversation } from './api';
 import { makeTheme } from './theme';
 import { applyEvent, awaitingReply } from './reducer';
@@ -211,7 +211,7 @@ export default function App() {
     onUnauthorized: onUnauth,
   });
 
-  const send = async (text: string, files: File[]): Promise<boolean> => {
+  const send = async (text: string, files: File[], widget?: WidgetEvent): Promise<boolean> => {
     setError(undefined);
     let optimistic = false;
     try {
@@ -227,11 +227,11 @@ export default function App() {
       const attachments = await toOutgoing(files);
       const views: AttachmentView[] = files.map((f, i) => ({ id: `local-${Date.now()}-${i}`, name: f.name, mimeType: f.type, size: f.size, url: URL.createObjectURL(f) }));
       setMessages((m) => [...m,
-        { id: `local-${Date.now()}`, role: 'user', text, attachments: views, createdAt: Date.now(), status: 'done' },
+        { id: `local-${Date.now()}`, role: 'user', text, ...(widget ? { hidden: true } : {}), attachments: views, createdAt: Date.now(), status: 'done' },
         ...(answering ? [] : [{ id: `local-a-${Date.now()}`, role: 'assistant' as const, text: '', createdAt: Date.now(), status: 'streaming' as const }])]);
       optimistic = true;
       setRunning(true);
-      await api.send(id, text, attachments);
+      await api.send(id, text, attachments, widget);
       return true;
     } catch (e) {
       setRunning(false);
@@ -300,8 +300,8 @@ export default function App() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); navigate('/'); }} />}
             {view === 'skills' && <SkillsPage agents={agents} />}
-            {view === 'miniapps' && (appId ? <MiniappView key={appId} id={appId} refreshKey={miniappsTick} dataKey={dataTick.appId === appId ? dataTick.n : 0} onBack={() => navigate('/miniapps')} onName={setAppName} /> : <MiniappsPage agents={agents} refreshKey={miniappsTick} onOpen={(id) => navigate(`/miniapps/${id}`)} />)}
-            {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => navigate(`/c/${id}`)} />}
+            {view === 'miniapps' && (appId ? <MiniappView key={appId} id={appId} refreshKey={miniappsTick} dataKey={dataTick.appId === appId ? dataTick.n : 0} onBack={() => navigate('/miniapps')} onName={setAppName} onOpenJobs={() => navigate('/jobs')} /> : <MiniappsPage agents={agents} refreshKey={miniappsTick} onOpen={(id) => navigate(`/miniapps/${id}`)} />)}
+            {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => navigate(`/c/${id}`)} onOpenMiniapp={(id) => navigate(`/miniapps/${id}`)} />}
           </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}
           onStart={(id, s) => { setNewAgent(id); setSub(s); setCurrentId(undefined); setNewDlg(false); }} />

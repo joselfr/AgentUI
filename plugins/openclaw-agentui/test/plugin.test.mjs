@@ -428,7 +428,7 @@ test('widget tools: agentui_chart / map / code, reserved for AgentUI runs', asyn
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_ui', 'agentui_ask', 'agentui_confirm', 'agentui_form', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify']);
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_custom_widget', 'agentui_ask', 'agentui_confirm', 'agentui_form', 'agentui_custom_widget_wait', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'job', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify']);
   // The manifest declares exactly these tools (contracts.tools), otherwise OpenClaw warns at load
   assert.deepEqual(JSON.parse(readFileSync(new URL('../openclaw.plugin.json', import.meta.url), 'utf8')).contracts.tools, opts.names);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
@@ -445,12 +445,19 @@ test('widget tools: agentui_chart / map / code, reserved for AgentUI runs', asyn
   await assert.rejects(tools[2].execute('t5', { code: ' ' }), /empty/);
   const hooks = {};
   entry.registerFull({ registerService: () => {}, registerTool: () => {}, on: (name, fn) => (hooks[name] = fn) });
-  assert.match(hooks.before_prompt_build({}, { sessionKey: 'agent:main:agentui:direct:c1' }).appendSystemContext, /agentui_ui/);
+  assert.match(hooks.before_prompt_build({}, { sessionKey: 'agent:main:agentui:direct:c1' }).appendSystemContext, /agentui_custom_widget/);
   assert.equal(hooks.before_prompt_build({}, { sessionKey: 'agent:main:telegram:direct:1' }), undefined);
-  const ui = tools.find((t) => t.name === 'agentui_ui');
+  const ui = tools.find((t) => t.name === 'agentui_custom_widget');
   assert.match((await ui.execute('u1', { code: 'export default function W() { return <div />; }' })).details.token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
   await assert.rejects(ui.execute('u2', { code: 'const W = () => null;' }), /default-export/);
   await assert.rejects(ui.execute('u3', { code: ' ' }), /empty/);
+  // Two-way widget: `update` + `state` pushes a state to the displayed widget (same token, no code)
+  const board = (await ui.execute('u4', { code: 'export default function W() { return <div />; }', state: { fen: 'start' } })).details.token;
+  const pushed = JSON.parse((await ui.execute('u5', { update: board, state: { fen: 'after e4' } })).content[0].text);
+  assert.deepEqual([pushed.widget, pushed.updated], [board, true]);
+  await assert.rejects(ui.execute('u6', { update: 'abc', state: 1 }), /must be the/);
+  await assert.rejects(ui.execute('u7', { update: board }), /needs a `state`/);
+  await assert.rejects(ui.execute('u8', { update: board, state: 'x'.repeat(33 * 1024) }), /too large/);
   const table = tools.find((t) => t.name === 'agentui_table');
   const okTable = await table.execute('t6', { columns: [{ label: 'A' }, { label: 'B', kind: 'number' }], rows: [['x', 1], ['y', null]] });
   assert.match(okTable.details.token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
@@ -546,4 +553,14 @@ test('send outside the gateway (CLI, isolated cron): one-off send-only connectio
   assert.equal(fs.at(-1).text, 'From the CLI');
   assert.equal(hello.mode, 'send-only');
   wss.close();
+});
+
+test('agentui_custom_widget_wait: a widget event, a typed message and a timeout are told apart; the token is checked', async () => {
+  const { waitResult, askError } = await import('../dist/src/widget-tools.js');
+  assert.deepEqual(waitResult(JSON.stringify({ agentui: 'widget-event', widget: '[[agentui:a1b2c3]]', text: 'move e2e4' })), { from: 'widget', widget: '[[agentui:a1b2c3]]', event: 'move e2e4' });
+  assert.deepEqual(waitResult('hello'), { from: 'user', message: 'hello' });
+  assert.deepEqual(waitResult('{"a":1}'), { from: 'user', message: '{"a":1}' });
+  assert.deepEqual(waitResult(JSON.stringify({ agentui: 'timeout' })), { timeout: true });
+  assert.match(askError('custom_widget_wait', { widget: 'abc' }), /widget/);
+  assert.equal(askError('custom_widget_wait', { widget: '[[agentui:a1b2c3]]' }), undefined);
 });

@@ -18,6 +18,7 @@ ws.on('open', () => send({
 import { DEMO_MINIAPPS } from './miniapps.mjs';
 import * as fr from './content.fr.mjs';
 import * as en from './content.en.mjs';
+import { GAME_CODE, newGame } from './game.mjs';
 
 // DEMO_LANG=en plays the English content (captures for docs/en/); French by default.
 const { JOBS, CRON_MESSAGES, SCENARIOS, FALLBACK, REASONING, ACK } = process.env.DEMO_LANG === 'en' ? en : fr;
@@ -37,7 +38,52 @@ async function createMiniapps() {
 const questions = new Map(); // conversationId → open question (resolved when the user's answer arrives)
 const widgetText = (type, args) => `\n\n\`\`\`widget\n${JSON.stringify({ type, arguments: args })}\n\`\`\`\n`;
 
+// Tic-tac-toe (e2e/ui-twoway.mjs): a live session like a real agent's agentui_custom_widget_wait loop. The run stays open; each widget event arrives as the
+// answer of the pending wait, the agent pushes the new state (agentui_custom_widget update) and listens again.
+const games = new Map(); // conversationId → { token, state, qid }
+async function gameTool(conversationId, runId, name, args, result) {
+  const ev = (event) => send({ type: 'event', conversationId, runId, event });
+  const id = `t${hex()}`;
+  ev({ type: 'tool.started', id, name, args });
+  await sleep(120);
+  if (result) ev({ type: 'tool.completed', id, name, result: JSON.stringify(result) });
+  return id;
+}
+async function listen(conversationId, runId, g) {
+  const ev = (event) => send({ type: 'event', conversationId, runId, event });
+  g.qid = `q${hex()}`;
+  g.waitTool = await gameTool(conversationId, runId, 'agentui_custom_widget_wait', { widget: g.token });
+  ev({ type: 'question.requested', id: g.qid }); // no widget block: the widget is already displayed
+}
+async function startGame(conversationId, runId) {
+  const ev = (event) => send({ type: 'event', conversationId, runId, event });
+  const g = { token: `[[agentui:${hex()}]]`, state: newGame() };
+  games.set(conversationId, g);
+  await gameTool(conversationId, runId, 'agentui_custom_widget', { code: GAME_CODE, state: g.state }, { widget: g.token });
+  ev({ type: 'message.delta', text: `Let's play! You are X.\n\n${g.token}` });
+  await listen(conversationId, runId, g);
+}
+async function gameEvent(m) {
+  const { conversationId, runId } = m;
+  const ev = (event) => send({ type: 'event', conversationId, runId, event });
+  const g = games.get(conversationId);
+  ev({ type: 'question.resolved', id: g.qid });
+  const e = (() => { try { return JSON.parse(m.text); } catch { return null; } })();
+  ev({ type: 'tool.completed', id: g.waitTool, name: 'agentui_custom_widget_wait', result: JSON.stringify(e?.agentui === 'widget-event' ? { from: 'widget', event: e.text } : { from: 'user', message: m.text }) });
+  const i = e?.agentui === 'widget-event' ? Number(/^move (\d)$/.exec(e.text)?.[1]) : NaN;
+  if (Number.isNaN(i)) return listen(conversationId, runId, g); // a chat message: nothing to play
+  const cells = [...g.state.cells];
+  cells[i] = 'X';
+  const free = cells.findIndex((c) => !c);
+  if (free >= 0) cells[free] = 'O';
+  g.state = { cells, note: free >= 0 ? `I played ${free + 1}. Your turn` : 'Draw' };
+  await gameTool(conversationId, runId, 'agentui_custom_widget', { update: g.token, state: g.state }, { widget: g.token, updated: true });
+  if (free < 0) { ev({ type: 'message.delta', text: '\n\nDraw, well played!' }); ev({ type: 'run.completed' }); games.delete(conversationId); return; }
+  await listen(conversationId, runId, g);
+}
+
 async function play(conversationId, runId, text) {
+  if (/tic-?tac-?toe/i.test(text)) return startGame(conversationId, runId);
   const ev = (event) => send({ type: 'event', conversationId, runId, event });
   const sc = SCENARIOS.find((s) => s.match.test(text)) ?? FALLBACK;
   ev({ type: 'reasoning.delta', text: REASONING });
@@ -87,6 +133,7 @@ ws.on('message', (raw) => {
   else if (m.type === 'welcome') { void createMiniapps(); CRON_MESSAGES.forEach((c, i) => setTimeout(() => send({ type: 'outbound', id: `o${hex()}`, ...c }), 600 + i * 400)); }
   else if (m.type === 'ping') send({ type: 'pong' });
   else if (m.type === 'inbound') void play(m.conversationId, m.runId, m.text);
+  else if (m.type === 'reply' && games.has(m.conversationId)) void gameEvent(m);
   else if (m.type === 'reply') void (async () => {
     const ev = (event) => send({ type: 'event', conversationId: m.conversationId, runId: m.runId, event });
     if (questions.has(m.conversationId)) ev({ type: 'question.resolved', id: questions.get(m.conversationId) }); // like the real plugins

@@ -29,7 +29,13 @@ export function widgetError(key: string, args: Args): string | undefined {
     if (args.update !== undefined && !/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.update))) return '`update` must be the [[agentui:…]] token returned by the first call.';
   } else if (key === 'map' && !args.points?.length) return 'At least one point is required.';
   else if (key === 'code' && !String(args.code ?? '').trim()) return 'The code is empty.';
-  else if (key === 'ui') {
+  else if (key === 'custom_widget') {
+    if (args.state !== undefined && Buffer.byteLength(JSON.stringify(args.state)) > 32 * 1024) return 'The state is too large (max 32 KB).';
+    if (args.update !== undefined) {
+      if (!/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.update))) return '`update` must be the [[agentui:…]] token of the widget to update.';
+      if (args.state === undefined) return 'An update needs a `state`.';
+      return undefined;
+    }
     const code = String(args.code ?? '');
     if (!code.trim()) return 'The code is empty.';
     if (Buffer.byteLength(code) > 64 * 1024) return 'The code is too large (max 64 KB).';
@@ -40,6 +46,7 @@ export function widgetError(key: string, args: Args): string | undefined {
 
 /** Checks of the interactive tools (ask / confirm / form), like `widgetError` for display widgets. */
 export function askError(key: string, args: Args): string | undefined {
+  if (key === 'custom_widget_wait' && !/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.widget ?? ''))) return '`widget` must be the [[agentui:…]] token of the widget returned by agentui_custom_widget.';
   if (key === 'ask' && !String(args.question ?? '').trim()) return 'The question is empty.';
   if (key === 'confirm' && !String(args.title ?? '').trim()) return 'The title is empty.';
   if (key === 'form') {
@@ -51,6 +58,19 @@ export function askError(key: string, args: Args): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Result of `agentui_custom_widget_wait` from what the user's side delivered: a widget event (the server wraps it in a small JSON object so that it
+ * is not mistaken for a chat message), a chat message typed meanwhile, or the end of the wait.
+ */
+export function waitResult(answer: string): Record<string, unknown> {
+  try {
+    const o = JSON.parse(answer) as { agentui?: string; widget?: string | null; text?: string };
+    if (o?.agentui === 'widget-event') return { from: 'widget', widget: o.widget ?? undefined, event: o.text ?? '' };
+    if (o?.agentui === 'timeout') return { timeout: true };
+  } catch { /* plain chat message */ }
+  return { from: 'user', message: answer };
 }
 
 /** AgentUI chat of a tool call: the session key of a direct peer ends with `agentui:direct:<conversationId>`. */
@@ -88,7 +108,8 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
         if (!conversationId) throw new Error("AgentUI chat not found for this tool call.");
         const res = await askUser(conversationId, key, args, signal);
         if ('error' in res) throw new Error(res.error);
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ answer: res.answer }) }], details: { answer: res.answer } };
+        const out = key === 'custom_widget_wait' ? waitResult(res.answer) : { answer: res.answer };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], details: out };
       },
     }));
     const display = Object.entries(spec.tools).map(([key, tool]) => ({
@@ -109,7 +130,7 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
             files[im.src] = media.name;
           }
         }
-        if (key === 'progress' && args.update) {
+        if ((key === 'progress' || key === 'custom_widget') && args.update) {
           // Update: same token, the front shows the state of the latest call.
           return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: args.update, updated: true, instruction: spec.updateInstruction }) }], details: { token: args.update } };
         }

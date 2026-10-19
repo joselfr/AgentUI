@@ -45,11 +45,13 @@ export function interactiveBlocks(text: string): string[] {
 /** Plugins expose each display widget as an `agentui_<type>` tool (e.g. `agentui_chart`): its arguments are the widget's. */
 const WIDGET_TOOL_PREFIX = 'agentui_';
 export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string; startedAt?: number; endedAt?: number };
-const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image', 'ui']);
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image', 'custom_widget']);
+/** Name of the tool before it was renamed: conversations that already used it keep rendering. */
+const LEGACY_UI_TOOL = `${WIDGET_TOOL_PREFIX}ui`;
 
 export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
   if (!t.name.startsWith(WIDGET_TOOL_PREFIX)) return undefined;
-  const type = t.name.slice(WIDGET_TOOL_PREFIX.length);
+  const type = t.name === LEGACY_UI_TOOL ? 'custom_widget' : t.name.slice(WIDGET_TOOL_PREFIX.length);
   const args = t.args;
   if (!DISPLAY_WIDGETS.has(type) || !args || typeof args !== 'object' || Array.isArray(args)) return undefined;
   return { type, arguments: args as Record<string, unknown> };
@@ -66,6 +68,9 @@ function stripPartialToken(text: string): string {
   return text;
 }
 const fence = (w: { type: string; arguments: Record<string, unknown> }) => '\n\n```widget\n' + JSON.stringify(w) + '\n```\n\n';
+
+/** `agentui_custom_widget` call that only pushes a new state to a widget already displayed (`update` = its token): it creates no component. */
+const isUiUpdate = (t: ToolCallLike) => widgetOfTool(t)?.type === 'custom_widget' && typeof (t.args as { update?: unknown } | undefined)?.update === 'string';
 
 const sameCall = (a: ToolCallLike, b: ToolCallLike) => (a.id !== undefined && b.id !== undefined ? a.id === b.id : a === b);
 
@@ -147,7 +152,11 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
     const id = tokenOf(t);
     const w = id ? widgetOfTool(t) : undefined;
     if (id && w) {
-      widgets.set(id, w.type === 'image' ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w);
+      const prev = widgets.get(id);
+      // State update of a dynamic widget: the code stays that of the first call, only `state` follows the latest call.
+      if (isUiUpdate(t)) { if (prev) widgets.set(id, { ...prev, arguments: { ...prev.arguments, state: w.arguments.state } }); continue; }
+      // A dynamic widget knows its token: its events to the agent say which widget they come from.
+      widgets.set(id, w.type === 'image' ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w.type === 'custom_widget' ? { ...w, arguments: { ...w.arguments, token: `[[agentui:${id}]]` } } : w);
     }
   }
   const used = new Set<string>();
@@ -160,6 +169,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
   });
   out = stripPartialToken(out);
   if (done) for (const t of own) {
+    if (isUiUpdate(t)) continue; // the widget lives where it was created
     const id = tokenOf(t);
     const w = id ? widgets.get(id) : undefined;
     if (id && w && !used.has(id) && !OUT_OF_TEXT.has(w.type)) out += fence(w);

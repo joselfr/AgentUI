@@ -274,6 +274,16 @@ async def main():
         assert outs[0]["text"] == "Reminder: meeting at 2 pm" and "conversationId" not in outs[0], outs
         print("✓ messages proactifs (outbound)")
 
+        # 3ter. streamed preview outside a run (text + cursor, then edits): ONE outbound with the final text, no cursor
+        r = await adapter.send("c1", "Validation run ok, the cha ▉")
+        await adapter.edit_message("c1", r.message_id, "Validation run ok, the chain does everything ▉")
+        await adapter.edit_message("c1", r.message_id, "Validation run ok, the chain does everything.", finalize=True)
+        await adapter.send("c1", "after the preview")
+        frames = await server.until(lambda f: f.get("type") == "outbound" and f.get("text") == "after the preview")
+        texts = [f["text"] for f in frames if f["type"] == "outbound" and "alidation" in f.get("text", "")]
+        assert texts == ["Validation run ok, the chain does everything."], texts
+        print("✓ preview outside a run: a single message, cursor removed")
+
         # 3bis. cron delivery (job_id metadata) during a reply in progress in the same chat
         await server.send({"type": "inbound", "conversationId": "cron-watch", "runId": "rc", "text": "long"})
         await asyncio.sleep(0.3)

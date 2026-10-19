@@ -90,7 +90,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
   app.get('/api/miniapps', async () => store.list());
   app.get<{ Params: { id: string } }>('/api/miniapps/:id', async (req) => must(req.params.id));
   app.delete<{ Params: { id: string } }>('/api/miniapps/:id', async (req) => {
-    store.remove(req.params.id);
+    await store.destroy(req.params.id);
     return { ok: true };
   });
   app.get<{ Params: { id: string } }>('/api/miniapps/:id/session', async (req) => {
@@ -211,7 +211,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     return sendFile(reply, file, 'public, max-age=300');
   };
 
-  // ---------- Widgets of the `agentui_ui` tool: compiled on demand, same runtime and sandbox as the miniapps ----------
+  // ---------- Widgets of the `agentui_custom_widget` tool: compiled on demand, same runtime and sandbox as the miniapps ----------
   /** Compiles the code of a widget; answers the iframe base URL (token-protected, like a miniapp's) or the build errors. */
   app.post<{ Body: { code?: unknown } }>('/api/widgets', async (req) => {
     const r = await widgets.compile(String(req.body?.code ?? ''));

@@ -33,7 +33,7 @@ Protocol between AgentUI (the "gateway", like Telegram for a bot) and a **channe
 | `abort` | `conversationId`, `runId` | Stop the run. |
 | `reply` | `conversationId`, `runId`, `text` | User answer to a question the agent asks **mid-run** (announced by `question.requested`). The plugin hands it to the waiting agent: the run continues and ends normally, it is not a new `inbound`. Optional: AgentUI only sends it while a question is open. |
 | `approval` | `conversationId`, `runId`, `id`, `approve: boolean`, `scope?: "once" \| "session" \| "always"` | Answer to an `approval.request`. |
-| `rpc` | `id`, `method`, `params?` | Optional call. Unknown method: `rpc.result` with `error`. Methods: `listSubAgents` → `[{ id, name, description?, isDefault? }]`; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (if `capabilities.jobs`); `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (if `capabilities.jobControl`); `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (if `capabilities.skills`); `readSkill {skillId, subAgentId?}` → `{ content }` (Markdown of the skill, if `capabilities.skills`); `deleteSession {conversationId}` → `{ ok: true }` (if `capabilities.sessionDelete`); `listModels` → `[{ provider, providerName, id }]`, `setModel {conversationId, model, provider?, subAgentId?}` → `{ model, provider?, message? }` and `sessionUsage {conversationId, subAgentId?}` → `Usage` or `null` (if `capabilities.models`). Dates in milliseconds. |
+| `rpc` | `id`, `method`, `params?` | Optional call. Unknown method: `rpc.result` with `error`. Methods: `listSubAgents` → `[{ id, name, description?, isDefault? }]`; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (if `capabilities.jobs`); `readJobScript {jobId}` → `{ name, content }` (source of the task's script, if `capabilities.jobs`); `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (if `capabilities.jobControl`); `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (if `capabilities.skills`); `readSkill {skillId, subAgentId?}` → `{ content }` (Markdown of the skill, if `capabilities.skills`); `deleteSession {conversationId}` → `{ ok: true }` (if `capabilities.sessionDelete`); `listModels` → `[{ provider, providerName, id }]`, `setModel {conversationId, model, provider?, subAgentId?}` → `{ model, provider?, message? }` and `sessionUsage {conversationId, subAgentId?}` → `Usage` or `null` (if `capabilities.models`). Dates in milliseconds. |
 | `miniapp.result` | `id`, `ok`, `result?` \| `error?` | Answer to a `miniapp.op`. `ok: false`: `error` is a message readable by the agent (invalid id, miniapp of another agent…). A failing build is **not** an error: `ok: true` with `result = { ok: false, errors: [{ file, line, message }] }`. |
 | `notify.result` | `id`, `ok`, `result?` \| `error?` | Answer to a `notify`. `result = { sent, note? }` (`sent`: devices reached; `0` if none is subscribed). |
 | `ping` | — | Keep-alive. |
@@ -83,7 +83,7 @@ over plain text, and models rarely pick a widget on their own. The plugins there
 AgentUI chats only: Hermes through `platform_hint`, OpenClaw through a `before_prompt_build` hook (`appendSystemContext`) filtered on
 AgentUI sessions.
 
-`agentui_ui` is the **dynamic** display widget: its `code` argument is a single TSX module (default-exported React component)
+`agentui_custom_widget` is the **dynamic** display widget: its `code` argument is a single TSX module (default-exported React component)
 that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js` only). Plugins only validate it (non-empty, ≤ 64 KB, has an
 `export default`); the front end sends the code to `POST /api/widgets`, which compiles it (esbuild, cached by hash) and returns the
 URL of a token-protected sandboxed iframe (`/w/<hash>/<token>/`, same runtime and CSP as a miniapp, no backend, no `/api`).
@@ -92,6 +92,26 @@ The widget can talk back through `reply(text)` (`@agentui/ui`): the front end se
 reaches the agent as if the user had typed it, the host only accepts it when the chat is idle (no run in progress, so it never answers a pending
 question), the iframe has the focus (the user clicked in it), at most once every 1.5 s, and for 1 to 2000 characters. `useCanReply()` tells the widget
 when it would be refused.
+
+**Live widgets (two-way).** A `agentui_custom_widget` widget becomes a *live widget* when the agent keeps a session open with it: it talks to its agent over a connection the agent keeps open, like `agentui_ask`, but for as long as
+it wants. It is a loop of the agent inside **one run**, and so inside the single chat message that holds the widget:
+1. `agentui_custom_widget` creates the widget (`code`, initial `state`) and returns its token;
+2. `agentui_custom_widget_wait` (`token`, `timeout_s` default 600, max 1800; `blockingTools` section) blocks like `agentui_ask` — `question.requested`, then
+   `question.resolved` on the answer — but displays nothing (no ```` ```widget ```` block: the widget is already there). It returns
+   `{"from":"widget","widget":<token>,"event":<text>}` for an event of the widget, `{"from":"user","message":<text>}` if the user typed in the
+   chat meanwhile, or `{"timeout":true}` (a normal outcome, the agent may listen again). Cancelling the run ends it with an error as usual;
+3. `agentui_custom_widget` with `update` (the token) and `state` (any JSON, ≤ 32 KB, replaces the previous one) pushes the new state; like
+   `agentui_progress`, it returns the same token with `updated: true` and creates no component. The front keeps the code of the first call and
+   posts the `state` of the latest one into the running iframe (`agentui:state`), where `useAgentState()` returns it. The iframe is neither
+   reloaded nor remounted (a live widget stays mounted while the agent thinks), so the component keeps its own React state; after a page reload
+   it starts again from the latest `state`;
+4. back to 2, until the agent stops calling `agentui_custom_widget_wait`: that is how it closes the session, then the run ends normally.
+
+In the component, `reply(text, { silent: true })` posts an event: `POST /api/conversations/:id/send` with `widget: { token }` (the front gives
+the component its token). It is only accepted while the agent waits (`awaitingReply`, otherwise 409): the server hands it to the adapter as the
+`reply` frame, whose `text` is `{"agentui":"widget-event","widget":<token>,"text":<text>}` (so the plugin does not mistake it for a chat message),
+and stores the user message `hidden`. A plugin that times out a wait delivers `{"agentui":"timeout"}`. `useCanReply()` is therefore true only while
+the agent listens: the widget is disabled while it thinks. Nothing is delivered without an open wait. Demo and test: `e2e/ui-twoway.mjs`.
 
 The interactive widgets `ask`, `confirm` and `form` are **blocking** tools (`agentui_ask`, `agentui_confirm`,
 `agentui_form`, `blockingTools` section of the same file). The tool emits `question.requested`, adds the ```` ```widget ````

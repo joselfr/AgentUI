@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import type { AgentInfo, Job, MiniApp, Message, ModelOption, OutgoingAttachment, SearchHit, Skill, SubAgent, Usage } from '@agentui/shared';
+import type { AgentInfo, Job, MiniApp, Message, ModelOption, OutgoingAttachment, SearchHit, Skill, SubAgent, Usage, WidgetEvent } from '@agentui/shared';
 
 export interface Conversation {
   id: string;
@@ -54,6 +54,7 @@ export const api = {
   skills: (id: string, sub?: string) => call<Skill[]>('GET', `/agents/${id}/skills${q(sub)}`),
   skill: (id: string, skillId: string, sub?: string) => call<{ content: string }>('GET', `/agents/${id}/skills/${encodeURIComponent(skillId)}${q(sub)}`),
   jobs: (id: string, sub?: string) => call<Job[]>('GET', `/agents/${id}/jobs${q(sub)}`),
+  jobScript: (id: string, jobId: string, sub?: string) => call<{ name: string; content: string }>('GET', `/agents/${id}/jobs/${encodeURIComponent(jobId)}/script${q(sub)}`),
   jobAction: (id: string, jobId: string, action: string, sub?: string) =>
     call<{ ok: true }>('POST', `/agents/${id}/jobs/${encodeURIComponent(jobId)}/${action}${q(sub)}`),
   models: (agentId: string) => call<ModelOption[]>('GET', `/agents/${agentId}/models`),
@@ -69,12 +70,13 @@ export const api = {
   setFavorite: (id: string, favorite: boolean) => call('PATCH', `/conversations/${id}`, { favorite }),
   setArchived: (id: string, archived: boolean) => call('PATCH', `/conversations/${id}`, { archived }),
   remove: (id: string) => call('DELETE', `/conversations/${id}`),
-  send: (id: string, text: string, attachments: OutgoingAttachment[] = []) =>
-    call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments }),
+  send: (id: string, text: string, attachments: OutgoingAttachment[] = [], widget?: WidgetEvent) =>
+    call<{ runId: string; messageId: string }>('POST', `/conversations/${id}/send`, { text, attachments, ...(widget ? { widget } : {}) }),
   abort: (id: string) => call('POST', `/conversations/${id}/abort`),
   miniapps: () => call<MiniApp[]>('GET', '/miniapps'),
   miniapp: (id: string) => call<MiniApp>('GET', `/miniapps/${id}`),
   removeMiniapp: (id: string) => call<{ ok: true }>('DELETE', `/miniapps/${id}`),
+  miniappJobs: (id: string) => call<Job[]>('GET', `/miniapps/${id}/jobs`),
   miniappFs: (id: string) => call<{ path: string; mode: 'ro' | 'rw'; approved: boolean }[]>('GET', `/miniapps/${id}/fs`),
   setMiniappFs: (id: string, path: string, approved: boolean) => call<{ path: string; mode: 'ro' | 'rw'; approved: boolean }[]>('PUT', `/miniapps/${id}/fs`, { path, approved }),
   buildWidget: (code: string) => call<{ ok: true; base: string } | { ok: false; errors: { line?: number; column?: number; message: string }[] }>('POST', '/widgets', { code }),

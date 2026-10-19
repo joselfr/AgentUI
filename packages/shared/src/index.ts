@@ -70,6 +70,8 @@ export interface Job {
   deliverTo?: string;
   /** Matching AgentUI chat, if it already exists (filled in by the server). */
   conversationId?: string;
+  /** Miniapp this task belongs to (tagged by the agent); deleted along with it. */
+  miniappId?: string;
 }
 
 /** Search result: a chat whose title or a message matches all the words of the query. */
@@ -156,10 +158,15 @@ export interface OutgoingAttachment {
   data: string;
 }
 
+/** Origin of a user message that is an event of a dynamic widget (`token`: the `[[agentui:…]]` token of that widget). */
+export interface WidgetEvent { token?: string }
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   text: string;
+  /** Event of a dynamic widget (`reply(text, { silent: true })`) sent to the agent over its live session (`agentui_custom_widget_wait`): not shown in the chat. */
+  hidden?: boolean;
   reasoning?: string;
   toolCalls?: ToolCall[];
   subAgentRuns?: SubAgentRun[];

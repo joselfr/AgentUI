@@ -116,6 +116,12 @@ export function openDb(dataDir: string): DB {
       approved INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (app_id, path)
     );
+    CREATE TABLE IF NOT EXISTS miniapp_jobs (
+      app_id TEXT NOT NULL REFERENCES miniapps(id) ON DELETE CASCADE,
+      agent_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      PRIMARY KEY (agent_id, job_id)
+    );
     CREATE TABLE IF NOT EXISTS miniapp_kv (
       app_id TEXT NOT NULL REFERENCES miniapps(id) ON DELETE CASCADE,
       key TEXT NOT NULL,
@@ -132,6 +138,7 @@ export function openDb(dataDir: string): DB {
   try { db.exec('ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch { /* column already present */ }
   try { db.exec('ALTER TABLE conversations ADD COLUMN usage TEXT'); } catch { /* column already present */ }
   try { db.exec('ALTER TABLE messages ADD COLUMN pending_question TEXT'); } catch { /* column already present */ }
+  try { db.exec('ALTER TABLE messages ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0'); } catch { /* column already present */ }
   for (const col of ['reasoning TEXT', 'summary TEXT', 'session_id TEXT']) {
     try { db.exec(`ALTER TABLE subagent_runs ADD COLUMN ${col}`); } catch { /* column already present */ }
   }

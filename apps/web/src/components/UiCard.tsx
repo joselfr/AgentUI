@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { themeCssVars } from '@agentui/shared';
+import { themeCssVars, type WidgetEvent } from '@agentui/shared';
 import { api } from '../api';
 import { getLang, t, useLang } from '../i18n';
 
-interface Ui { code: string; title?: string; maxHeight: number }
+interface Ui { code: string; title?: string; maxHeight: number; state?: unknown; token?: string }
 
 const MIN_HEIGHT = 40;
 const MAX_HEIGHT = 4000;
 
-/** Arguments of the `ui` widget: `{ code, title?, height? }`. `code` is a TSX module that default-exports a React component. `undefined` if invalid. */
+/** Arguments of the `ui` widget: `{ code, title?, height?, state? }` (`state`: latest value pushed by the agent). `code` is a TSX module that default-exports a React component. `undefined` if invalid. */
 export function parseUi(a: Record<string, unknown>): Ui | undefined {
   if (typeof a.code !== 'string' || !a.code.trim()) return undefined;
   const h = a.height;
@@ -18,6 +18,8 @@ export function parseUi(a: Record<string, unknown>): Ui | undefined {
     code: a.code,
     title: typeof a.title === 'string' && a.title.trim() ? a.title.trim() : undefined,
     maxHeight: typeof h === 'number' && isFinite(h) ? Math.min(Math.max(h, 120), MAX_HEIGHT) : 2400,
+    state: a.state,
+    token: typeof a.token === 'string' ? a.token : undefined,
   };
 }
 
@@ -35,7 +37,7 @@ const safeUrl = (u: unknown): string | undefined => {
 export const REPLY_MAX = 2000;
 const REPLY_COOLDOWN_MS = 1500;
 
-export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: string) => Promise<boolean> }) {
+export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: string, widget?: WidgetEvent) => Promise<boolean> }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const muiTheme = useTheme();
   const lang = useLang() && getLang();
@@ -58,12 +60,23 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
   }, [ui.code]);
 
   const lastReply = useRef(0);
+  const token = useRef(ui.token);
+  token.current = ui.token;
   const reply = useRef(onReply);
   reply.current = onReply;
   const postChat = useCallback(() => {
     frame.current?.contentWindow?.postMessage({ type: 'agentui:chat', canReply: !!reply.current }, '*');
   }, []);
   useEffect(postChat, [postChat, !!onReply]);
+
+  // State pushed by the agent (`agentui_custom_widget` with `update` + `state`): sent to the running widget, which is neither reloaded nor remounted.
+  const state = useRef(ui.state);
+  state.current = ui.state;
+  const postState = useCallback(() => {
+    if (state.current !== undefined) frame.current?.contentWindow?.postMessage({ type: 'agentui:state', state: state.current }, '*');
+  }, []);
+  const stateJson = JSON.stringify(ui.state) ?? '';
+  useEffect(postState, [postState, stateJson]);
 
   const postTheme = useCallback(() => {
     frame.current?.contentWindow?.postMessage({ type: 'agentui:theme', mode, lang, vars: themeCssVars(mode) }, '*');
@@ -74,8 +87,8 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
     const onMsg = (e: MessageEvent) => {
       const w = frame.current?.contentWindow;
       if (!w || e.source !== w) return;
-      const m = e.data as { type?: string; id?: string; height?: unknown; message?: unknown; url?: unknown; text?: unknown } | null;
-      if (m?.type === 'agentui:ready') { setReady(true); postTheme(); postChat(); }
+      const m = e.data as { type?: string; id?: string; height?: unknown; message?: unknown; url?: unknown; text?: unknown; silent?: unknown } | null;
+      if (m?.type === 'agentui:ready') { setReady(true); postTheme(); postChat(); postState(); }
       else if (m?.type === 'agentui:resize' && typeof m.height === 'number') setHeight(Math.max(MIN_HEIGHT, Math.min(m.height, ui.maxHeight)));
       else if (m?.type === 'agentui:error') setRuntimeError(String(m.message ?? ''));
       else if (m?.type === 'agentui:open') { const url = safeUrl(m.url); if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
@@ -88,13 +101,13 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
         const done = (ok: boolean) => w.postMessage({ type: 'agentui:reply.result', id: m.id, ok }, '*');
         if (!allowed) return done(false);
         lastReply.current = now;
-        void reply.current!(text).then(done, () => done(false));
+        void reply.current!(text, m.silent === true ? { token: token.current } : undefined).then(done, () => done(false));
       }
       else if (m?.type === 'agentui:fetch' && typeof m.id === 'string') w.postMessage({ type: 'agentui:fetch.result', id: m.id, status: 404, body: { error: 'This widget has no backend.' } }, '*');
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [postTheme, postChat, ui.maxHeight]);
+  }, [postTheme, postChat, postState, ui.maxHeight]);
 
   if (errors.length) {
     return (
@@ -109,7 +122,7 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
       {ui.title && <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{ui.title}</Typography>}
       <Box sx={{ position: 'relative', minHeight: ready ? 0 : 96 }}>
         {!ready && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}><CircularProgress size={20} /></Box>}
-        {base && <iframe ref={frame} title={ui.title ?? t('ui.title')} src={base} sandbox="allow-scripts" onLoad={() => { postTheme(); postChat(); }}
+        {base && <iframe ref={frame} title={ui.title ?? t('ui.title')} src={base} sandbox="allow-scripts" onLoad={() => { postTheme(); postChat(); postState(); }}
           style={{ display: 'block', width: '100%', height, border: 0, background: 'transparent', colorScheme: mode, visibility: ready ? 'visible' : 'hidden' }} />}
       </Box>
       {runtimeError && <Alert severity="error" onClose={() => setRuntimeError('')} sx={{ mt: 0.5, whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{runtimeError}</Alert>}

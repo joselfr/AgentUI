@@ -41,6 +41,25 @@ describe('store', () => {
     expect(store.distFile('todo', 'app.js')).toBeTruthy(); // previous build kept
   });
 
+  it('tags jobs to a miniapp and deletes them with it', async () => {
+    store.create('a1', { id: 'todo', name: 'Todo' });
+    store.create('a1', { id: 'other', name: 'Other' });
+    store.linkJob('todo', 'a1', 'j1');
+    store.linkJob('todo', 'a1', 'j2');
+    store.linkJob('other', 'a1', 'j3');
+    expect(store.jobsOf('todo')).toEqual(['j1', 'j2']);
+    expect(store.jobLinks('a1').get('j3')).toBe('other');
+    expect(() => store.linkJob('todo', 'a2', 'j9')).toThrow(AppError);
+    store.unlinkJob('a1', 'j2');
+    const purged: string[][] = [];
+    store.purgeJobs = async (_agent, ids) => { purged.push(ids); throw new Error('scheduler down'); };
+    await store.destroy('todo', 'a1'); // best effort: removed even if the purge fails
+    expect(purged).toEqual([['j1']]);
+    expect(store.get('todo')).toBeUndefined();
+    expect(store.jobLinks('a1').has('j1')).toBe(false);
+    expect(store.jobLinks('a1').get('j3')).toBe('other');
+  });
+
   it('refuses other agents, bad ids and bad paths', async () => {
     store.create('a1', { id: 'todo', name: 'Todo' });
     await expect(store.writeFiles('todo', 'a2', [{ path: 'src/main.tsx', content: MAIN }])).rejects.toBeInstanceOf(AppError);
@@ -354,7 +373,7 @@ describe('ctx.crypto signatures', () => {
   });
 });
 
-describe('widgets (agentui_ui)', () => {
+describe('widgets (agentui_custom_widget)', () => {
   it('compiles in a sandbox: only the runtime modules, cached by hash', async () => {
     const w = new WidgetStore(dir);
     const code = "import { Card, Text } from '@agentui/ui'; import { useState } from 'react'; export default function W() { const [n] = useState(1); return <Card><Text>{n}</Text></Card>; }";

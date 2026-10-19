@@ -156,13 +156,20 @@ async function main() {
     if (!a.readSkill) return reply.code(501).send({ error: 'Not supported' });
     return { content: await a.readSkill(req.params.skillId, req.query.sub) };
   });
-  app.get<{ Params: { id: string }; Querystring: { sub?: string } }>('/api/agents/:id/jobs', async (req) =>
-    // Link to the chat that receives the results of each task, when it already exists.
-    (await adapterOf(req.params.id).listJobs(req.query.sub)).map((j) => {
+  app.get<{ Params: { id: string }; Querystring: { sub?: string } }>('/api/agents/:id/jobs', async (req) => {
+    // Link to the chat that receives the results of each task, when it already exists, and to its miniapp.
+    const links = apps.jobLinks(req.params.id);
+    return (await adapterOf(req.params.id).listJobs(req.query.sub)).map((j) => {
       const conv = j.deliverTo ? runs.findByRemoteSession(req.params.id, j.deliverTo) : undefined;
-      return conv ? { ...j, conversationId: conv.id } : j;
-    }),
-  );
+      const miniappId = links.get(j.id);
+      return { ...j, ...(conv ? { conversationId: conv.id } : {}), ...(miniappId ? { miniappId } : {}) };
+    });
+  });
+  app.get<{ Params: { id: string; jobId: string }; Querystring: { sub?: string } }>('/api/agents/:id/jobs/:jobId/script', async (req, reply) => {
+    const a = adapterOf(req.params.id);
+    if (!a.readJobScript) return reply.code(501).send({ error: 'Not supported' });
+    return a.readJobScript(req.params.jobId, req.query.sub);
+  });
   app.post<{ Params: { id: string; jobId: string; action: string }; Querystring: { sub?: string } }>(
     '/api/agents/:id/jobs/:jobId/:action',
     async (req, reply) => {
@@ -170,9 +177,20 @@ async function main() {
       const action = z.enum(['pause', 'resume', 'run', 'delete']).parse(req.params.action);
       if (!a.jobAction) return reply.code(501).send({ error: 'Not supported' });
       await a.jobAction(req.params.jobId, action, req.query.sub);
+      if (action === 'delete') apps.unlinkJob(req.params.id, req.params.jobId);
       return { ok: true };
     },
   );
+
+  /** Scheduled tasks tagged to a miniapp, as the agent's scheduler currently reports them. */
+  app.get<{ Params: { id: string } }>('/api/miniapps/:id/jobs', async (req, reply) => {
+    const m = apps.get(req.params.id);
+    if (!m) return reply.code(404).send({ error: 'Unknown miniapp' });
+    const ids = new Set(apps.jobsOf(m.id));
+    if (!ids.size) return [];
+    const a = adapters.get(m.agentId);
+    return a ? (await a.listJobs().catch(() => [])).filter((j) => ids.has(j.id)).map((j) => ({ ...j, miniappId: m.id })) : [];
+  });
 
   // ---------- Conversations ----------
   const convDto = (c: ReturnType<RunManager['listConversations']>[number]) => ({
@@ -254,16 +272,22 @@ async function main() {
     const b = z
       .object({
         text: z.string().max(100_000).default(''),
+        // Event of a dynamic widget (not a chat message): `silent` is the older form, without the widget token.
+        widget: z.object({ token: z.string().regex(/^\[\[agentui:[0-9a-f]+\]\]$/).optional() }).optional(),
+        silent: z.boolean().default(false),
         attachments: z.array(z.object({ name: z.string().min(1).max(300), mimeType: z.string().max(200).default(''), data: z.string() })).max(20).default([]),
       })
       .refine((v) => v.text.trim() || v.attachments.length, { message: 'Message vide' })
       .parse(req.body);
     try {
       // During an agent question (question.requested), the message is the answer: it resumes the current run.
+      const widget = b.widget ?? (b.silent ? {} : undefined);
       if (runs.awaitingReply(req.params.id)) {
         if (b.attachments.length) return reply.code(400).send({ error: 'No attachment in an answer' });
-        return await runs.reply(req.params.id, b.text);
+        return await runs.reply(req.params.id, b.text, widget);
       }
+      // A widget event only travels over the live session of the agent (agentui_custom_widget_wait): without it there is nobody to hear it.
+      if (widget) return reply.code(409).send({ error: 'The agent is not listening to this widget' });
       return await runs.start(req.params.id, b.text, b.attachments);
     } catch (e) {
       return reply.code(e instanceof AttachmentError ? 400 : 409).send({ error: (e as Error).message });
@@ -294,6 +318,10 @@ async function main() {
   // ---------- Miniapps (created by the agents, shown in the Miniapps tab) ----------
   const apps = new MiniAppStore(db, env.dataDir, env.miniappFsRoots);
   apps.onChange = (id, kind) => runs.broadcast({ type: 'miniapp.changed', appId: id, removed: kind === 'removed' });
+  apps.purgeJobs = async (agentId, jobIds) => {
+    const a = adapters.get(agentId);
+    for (const jobId of jobIds) await a?.jobAction?.(jobId, 'delete').catch((e) => app.log.warn({ agent: agentId, jobId, err: String(e) }, 'miniapp job not deleted'));
+  };
   const appData = new AppData(db);
   const dataTimers = new Map<string, ReturnType<typeof setTimeout>>();
   apps.onData = (id) => {

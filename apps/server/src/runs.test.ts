@@ -43,6 +43,39 @@ test('run: persistence of text and tools, replayable events', async () => {
   expect(runs.isRunning(conv.id)).toBe(false);
 });
 
+test('widget event: travels as the answer of the live session (agentui_custom_widget_wait), tagged with the widget, stored hidden', async () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const replies: string[] = [];
+  const queue: AgentEvent[] = [];
+  let wake: (() => void) | undefined;
+  const push = (e: AgentEvent) => { queue.push(e); wake?.(); };
+  const adapter = {
+    capabilities: () => ({}),
+    async send() {
+      async function* events() {
+        for (;;) {
+          while (!queue.length) await new Promise<void>((r) => (wake = r));
+          const e = queue.shift()!;
+          yield e;
+          if (e.type === 'run.completed') return;
+        }
+      }
+      return { runId: 'r1', sessionId: 's1', events: events() };
+    },
+    async reply(_runId: string, _sessionId: string, text: string) { replies.push(text); },
+  } as unknown as AgentAdapter;
+  const runs = new RunManager(db, new Map([['a', adapter]]));
+  const conv = runs.createConversation('a');
+  await runs.start(conv.id, 'play chess');
+  push({ type: 'question.requested', id: 'w1' }); // the agent is in agentui_custom_widget_wait
+  await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(true));
+  await runs.reply(conv.id, 'move e2e4', { token: '[[agentui:a1b2c3]]' });
+  expect(JSON.parse(replies[0]!)).toEqual({ agentui: 'widget-event', widget: '[[agentui:a1b2c3]]', text: 'move e2e4' });
+  const msgs = runs.getMessages(conv.id);
+  expect(msgs.filter((m) => m.role === 'user').map((m) => [m.text, m.hidden])).toEqual([['play chess', undefined], ['move e2e4', true]]);
+  push({ type: 'run.completed' });
+});
+
 test('scrypt passwords', () => {
   const h = hashPassword('secret123');
   expect(verifyPassword('secret123', h)).toBe(true);

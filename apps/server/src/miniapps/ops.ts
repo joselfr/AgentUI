@@ -15,6 +15,7 @@ const SCHEMAS = {
   delete_file: z.object({ id, path }),
   remove: z.object({ id }),
   logs: z.object({ id }),
+  job: z.object({ id, action: z.enum(['link', 'unlink', 'list']), job_id: z.string().min(1).max(200).optional() }),
   data: z.object({
     id,
     action: z.enum(['find', 'get', 'insert', 'update', 'remove', 'kv_get', 'kv_set', 'kv_delete']),
@@ -56,8 +57,16 @@ export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: s
       return r.ok ? { ok: true } : { ok: false, errors: r.errors };
     }
     case 'remove':
-      store.remove(a.id, agentId);
+      await store.destroy(a.id, agentId);
       return { ok: true };
+    case 'job': {
+      store.assertOwner(a.id, agentId);
+      if (a.action === 'list') return { jobs: store.jobsOf(a.id) };
+      if (!a.job_id) throw new AppError(`"job_id" is required for action ${a.action}.`);
+      if (a.action === 'link') store.linkJob(a.id, agentId, a.job_id);
+      else store.unlinkJob(agentId, a.job_id);
+      return { ok: true, jobs: store.jobsOf(a.id) };
+    }
     case 'logs':
       return { lines: store.getLogs(a.id, agentId) };
     case 'data': {

@@ -4,6 +4,7 @@ import Pause from '@mui/icons-material/Pause';
 import PlayArrow from '@mui/icons-material/PlayArrow';
 import Bolt from '@mui/icons-material/Bolt';
 import Delete from '@mui/icons-material/Delete';
+import Apps from '@mui/icons-material/Apps';
 import Forum from '@mui/icons-material/Forum';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import type { AgentInfo, Job } from '@agentui/shared';
@@ -11,6 +12,7 @@ import { api } from '../../api';
 import { useBackClose } from '../../useBackClose';
 import { MONO } from '../../theme';
 import { useConfirm } from '../Confirm';
+import CodeCard, { parseCode } from '../CodeCard';
 import { card, useLoad, Page, Status, Pickers, useScope } from './shared';
 import { fmtDateTime, t } from '../../i18n';
 
@@ -29,8 +31,18 @@ function RunState({ j, launched }: { j: Job; launched: boolean }) {
 }
 
 /** Task detail popup: schedule, last run, executed script and prompt given to the agent. */
-function JobDialog({ j, onClose }: { j?: Job; onClose: () => void }) {
+function JobDialog({ j, agentId, sub, onClose }: { j?: Job; agentId?: string; sub?: string; onClose: () => void }) {
   useBackClose(!!j, onClose);
+  // Source of the script, read on demand from the agent's machine (colored like the code widget); falls back to the plain path.
+  const [source, setSource] = useState<{ name: string; content: string }>();
+  useEffect(() => {
+    setSource(undefined);
+    if (!j?.script || !agentId) return;
+    let live = true;
+    api.jobScript(agentId, j.id, sub).then((s) => live && setSource(s)).catch(() => {});
+    return () => { live = false; };
+  }, [j?.id, j?.script, agentId, sub]);
+  const code = source && parseCode({ code: source.content, filename: source.name, language: source.name.split('.').pop()?.toLowerCase() });
   const field = (label: string, value: ReactNode) => (
     <Box>
       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{label}</Typography>
@@ -52,7 +64,7 @@ function JobDialog({ j, onClose }: { j?: Job; onClose: () => void }) {
             <RunState j={j} launched={false} />
             {j.lastError && block(j.lastError, true)}
           </Box>)}
-          {j.script && field(j.mode === 'script' ? t('jobs.script') : t('jobs.preScript'), block(j.script, true))}
+          {j.script && field(j.mode === 'script' ? t('jobs.script') : t('jobs.preScript'), code ? <CodeCard code={code} /> : block(j.script, true))}
           {j.prompt && field(t('jobs.prompt'), block(j.prompt, false))}
         </DialogContent>
         <DialogActions><Button onClick={onClose}>{t('common.close')}</Button></DialogActions>
@@ -60,7 +72,7 @@ function JobDialog({ j, onClose }: { j?: Job; onClose: () => void }) {
     </Dialog>);
 }
 
-export function JobsPage({ agents, onOpenConversation }: { agents: AgentInfo[]; onOpenConversation: (id: string) => void }) {
+export function JobsPage({ agents, onOpenConversation, onOpenMiniapp }: { agents: AgentInfo[]; onOpenConversation: (id: string) => void; onOpenMiniapp: (id: string) => void }) {
   const { ask, dialog: confirmDialog } = useConfirm();
   const sc = useScope(agents, (a) => a.capabilities.jobs);
   const jobs = useLoad<Job[]>(() => (sc.agent ? api.jobs(sc.agent.id, sc.sub) : Promise.resolve([])), [sc.agent?.id, sc.sub]);
@@ -120,6 +132,7 @@ export function JobsPage({ agents, onOpenConversation }: { agents: AgentInfo[]; 
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{j.name}</Typography>
                   {j.mode && <Chip size="small" variant="outlined" label={j.mode === 'script' ? t('jobs.modeScript') : t('jobs.modeAgent')} />}
                   {!j.enabled && <Chip size="small" label={t('jobs.paused')} />}
+                  {j.miniappId && <Chip size="small" variant="outlined" icon={<Apps />} label={j.miniappId} onClick={(e) => { e.stopPropagation(); onOpenMiniapp(j.miniappId!); }} />}
                   <RunState j={j} launched={!!launched[j.id]} />
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
@@ -140,7 +153,7 @@ export function JobsPage({ agents, onOpenConversation }: { agents: AgentInfo[]; 
         })}
       </Box>
       {confirmDialog}
-      <JobDialog j={jobs.data?.find((x) => x.id === detail)} onClose={() => setDetail(undefined)} />
+      <JobDialog j={jobs.data?.find((x) => x.id === detail)} agentId={sc.agent?.id} sub={sc.sub} onClose={() => setDetail(undefined)} />
       <Snackbar open={!!notice} autoHideDuration={notice?.conversationId ? 15000 : 6000} onClose={() => setNotice(undefined)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity={notice?.ok ? 'success' : 'error'} variant="filled" onClose={() => setNotice(undefined)}
           action={notice?.conversationId ? <Button color="inherit" size="small" onClick={() => { onOpenConversation(notice.conversationId!); setNotice(undefined); }}>{t('jobs.seeResult')}</Button> : undefined}>

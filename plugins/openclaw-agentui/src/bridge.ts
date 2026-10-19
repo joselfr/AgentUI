@@ -9,7 +9,7 @@ import type { AgentUIClient } from './client.js';
 import type { AgentEvent, GatewayMessage, Media, Usage } from './protocol.js';
 import { getAgentUIRuntime } from './runtime.js';
 import { listSubAgents } from './agents.js';
-import { jobAction, listJobs } from './cron.js';
+import { jobAction, listJobs, readJobScript } from './cron.js';
 import { listSkills, readSkill } from './skills.js';
 import { randomBytes } from 'node:crypto';
 import type { AskResult, RunHost } from './hosts.js';
@@ -304,7 +304,10 @@ export class AgentUIBridge implements RunHost {
     if (run.toolAsk) return Promise.resolve({ error: "A question is already awaiting an answer: wait for it before asking another one." });
     return new Promise<AskResult>((resolve) => {
       const id = `ui_${randomBytes(6).toString('hex')}`;
-      const timer = setTimeout(() => settle({ error: "No answer from the user (timed out)." }), ASK_TIMEOUT_MS);
+      // `custom_widget_wait`: live session with a widget. No widget is displayed (it already is), and running out of time is a normal outcome, not an error.
+      const live = key === 'custom_widget_wait';
+      const waitMs = live ? Math.min(Math.max(Number(args.timeout_s) || 600, 1), 1800) * 1000 : ASK_TIMEOUT_MS;
+      const timer = setTimeout(() => settle(live ? { answer: JSON.stringify({ agentui: 'timeout' }) } : { error: "No answer from the user (timed out)." }), waitMs);
       timer.unref?.();
       const onAbort = () => settle({ error: 'Exchange interrupted.' });
       const settle = (res: AskResult) => {
@@ -318,7 +321,7 @@ export class AgentUIBridge implements RunHost {
       run.toolAsk = { id, answer: (answer) => settle({ answer }), cancel: () => settle({ error: 'Exchange interrupted.' }) };
       signal?.addEventListener('abort', onAbort, { once: true });
       this.emit(run, { type: 'question.requested', id });
-      this.appendBlock(run, '```widget\n' + JSON.stringify({ type: key, arguments: args }) + '\n```');
+      if (!live) this.appendBlock(run, '```widget\n' + JSON.stringify({ type: key, arguments: args }) + '\n```');
     });
   }
 
@@ -540,12 +543,14 @@ export class AgentUIBridge implements RunHost {
   private async onRpc(msg: Extract<GatewayMessage, { type: 'rpc' }>): Promise<void> {
     const client = this.p.client();
     const params = (msg.params ?? {}) as Json;
-    if (msg.method === 'listJobs' || msg.method === 'jobAction') {
+    if (msg.method === 'listJobs' || msg.method === 'jobAction' || msg.method === 'readJobScript') {
       try {
         const result =
           msg.method === 'listJobs'
             ? await listJobs(typeof params.subAgentId === 'string' ? params.subAgentId : undefined)
-            : await jobAction(String(params.jobId ?? ''), String(params.action ?? ''));
+            : msg.method === 'readJobScript'
+              ? await readJobScript(String(params.jobId ?? ''))
+              : await jobAction(String(params.jobId ?? ''), String(params.action ?? ''));
         client?.send({ type: 'rpc.result', id: msg.id, result });
       } catch (e) {
         client?.send({ type: 'rpc.result', id: msg.id, error: e instanceof Error ? e.message : String(e) });

@@ -35,6 +35,8 @@ export interface AgentAdapter {
   /** Content (Markdown) of a skill; absent = the agent cannot read it. */
   readSkill?(skillId: string, subAgentId?: string): Promise<string>;
   listJobs(subAgentId?: string): Promise<Job[]>;
+  /** Source of the script run by a task (read from the agent's machine); absent = the agent cannot show it. */
+  readJobScript?(jobId: string, subAgentId?: string): Promise<{ name: string; content: string }>;
   jobAction?(jobId: string, action: 'pause' | 'resume' | 'run' | 'delete', subAgentId?: string): Promise<void>;
   /** Deletes the platform session (channel adapters); absent = the agent cannot do it. */
   deleteSession?(sessionId: string): Promise<void>;

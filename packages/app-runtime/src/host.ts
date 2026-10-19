@@ -10,6 +10,8 @@ const dataSubs = new Set<() => void>();
 const chatSubs = new Set<() => void>();
 const replies = new Map<string, (ok: boolean) => void>();
 let canReplyNow = false;
+let agentState: unknown;
+const stateSubs = new Set<() => void>();
 
 function applyTheme(t: HostTheme) {
   theme = t;
@@ -30,6 +32,7 @@ if (typeof window !== 'undefined') {
     if (m?.type === 'agentui:theme') applyTheme({ mode: m.mode, lang: m.lang, vars: m.vars ?? {} });
     else if (m?.type === 'agentui:data') dataSubs.forEach((f) => f());
     else if (m?.type === 'agentui:chat') { canReplyNow = !!m.canReply; chatSubs.forEach((f) => f()); }
+    else if (m?.type === 'agentui:state') { agentState = m.state; stateSubs.forEach((f) => f()); }
     else if (m?.type === 'agentui:reply.result') { const done = replies.get(m.id); replies.delete(m.id); done?.(!!m.ok); }
     else if (m?.type === 'agentui:fetch.result') {
       const done = pending.get(m.id);
@@ -61,17 +64,33 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Sends `text` in the chat as the user's next message (chat widgets, `agentui_ui` only: miniapps have no chat). It answers `true`
+ * Sends `text` in the chat as the user's next message (chat widgets, `agentui_custom_widget` only: miniapps have no chat). It answers `true`
  * once sent, `false` when it was refused: the agent is busy, the click did not come from the user, the text is empty or over
  * 2000 characters. Call it from a click handler, e.g. `<Button onClick={() => reply(`Tell me more about ${offer.name}`)}>Details</Button>`.
+ * With `{ silent: true }` the message reaches the agent but is not shown in the chat: use it for the moves of a game or any
+ * exchange that happens inside the widget; the agent answers by pushing a new state (`useAgentState`).
  */
-export function reply(text: string): Promise<boolean> {
+export function reply(text: string, opts?: { silent?: boolean }): Promise<boolean> {
   const id = `p${++seq}`;
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => { replies.delete(id); resolve(false); }, 5000);
     replies.set(id, (ok) => { clearTimeout(timer); resolve(ok); });
-    toHost({ type: 'agentui:reply', id, text: String(text) });
+    toHost({ type: 'agentui:reply', id, text: String(text), ...(opts?.silent ? { silent: true } : {}) });
   });
+}
+
+/**
+ * Latest state the agent pushed to this widget (`agentui_custom_widget` called with `update` + `state`), `initial` until the first one.
+ * The widget is not reloaded between two states: its own React state (selection, animation…) is kept.
+ */
+export function useAgentState<T = unknown>(initial?: T): T | undefined {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const f = () => force((n) => n + 1);
+    stateSubs.add(f);
+    return () => { stateSubs.delete(f); };
+  }, []);
+  return (agentState === undefined ? initial : agentState) as T | undefined;
 }
 
 /** `false` while the agent is working (a `reply` would be refused): disable the buttons that call it. */

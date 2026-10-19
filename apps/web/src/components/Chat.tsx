@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, Avatar, Box, Button, CircularProgress, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import type { Capabilities, Message } from '@agentui/shared';
+import type { Capabilities, Message, WidgetEvent } from '@agentui/shared';
 import Composer from './chat/Composer';
-import MessageBubble from './chat/MessageBubble';
+import MessageBubble, { type ReplyFor } from './chat/MessageBubble';
 import UnreadDivider from './chat/UnreadDivider';
 import SelectionQuote from './chat/SelectionQuote';
 import { plainText, withQuote } from './chat/quote';
@@ -19,7 +19,7 @@ export default function Chat(props: {
   modelPicker?: ReactNode;
   unreadMark?: { id: string; count: number };
   title: string; agentName: string; messages: Message[]; loading: boolean; isNew: boolean; running: boolean; awaiting: boolean; expandTools: boolean;
-  canAbort: boolean; attach: Capabilities['attachments']; approval?: { id: string; description: string }; onApprove: (ok: boolean) => void; onSend: (t: string, files: File[]) => Promise<boolean>; onAbort: () => void; error?: string;
+  canAbort: boolean; attach: Capabilities['attachments']; approval?: { id: string; description: string }; onApprove: (ok: boolean) => void; onSend: (t: string, files: File[], widget?: WidgetEvent) => Promise<boolean>; onAbort: () => void; error?: string;
 }) {
   const [drag, setDrag] = useState(false);
   // Text being replied to (a message or a selection). Not offered while the agent waits for an answer: that text is the answer itself.
@@ -30,6 +30,14 @@ export default function Chat(props: {
   const attachments = useAttachments(props.attach);
   const scroll = useStickToBottom(props.messages);
   const lastAssistant = props.messages.findLastIndex((m) => m.role === 'assistant');
+  // The widget the agent is listening to (the pending agentui_custom_widget_wait): only that one is live while the agent waits, the others stay inactive.
+  const liveWidget = useMemo(() => {
+    const calls = props.messages.findLast((m) => m.role === 'assistant')?.toolCalls ?? [];
+    const w = calls.findLast((c) => /custom_widget_wait$/.test(c.name) && c.status === 'running')?.args as { widget?: unknown } | undefined;
+    return typeof w?.widget === 'string' ? w.widget : undefined;
+  }, [props.messages]);
+  const replyFor: ReplyFor = (widget) =>
+    !props.running || (props.awaiting && (!liveWidget || !widget || widget === liveWidget)) ? (t, event) => props.onSend(t, [], event) : undefined;
   const allTools = useMemo(() => props.messages.flatMap((m) => m.toolCalls ?? []), [props.messages]);
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}
@@ -50,17 +58,18 @@ export default function Chat(props: {
               <Typography variant="body2">{t('chat.talkHint')}</Typography>
             </Box>)}
           {props.messages.map((m, i) => {
+            if (m.hidden) return null; // sent silently by a widget: the agent gets it, the chat does not show it
             const last = i === props.messages.length - 1;
             // Answers already given: the user messages that follow (an agent question mid-run receives several)
             const answers: string[] = [];
-            for (let j = i + 1; props.messages[j]?.role === 'user'; j++) answers.push(props.messages[j]!.text);
+            for (let j = i + 1; props.messages[j]?.role === 'user'; j++) if (!props.messages[j]!.hidden) answers.push(props.messages[j]!.text);
             const current = i === lastAssistant;
             return (
               <Fragment key={m.id}>
                 {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
                 <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName} allTools={allTools}
                   answers={answers} onQuote={onQuote}
-                  onReply={!props.running ? (t) => props.onSend(t, []) : undefined}
+                  onReply={replyFor}
                   onAnswer={current && (!props.running || props.awaiting) ? (t) => void props.onSend(t, []) : undefined}
                   working={props.running && m.role === 'assistant' && (last || m.status === 'streaming')} />
               </Fragment>);

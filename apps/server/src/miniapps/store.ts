@@ -163,6 +163,43 @@ export class MiniAppStore {
     return this.fsGrants(id);
   }
 
+  /** Scheduled tasks of the agent that belong to a miniapp (tagged by the agent with `agentui_miniapp_job`). */
+  jobsOf(id: string): string[] {
+    return (this.db.prepare('SELECT job_id FROM miniapp_jobs WHERE app_id = ? ORDER BY job_id').all(id) as unknown as { job_id: string }[]).map((r) => r.job_id);
+  }
+
+  /** Miniapp id by job id, for one agent. */
+  jobLinks(agentId: string): Map<string, string> {
+    const rows = this.db.prepare('SELECT job_id, app_id FROM miniapp_jobs WHERE agent_id = ?').all(agentId) as unknown as { job_id: string; app_id: string }[];
+    return new Map(rows.map((r) => [r.job_id, r.app_id]));
+  }
+
+  linkJob(id: string, agentId: string, jobId: string): void {
+    this.owned(id, agentId);
+    this.db.prepare('INSERT OR REPLACE INTO miniapp_jobs (app_id, agent_id, job_id) VALUES (?,?,?)').run(id, agentId, jobId);
+    this.onChange?.(id, 'changed');
+  }
+
+  /** Forgets the tag of a job (unlinked by the agent, or the job itself was deleted). */
+  unlinkJob(agentId: string, jobId: string): void {
+    const row = this.db.prepare('SELECT app_id FROM miniapp_jobs WHERE agent_id = ? AND job_id = ?').get(agentId, jobId) as unknown as { app_id: string } | undefined;
+    if (!row) return;
+    this.db.prepare('DELETE FROM miniapp_jobs WHERE agent_id = ? AND job_id = ?').run(agentId, jobId);
+    this.onChange?.(row.app_id, 'changed');
+  }
+
+  /** Called with the tagged jobs just before a miniapp is removed, to delete them from the agent's scheduler. */
+  purgeJobs?: (agentId: string, jobIds: string[]) => Promise<void>;
+
+  /** Removes a miniapp together with its scheduled tasks (best effort: the miniapp goes away even if the scheduler is unreachable). */
+  async destroy(id: string, agentId?: string): Promise<void> {
+    const app = agentId ? this.owned(id, agentId) : this.get(id);
+    if (!app) throw new AppError(`Unknown miniapp "${id}".`, 404);
+    const jobs = this.jobsOf(id);
+    if (jobs.length) await this.purgeJobs?.(app.agentId, jobs).catch(() => {});
+    this.remove(id, agentId);
+  }
+
   remove(id: string, agentId?: string): void {
     if (agentId) this.owned(id, agentId);
     else if (!this.get(id)) throw new AppError(`Unknown miniapp "${id}".`, 404);

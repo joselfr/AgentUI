@@ -53,6 +53,7 @@ OWNER_ID = "agentui-owner"  # the user is authenticated by AgentUI, not by Herme
 MAX_RESULT = 20_000
 MAX_MEDIA = 20 * 1024 * 1024
 OUTBOX_LIMIT = 2_000
+PREVIEW_HOLD_S = 10.0  # a streamed preview outside a run waits this long for its next edit before being posted as is
 ASK_TIMEOUT = 1800.0  # seconds to wait for the answer to an interactive widget (agentui_ask / confirm / form)
 
 CAPABILITIES = {
@@ -145,6 +146,28 @@ def _list_jobs() -> List[dict]:
             "deliverTo": deliver_to,
         })
     return out
+
+
+MAX_SCRIPT_BYTES = 200_000
+
+
+def _read_job_script(job_id: str) -> dict:
+    """Source of the script of a cron task (``scripts/`` folder of the Hermes home; nothing outside it)."""
+    from cron.jobs import get_job
+    from hermes_constants import get_hermes_home
+
+    job = get_job(job_id)
+    if not job:
+        raise ValueError(f"task not found: {job_id}")
+    name = str(job.get("script") or "")
+    if not name:
+        raise ValueError("this task has no script")
+    root = (get_hermes_home() / "scripts").resolve()
+    path = (root / name).resolve()
+    if root not in path.parents or not path.is_file():
+        raise ValueError(f"script not found: {name}")
+    data = path.read_bytes()[:MAX_SCRIPT_BYTES]
+    return {"name": name, "content": data.decode("utf-8", errors="replace")}
 
 
 def _job_action(job_id: str, action: str) -> dict:
@@ -368,6 +391,8 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._muted_until: Dict[str, float] = {}  # stopped chats: the /stop confirmation is ignored
         self._lock = threading.Lock()  # protects the tables below (agent thread + asyncio loop)
         self._runs: Dict[str, _Run] = {}  # conversationId → run en cours
+        # Streamed previews sent outside any run (message_id → [chat, text, flush timer]): held until the final edit, then posted once.
+        self._previews: Dict[str, list] = {}
         self._approvals: Dict[str, str] = {}  # approval id → Hermes session_key
         self._clarifies: Dict[str, Tuple[str, str]] = {}  # chat → (session_key, clarify_id) of the pending question
         self._asks: Dict[str, _Ask] = {}  # chat → question of a pending interactive tool
@@ -737,6 +762,7 @@ class AgentUIAdapter(BasePlatformAdapter):
             "listJobs": _list_jobs,
             "listSkills": _list_skills,
             "readSkill": lambda: _read_skill(str(params.get("skillId", ""))),
+            "readJobScript": lambda: _read_job_script(str(params.get("jobId", ""))),
             "jobAction": lambda: _job_action(str(params.get("jobId", "")), str(params.get("action", ""))),
             "deleteSession": lambda: self._delete_session(str(params.get("conversationId", ""))),
         }
@@ -821,9 +847,38 @@ class AgentUIAdapter(BasePlatformAdapter):
             with self._lock:
                 run.bubbles[message_id] = _strip_cursor(content)
             self._sync(run)
+        elif _strip_cursor(content) != content:
+            # Stream consumer preview (text + cursor) outside a run: the protocol cannot edit an outbound message,
+            # so keep it until the final edit instead of posting every partial text as a message of its own.
+            with self._lock:
+                self._previews[message_id] = [chat_id, _strip_cursor(content), None]
+            self._arm_preview(message_id)
         else:
             self._outbound(chat_id, content, [])
         return SendResult(success=True, message_id=message_id)
+
+    def _arm_preview(self, message_id: str) -> None:
+        """(Re)starts the safety timer that posts a held preview if its final edit never comes."""
+        timer = threading.Timer(PREVIEW_HOLD_S, self._flush_preview, args=(message_id,))
+        timer.daemon = True
+        with self._lock:
+            entry = self._previews.get(message_id)
+            if entry is None:
+                return
+            if entry[2] is not None:
+                entry[2].cancel()
+            entry[2] = timer
+        timer.start()
+
+    def _flush_preview(self, message_id: str) -> None:
+        with self._lock:
+            entry = self._previews.pop(message_id, None)
+        if entry is None:
+            return
+        if entry[2] is not None:
+            entry[2].cancel()
+        if entry[1].strip():
+            self._outbound(entry[0], entry[1], [])
 
     def _outbound(self, chat_id: str, text: Optional[str], media: List[dict], title: Optional[str] = None) -> None:
         msg: Dict[str, Any] = {"type": "outbound", "id": uuid.uuid4().hex}
@@ -911,6 +966,11 @@ class AgentUIAdapter(BasePlatformAdapter):
         """Interactive tool (agent thread): displays the `key` widget then waits for the user's answer,
         which arrives through the `reply` frame as for `clarify`. Returns `{"answer": …}` or `{"error": …}`."""
         ask = _Ask(id=uuid.uuid4().hex[:12])
+        live = key == "custom_widget_wait"
+        try:
+            wait = min(max(float(args.get("timeout_s") or 600), 1.0), 1800.0) if live else ASK_TIMEOUT
+        except (TypeError, ValueError):
+            wait = 600.0
         with self._lock:
             run = self._runs.get(chat)
             if run is None:
@@ -918,23 +978,38 @@ class AgentUIAdapter(BasePlatformAdapter):
             if chat in self._asks:
                 return {"error": "A question is already awaiting an answer: wait for it before asking another one."}
             self._asks[chat] = ask
-            run.bubbles[uuid.uuid4().hex] = "```widget\n" + json.dumps({"type": key, "arguments": args}, ensure_ascii=False) + "\n```"
+            if not live:  # `custom_widget_wait` (live session with a widget) displays nothing: the widget is already there
+                run.bubbles[uuid.uuid4().hex] = "```widget\n" + json.dumps({"type": key, "arguments": args}, ensure_ascii=False) + "\n```"
         # Before the widget: when it arrives, AgentUI already knows the answer is expected.
         self._emit(chat, {"type": "question.requested", "id": ask.id})
         self._sync(run)
-        ask.event.wait(ASK_TIMEOUT)
+        signalled = ask.event.wait(wait)  # False = nothing happened for `wait` seconds
         with self._lock:
             if self._asks.get(chat) is ask:
                 del self._asks[chat]
         self._emit(chat, {"type": "question.resolved", "id": ask.id})
         if ask.answer is None:
+            if live and not signalled:  # a normal outcome for a live session, the agent decides whether to keep listening
+                return {"timeout": True}
             return {"error": "No answer from the user (exchange interrupted or timed out)."}
+        if live:
+            return _wait_result(ask.answer)
         return {"answer": ask.answer}
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         pass  # AgentUI already shows the run state
 
     async def edit_message(self, chat_id: str, message_id: str, content: str, *, finalize: bool = False, **kwargs) -> SendResult:
+        with self._lock:
+            preview = self._previews.get(message_id)
+            if preview is not None:
+                preview[1] = _strip_cursor(content)
+        if preview is not None:
+            if finalize or _strip_cursor(content) == content:  # final text (no cursor): post it once
+                self._flush_preview(message_id)
+            else:
+                self._arm_preview(message_id)
+            return SendResult(success=True, message_id=message_id)
         with self._lock:
             run = self._runs.get(chat_id)
             if run is None or message_id not in run.bubbles:
@@ -947,7 +1022,12 @@ class AgentUIAdapter(BasePlatformAdapter):
         with self._lock:
             run = self._runs.get(chat_id)
             removed = run is not None and run.bubbles.pop(message_id, None) is not None
-        if removed:
+            held = self._previews.pop(message_id, None)
+        if held is not None:
+            if held[2] is not None:
+                held[2].cancel()
+            removed = True
+        if removed and run is not None:
             self._sync(run)
         return removed
 
@@ -1156,7 +1236,17 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
         return "At least one point is required."
     elif key == "code" and not str(args.get("code") or "").strip():
         return "The code is empty."
-    elif key == "ui":
+    elif key == "custom_widget":
+        state = args.get("state")
+        if state is not None and len(json.dumps(state, ensure_ascii=False).encode("utf-8")) > 32 * 1024:
+            return "The state is too large (max 32 KB)."
+        update = args.get("update")
+        if update is not None:
+            if not re.fullmatch(r"\[\[agentui:[0-9a-f]+\]\]", str(update)):
+                return "`update` must be the [[agentui:…]] token of the widget to update."
+            if state is None:
+                return "An update needs a `state`."
+            return None
         code = str(args.get("code") or "")
         if not code.strip():
             return "The code is empty."
@@ -1167,8 +1257,22 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _wait_result(answer: str) -> Dict[str, Any]:
+    """Result of `agentui_custom_widget_wait`: a widget event (wrapped by the server in a small JSON object so it is not mistaken for a chat
+    message) or a chat message the user typed meanwhile."""
+    try:
+        o = json.loads(answer)
+        if isinstance(o, dict) and o.get("agentui") == "widget-event":
+            return {"from": "widget", "widget": o.get("widget"), "event": o.get("text") or ""}
+    except ValueError:
+        pass
+    return {"from": "user", "message": answer}
+
+
 def _ask_error(key: str, args: Dict[str, Any]) -> Optional[str]:
     """Semantic checks of the interactive tools (the JSON schema cannot express them)."""
+    if key == "custom_widget_wait" and not re.fullmatch(r"\[\[agentui:[0-9a-f]+\]\]", str(args.get("widget") or "")):
+        return "`widget` must be the [[agentui:…]] token of the widget returned by agentui_custom_widget."
     if key == "ask" and not str(args.get("question") or "").strip():
         return "The question is empty."
     if key == "confirm" and not str(args.get("title") or "").strip():
@@ -1279,7 +1383,7 @@ def _register_widget_tools(ctx) -> None:
                     if not chat or _ACTIVE is None or not _ACTIVE._emit(chat, {"type": "message.media", **media}):
                         return json.dumps({"error": "No AgentUI exchange in progress: cannot copy the image."}, ensure_ascii=False)
                     files[src] = media["name"]
-            update = args.get("update") if key == "progress" else None
+            update = args.get("update") if key in ("progress", "custom_widget") else None
             if update:  # update: same token, the front shows the state of the latest call
                 return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
             instruction = spec["progressInstruction"] if key == "progress" else spec["tokenInstruction"]

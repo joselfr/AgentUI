@@ -9,7 +9,7 @@ import TextFields from '@mui/icons-material/TextFields';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // a line break = a line (cron outputs, short messages)
-import type { Message } from '@agentui/shared';
+import type { Message, WidgetEvent } from '@agentui/shared';
 import { rehypeTableLabels } from './markdownTables';
 import { formatSize, isImage, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
@@ -66,8 +66,11 @@ function Attachments({ m }: { m: Message }) {
   );
 }
 
+/** What a dynamic widget may do for the chat: `undefined` while it must stay inactive. `widget` is the widget's own token, to tell the live one apart. */
+export type ReplyFor = (widget?: string) => ((text: string, event?: WidgetEvent) => Promise<boolean>) | undefined;
+
 /** Display widgets (no answer): ```widget block or `agentui_<type>` tool. `undefined` if the type or arguments are invalid. */
-function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message, onReply?: (text: string) => Promise<boolean>): ReactElement | undefined {
+function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message, onReply?: ReplyFor): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
   if (w?.type === 'table') { const table = parseTable(w.arguments); if (table) return <TableCard table={table} />; }
@@ -84,7 +87,7 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
       return <ImageCard gallery={gallery} resolve={resolve} />;
     }
   }
-  if (w?.type === 'ui') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply} />; }
+  if (w?.type === 'custom_widget') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply?.(ui.token)} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }
@@ -128,7 +131,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
   onQuote?: (t: string) => void;
   m: Message; expandTools: boolean; agentName: string; answers?: string[]; onAnswer?: (t: string) => void; working?: boolean;
   /** Sends a new user message from a dynamic widget (`reply`); absent while the agent is working. */
-  onReply?: (t: string) => Promise<boolean>;
+  onReply?: ReplyFor;
   /** Tool calls of the whole chat: the agent may reuse the token of a widget from an earlier message. */
   allTools?: ToolCallLike[];
 }) {
@@ -172,8 +175,9 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
       const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
       const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
-      // While streaming, only the image gallery is already shown (the block comes from an expanded token, hence complete): its local files arrive one by one.
-      const early = lang === 'widget' && m.status === 'streaming' && parseWidget(raw)?.type === 'image';
+      // While streaming, only the image gallery and the dynamic widgets are already shown (the block comes from an expanded token, hence complete): the
+      // gallery's local files arrive one by one, and a live widget (agentui_custom_widget_wait) must stay mounted while the agent thinks, or it would lose its state.
+      const early = lang === 'widget' && m.status === 'streaming' && ['image', 'custom_widget'].includes(parseWidget(raw)?.type ?? '');
       // An interactive block is added whole to the text by the plugin: once its fence is closed it stays a widget (frozen, with its answer)
       // while the run goes on after the user's reply, instead of falling back to raw JSON until the end of the run.
       const answered = (lang === 'widget' || lang === 'ask') && interactiveBlocks(m.text).includes(raw);

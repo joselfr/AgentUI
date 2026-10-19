@@ -27,7 +27,7 @@ async function main() {
   if (window.__AGENTUI.appId === 'widget') inlineWidget();
 }
 
-/** `agentui_ui` widget shown in the chat: no full-height page, the iframe is sized to its content and transparent. */
+/** `agentui_custom_widget` widget shown in the chat: no full-height page, the iframe is sized to its content and transparent. */
 function inlineWidget() {
   const style = document.createElement('style');
   style.textContent = 'html, body, #root { height: auto; } body { background: transparent; overflow-x: hidden; overflow-y: auto; }';

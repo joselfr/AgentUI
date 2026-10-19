@@ -63,6 +63,16 @@ export async function listJobs(subAgentId?: string) {
     }));
 }
 
+/** Source of the script of a task: the inline `script` payload, or the command line of a `command` payload. */
+export async function readJobScript(jobId: string): Promise<{ name: string; content: string }> {
+  const job = ((await cron().list({ includeDisabled: true })) as Json[]).find((j) => String(j.id) === jobId);
+  if (!job) throw new Error(`task not found: ${jobId}`);
+  const p = job.payload ?? {};
+  const content = p.kind === 'command' && Array.isArray(p.argv) ? p.argv.join(' ') : text(p.script);
+  if (!content) throw new Error('this task has no script');
+  return { name: String(job.displayName ?? job.name ?? job.id), content };
+}
+
 export async function jobAction(jobId: string, action: string): Promise<{ ok: true }> {
   const c = cron();
   if (action === 'delete') await c.remove(jobId);

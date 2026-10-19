@@ -6,6 +6,25 @@ const tool = (id: string, token = 'a3f9c1', args: unknown = chart, name = 'agent
   ({ id, name, args, resultPreview: `{"widget": "[[agentui:${token}]]", "instruction": "…"}` });
 const widget = `\`\`\`widget\n${JSON.stringify({ type: 'chart', arguments: chart })}\n\`\`\``;
 
+describe('agentui_custom_widget state updates', () => {
+  const code = 'export default function W() { return null; }';
+  const create = tool('t1', 'a3f9c1', { code, state: { n: 0 } }, 'agentui_custom_widget');
+  const update = (id: string, n: number) => ({ id, name: 'agentui_custom_widget', args: { update: '[[agentui:a3f9c1]]', state: { n } }, resultPreview: '{"widget": "[[agentui:a3f9c1]]", "updated": true}' });
+  const arg = (out: string) => JSON.parse(/```widget\n(.*)\n```/.exec(out)![1]!).arguments;
+  it('keeps the code of the first call and the state of the latest one', () => {
+    const out = expandWidgetTokens('[[agentui:a3f9c1]]', [create], [create, update('t2', 1), update('t3', 2)]);
+    expect(arg(out)).toEqual({ code, state: { n: 2 }, token: '[[agentui:a3f9c1]]' }); // the widget knows its token (its events say where they come from)
+  });
+  it('conversations from before the rename (tool agentui_ui) still render', () => {
+    const legacy = { ...create, name: 'agentui_ui' };
+    const out = expandWidgetTokens('[[agentui:a3f9c1]]', [legacy], [legacy, { ...update('t2', 1), name: 'agentui_ui' }]);
+    expect(arg(out)).toEqual({ code, state: { n: 1 }, token: '[[agentui:a3f9c1]]' });
+  });
+  it('an update call does not create a second widget in its own message', () => {
+    expect(expandWidgetTokens('Ton coup.', [update('t2', 1)], [create, update('t2', 1)])).toBe('Ton coup.');
+  });
+});
+
 describe('expandWidgetTokens', () => {
   it('replaces the token in place in the text', () => {
     const out = expandWidgetTokens('Before\n[[agentui:a3f9c1]]\nAfter', [tool('t1')]);

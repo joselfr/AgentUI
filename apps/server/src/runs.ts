@@ -240,6 +240,7 @@ export class RunManager {
       attachments: atts.filter((a) => a.message_id === r.id).map((a) => ({ id: a.id, name: a.name, mimeType: a.mime_type, size: a.size })),
       role: r.role,
       text: r.text,
+      hidden: r.hidden ? true : undefined,
       reasoning: r.reasoning ?? undefined,
       createdAt: r.created_at,
       runId: r.run_id ?? undefined,
@@ -487,14 +488,18 @@ export class RunManager {
       .get(convId, a.runId);
   }
 
-  /** Passes the user's answer to the question asked by the agent; the current run continues. */
-  async reply(convId: string, text: string): Promise<{ runId: string; messageId: string }> {
+  /**
+   * Passes the user's answer to the question asked by the agent; the current run continues. An event of a dynamic widget (`widget`) is
+   * the same thing over the live session the agent keeps open with `agentui_custom_widget_wait`: the agent gets it tagged with the widget, and the
+   * message is stored hidden (the widget shows its effect, the chat does not).
+   */
+  async reply(convId: string, text: string, widget?: { token?: string }): Promise<{ runId: string; messageId: string }> {
     const a = this.active.get(convId);
     if (!a || !this.awaitingReply(convId)) throw new Error('A run is already in progress in this conversation');
-    await this.adapters.get(a.agentId)!.reply!(a.runId, a.remoteSessionId, text);
+    await this.adapters.get(a.agentId)!.reply!(a.runId, a.remoteSessionId, widget ? JSON.stringify({ agentui: 'widget-event', widget: widget.token ?? null, text }) : text);
     this.db
-      .prepare('INSERT INTO messages (id, conversation_id, role, text, status, created_at) VALUES (?,?,?,?,?,?)')
-      .run(randomUUID(), convId, 'user', text, 'done', Date.now());
+      .prepare('INSERT INTO messages (id, conversation_id, role, text, status, created_at, hidden) VALUES (?,?,?,?,?,?,?)')
+      .run(randomUUID(), convId, 'user', text, 'done', Date.now(), widget ? 1 : 0);
     const m = this.db.prepare('SELECT id FROM messages WHERE conversation_id = ? AND run_id = ?').get(convId, a.runId) as { id: string };
     return { runId: a.runId, messageId: m.id };
   }
