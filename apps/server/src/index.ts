@@ -20,6 +20,7 @@ import { createReadStream } from 'node:fs';
 import { AppData } from './miniapps/data.js';
 import { registerMiniApps } from './miniapps/routes.js';
 import { AppError, MiniAppStore } from './miniapps/store.js';
+import { WidgetStore } from './miniapps/widgets.js';
 import { handleAppOp, isAppOp, opError } from './miniapps/ops.js';
 
 const COOKIE = 'agentui_session';
@@ -301,6 +302,7 @@ async function main() {
   };
   registerMiniApps(app, {
     store: apps,
+    widgets: new WidgetStore(env.dataDir),
     data: appData,
     secret,
     userOf,

@@ -1156,6 +1156,14 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
         return "At least one point is required."
     elif key == "code" and not str(args.get("code") or "").strip():
         return "The code is empty."
+    elif key == "ui":
+        code = str(args.get("code") or "")
+        if not code.strip():
+            return "The code is empty."
+        if len(code.encode("utf-8")) > 64 * 1024:
+            return "The code is too large (max 64 KB)."
+        if not re.search(r"export\s+default\b", code):
+            return "The module must default-export the React component (`export default function Widget() { … }`)."
     return None
 
 

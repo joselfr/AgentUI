@@ -298,6 +298,29 @@
           "images"
         ]
       }
+    },
+    "ui": {
+      "description": "Displays a dynamic, interactive widget in the AgentUI chat, written as a React component with the same UI kit as the miniapps. Use it when a static chart/table/map is not enough and the user should play with the result: calculator or simulator with sliders, filterable list, converter, quiz, timer, mini-dashboard, form with live preview. It is NOT persistent and has no backend or storage (state lives in the component, lost on reload); for something the user will keep using, create a miniapp instead (agentui_miniapp_guide). `code` is ONE TSX module that default-exports the component (React 18, automatic JSX: no need to import React; hooks from 'react'). The only importable modules are 'react', '@agentui/ui' and 'chart.js'; no relative imports, no network, no fetch. @agentui/ui: Stack, Row (gap, align, justify, wrap), Card (padding), Text (variant: h5 h6 subtitle body caption overline; muted, mono), Divider, Button (variant: contained outlined text; color: primary danger neutral; size: small; icon; loading), IconButton (icon, label), Icon (name), TextField (value, onChange(value: string), label, type, multiline, placeholder, onEnter), Select (value, onChange, options), Checkbox/Switch (checked, onChange(boolean), label), List/ListItem (primary, secondary, leading, trailing, onClick), Table (columns: {key,label,align?,render?}[], rows), Tabs (value, onChange, tabs: {value,label}[]), Chip (label, color), Alert (severity: info success warning error), Spinner, EmptyState, Chart (type: line bar doughnut; labels; series: {name,data}[]; height), toast(message), openUrl(url), useLang(), useTheme(). Icon names: add close check delete edit search refresh back forward star heart info warning error chevron-right chevron-down send download play pause more home person apps checklist. Style with the --au-* CSS variables (var(--au-accent), var(--au-muted), var(--au-line)…) so it follows the light/dark theme; never hard-code colors. Do not use Page (it is a full-screen layout): start with Card or Stack; the widget is sized to its content. Keep it compact (it sits in a chat bubble) and show texts in the user's language. The widget cannot send anything back to you: if you need the user's answer, use agentui_ask / agentui_form instead. Compilation errors are shown to the user, so write valid TSX. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The complete TSX module (max 64 KB), with `export default function Widget() { … }`."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional caption above the widget."
+          },
+          "height": {
+            "type": "integer",
+            "description": "Maximum height in px before the widget scrolls (default 640, max 1200)."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
     }
   },
   "tokenInstruction": "Place this token as is in your reply, where the component should appear.",

@@ -45,7 +45,7 @@ export function interactiveBlocks(text: string): string[] {
 /** Plugins expose each display widget as an `agentui_<type>` tool (e.g. `agentui_chart`): its arguments are the widget's. */
 const WIDGET_TOOL_PREFIX = 'agentui_';
 export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string; startedAt?: number; endedAt?: number };
-const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image']);
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image', 'ui']);
 
 export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
   if (!t.name.startsWith(WIDGET_TOOL_PREFIX)) return undefined;

@@ -213,6 +213,8 @@ export const fr = {
   'miniapps.deleteTitle': "Supprimer « {name} » ?",
   'miniapps.deleteText': "La miniapp, ses fichiers et ses données seront définitivement supprimés.",
   'miniapps.error': "La miniapp a signalé une erreur",
+  'ui.error': "Le widget n'a pas pu être compilé",
+  'ui.title': "Widget dynamique",
   'miniapps.notFound': "Cette miniapp n'existe plus.",
   'miniapps.fs.title': "Cette miniapp demande l'accès à des fichiers du serveur",
   'miniapps.fs.button': "Accès aux fichiers",

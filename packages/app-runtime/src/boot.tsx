@@ -24,6 +24,21 @@ async function main() {
     toHost({ type: 'agentui:error', message: msg.slice(0, 2000) });
   }
   toHost({ type: 'agentui:ready' });
+  if (window.__AGENTUI.appId === 'widget') inlineWidget();
+}
+
+/** `agentui_ui` widget shown in the chat: no full-height page, the iframe is sized to its content and transparent. */
+function inlineWidget() {
+  const style = document.createElement('style');
+  style.textContent = 'html, body, #root { height: auto; } body { background: transparent; overflow: hidden; }';
+  document.head.appendChild(style);
+  let last = 0;
+  const report = () => {
+    const h = Math.ceil(document.body.getBoundingClientRect().height);
+    if (h !== last) { last = h; toHost({ type: 'agentui:resize', height: h }); }
+  };
+  new ResizeObserver(report).observe(document.body);
+  report();
 }
 void main();
 window.addEventListener('error', (e) => toHost({ type: 'agentui:error', message: String(e.message).slice(0, 2000) }));

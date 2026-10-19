@@ -428,7 +428,7 @@ test('widget tools: agentui_chart / map / code, reserved for AgentUI runs', asyn
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_ask', 'agentui_confirm', 'agentui_form', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify']);
+  assert.deepEqual(opts.names, ['agentui_chart', 'agentui_map', 'agentui_code', 'agentui_table', 'agentui_progress', 'agentui_image', 'agentui_ui', 'agentui_ask', 'agentui_confirm', 'agentui_form', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify']);
   // The manifest declares exactly these tools (contracts.tools), otherwise OpenClaw warns at load
   assert.deepEqual(JSON.parse(readFileSync(new URL('../openclaw.plugin.json', import.meta.url), 'utf8')).contracts.tools, opts.names);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
@@ -443,6 +443,10 @@ test('widget tools: agentui_chart / map / code, reserved for AgentUI runs', asyn
   await assert.rejects(tools[0].execute('t3', { kind: 'pie', x: ['a'], series: [{ name: 's', y: [1] }, { name: 't', y: [2] }] }), /pie chart/);
   await assert.rejects(tools[1].execute('t4', { points: [] }), /At least one point/);
   await assert.rejects(tools[2].execute('t5', { code: ' ' }), /empty/);
+  const ui = tools.find((t) => t.name === 'agentui_ui');
+  assert.match((await ui.execute('u1', { code: 'export default function W() { return <div />; }' })).details.token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
+  await assert.rejects(ui.execute('u2', { code: 'const W = () => null;' }), /default-export/);
+  await assert.rejects(ui.execute('u3', { code: ' ' }), /empty/);
   const table = tools.find((t) => t.name === 'agentui_table');
   const okTable = await table.execute('t6', { columns: [{ label: 'A' }, { label: 'B', kind: 'number' }], rows: [['x', 1], ['y', null]] });
   assert.match(okTable.details.token, /^\[\[agentui:[0-9a-f]{6}\]\]$/);

@@ -78,6 +78,12 @@ result `files` = `{ path → attachment name }`. The front end links the path to
 a second time as an attachment. A missing or too large file, or one that is not an image, makes the tool fail
 (the error goes back to the agent).
 
+`agentui_ui` is the **dynamic** display widget: its `code` argument is a single TSX module (default-exported React component)
+that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js` only). Plugins only validate it (non-empty, ≤ 64 KB, has an
+`export default`); the front end sends the code to `POST /api/widgets`, which compiles it (esbuild, cached by hash) and returns the
+URL of a token-protected sandboxed iframe (`/w/<hash>/<token>/`, same runtime and CSP as a miniapp, no backend, no `/api`).
+Nothing is stored apart from the tool call itself, so the widget survives a reload but not the component state.
+
 The interactive widgets `ask`, `confirm` and `form` are **blocking** tools (`agentui_ask`, `agentui_confirm`,
 `agentui_form`, `blockingTools` section of the same file). The tool emits `question.requested`, adds the ```` ```widget ````
 `{"type": …, "arguments": …}` block to the run's text, waits for the `reply` frame and returns `{"answer": "<answer text>"}` to

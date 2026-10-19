@@ -6,6 +6,7 @@ import type { AuthUser } from '../auth.js';
 import type { AppData } from './data.js';
 import { runHandler, type SandboxResult } from './sandbox.js';
 import { AppError, type MiniAppStore } from './store.js';
+import { WidgetStore } from './widgets.js';
 
 const PUBLIC_RATE_PER_MIN = 120;
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -48,8 +49,8 @@ function sendResult(reply: FastifyReply, res: SandboxResult) {
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-function indexHtml(base: string, appId: string, name: string, version: number, hasCss: boolean, nonce: string): string {
-  const rt = `${base}_runtime/`;
+function indexHtml(base: string, appId: string, name: string, version: number, hasCss: boolean, nonce: string, runtimeBase = base): string {
+  const rt = `${runtimeBase}_runtime/`;
   const imports = {
     react: `${rt}react.js`,
     'react/jsx-runtime': `${rt}jsx-runtime.js`,
@@ -70,6 +71,7 @@ function indexHtml(base: string, appId: string, name: string, version: number, h
 
 export interface MiniAppRoutesOpts {
   store: MiniAppStore;
+  widgets: WidgetStore;
   data: AppData;
   secret: string;
   userOf: (cookies: Record<string, string | undefined>) => AuthUser | null;
@@ -77,7 +79,7 @@ export interface MiniAppRoutesOpts {
 }
 
 export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): void {
-  const { store, data, secret, runtimeDir } = o;
+  const { store, data, secret, runtimeDir, widgets } = o;
   const must = (id: string) => {
     const a = store.get(id);
     if (!a) throw new AppError('Unknown miniapp', 404);
@@ -201,6 +203,44 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
       .send(createReadStream(file));
   };
 
+  const sendRuntime = (reply: FastifyReply, name: string) => {
+    const file = resolve(runtimeDir, name);
+    if (!/^[A-Za-z0-9_.-]+$/.test(name) || !file.startsWith(resolve(runtimeDir) + sep) || !existsSync(file) || !statSync(file).isFile()) {
+      return reply.code(404).send({ error: 'not found' });
+    }
+    return sendFile(reply, file, 'public, max-age=300');
+  };
+
+  // ---------- Widgets of the `agentui_ui` tool: compiled on demand, same runtime and sandbox as the miniapps ----------
+  /** Compiles the code of a widget; answers the iframe base URL (token-protected, like a miniapp's) or the build errors. */
+  app.post<{ Body: { code?: unknown } }>('/api/widgets', async (req) => {
+    const r = await widgets.compile(String(req.body?.code ?? ''));
+    if (!r.ok) return r;
+    return { ok: true, base: `/w/${r.hash}/${signAppToken(secret, o.userOf(req.cookies)!.id, `widget-${r.hash}`)}/` };
+  });
+
+  app.get<{ Params: { hash: string; token: string; '*': string } }>('/w/:hash/:token/*', async (req, reply) => {
+    const { hash, token } = req.params;
+    if (!WidgetStore.validHash(hash) || !verifyAppToken(secret, `widget-${hash}`, token)) return reply.code(403).send({ error: 'forbidden' });
+    const rest = req.params['*'];
+    const base = `/w/${hash}/${token}/`;
+    if (rest === '' || rest === 'index.html') {
+      const nonce = randomBytes(16).toString('base64');
+      return reply
+        .header('Content-Type', 'text/html; charset=utf-8')
+        .header('Cache-Control', 'no-store')
+        .header('X-Content-Type-Options', 'nosniff')
+        .header('Content-Security-Policy', `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'`)
+        .send(indexHtml(base, 'widget', 'Widget', 1, false, nonce)); // content-addressed: version never changes
+    }
+    if (rest.startsWith('_runtime/')) return sendRuntime(reply, rest.slice('_runtime/'.length));
+    if (rest === 'app.js') {
+      const file = widgets.file(hash);
+      return file ? sendFile(reply, file, 'public, max-age=31536000, immutable') : reply.code(404).send({ error: 'not built' });
+    }
+    return reply.code(404).send({ error: 'not found' });
+  });
+
   app.get<{ Params: { id: string; token: string; '*': string } }>('/m/:id/:token/*', async (req, reply) => {
     const { id, token } = req.params;
     if (!verifyAppToken(secret, id, token)) return reply.code(403).send({ error: 'forbidden' });
@@ -221,14 +261,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         )
         .send(indexHtml(base, id, a.name, a.version, !!store.distFile(id, 'app.css'), nonce));
     }
-    if (rest.startsWith('_runtime/')) {
-      const name = rest.slice('_runtime/'.length);
-      const file = resolve(runtimeDir, name);
-      if (!/^[A-Za-z0-9_.-]+$/.test(name) || !file.startsWith(resolve(runtimeDir) + sep) || !existsSync(file) || !statSync(file).isFile()) {
-        return reply.code(404).send({ error: 'not found' });
-      }
-      return sendFile(reply, file, 'public, max-age=300');
-    }
+    if (rest.startsWith('_runtime/')) return sendRuntime(reply, rest.slice('_runtime/'.length));
     if (rest === 'app.js' || rest === 'app.css') {
       const file = store.distFile(id, rest);
       if (!file) return reply.code(404).send({ error: 'not built' });

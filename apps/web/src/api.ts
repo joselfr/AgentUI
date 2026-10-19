@@ -77,6 +77,7 @@ export const api = {
   removeMiniapp: (id: string) => call<{ ok: true }>('DELETE', `/miniapps/${id}`),
   miniappFs: (id: string) => call<{ path: string; mode: 'ro' | 'rw'; approved: boolean }[]>('GET', `/miniapps/${id}/fs`),
   setMiniappFs: (id: string, path: string, approved: boolean) => call<{ path: string; mode: 'ro' | 'rw'; approved: boolean }[]>('PUT', `/miniapps/${id}/fs`, { path, approved }),
+  buildWidget: (code: string) => call<{ ok: true; base: string } | { ok: false; errors: { line?: number; column?: number; message: string }[] }>('POST', '/widgets', { code }),
   miniappSession: (id: string) => call<{ base: string; version: number; name: string }>('GET', `/miniapps/${id}/session`),
   approval: (id: string, approvalId: string, approve: boolean) => call('POST', `/conversations/${id}/approval`, { approvalId, approve }),
 };

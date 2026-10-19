@@ -10,6 +10,7 @@ import Fastify from 'fastify';
 import { registerMiniApps, signAppToken, verifyAppToken } from './routes.js';
 import { runHandler, sanitizeHeaders } from './sandbox.js';
 import { AppError, MiniAppStore } from './store.js';
+import { WidgetStore } from './widgets.js';
 
 let dir: string;
 let db: DB;
@@ -175,7 +176,7 @@ describe('network', () => {
 describe('public handlers', () => {
   const server = async () => {
     const app = Fastify();
-    registerMiniApps(app, { store, data, secret: 's', userOf: () => null, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
     await app.ready();
     return app;
   };
@@ -250,7 +251,7 @@ describe('file grants', () => {
 describe('handler response headers', () => {
   const server = async () => {
     const app = Fastify();
-    registerMiniApps(app, { store, data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as any, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as any, runtimeDir: dir });
     await app.ready();
     return app;
   };
@@ -350,5 +351,33 @@ describe('ctx.crypto signatures', () => {
     expect(b.back).toBe('{"a":"é"}');
     expect(b.badKey).toMatch(/PEM/);
     expect(b.badAlg).toMatch(/must be one of/);
+  });
+});
+
+describe('widgets (agentui_ui)', () => {
+  it('compiles in a sandbox: only the runtime modules, cached by hash', async () => {
+    const w = new WidgetStore(dir);
+    const code = "import { Card, Text } from '@agentui/ui'; import { useState } from 'react'; export default function W() { const [n] = useState(1); return <Card><Text>{n}</Text></Card>; }";
+    const r = await w.compile(code);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(w.file(r.hash)).toBeTruthy();
+    expect(await w.compile(code)).toEqual(r);
+    const bad = await w.compile("import x from 'lodash'; export default () => <div>{x}</div>");
+    expect(bad.ok).toBe(false);
+    expect(!bad.ok && bad.errors[0]?.message).toMatch(/Cannot import "lodash"/);
+    expect((await w.compile('export default () => <div>')).ok).toBe(false);
+    await expect(w.compile('x'.repeat(70 * 1024))).rejects.toBeInstanceOf(AppError);
+  });
+
+  it('serves the iframe only with a valid token', async () => {
+    const widgets = new WidgetStore(dir);
+    const app = Fastify();
+    registerMiniApps(app, { store, widgets, data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as never, runtimeDir: dir });
+    const r = await widgets.compile('export default () => <div>hi</div>');
+    if (!r.ok) throw new Error('build');
+    const base = `/w/${r.hash}/${signAppToken('s', 1, `widget-${r.hash}`)}/`;
+    expect((await app.inject(base)).statusCode).toBe(200);
+    expect((await app.inject(`${base}app.js`)).statusCode).toBe(200);
+    expect((await app.inject(`/w/${r.hash}/bad.token.x/app.js`)).statusCode).toBe(403);
   });
 });

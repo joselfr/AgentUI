@@ -7,7 +7,7 @@ description: Build a miniapp (React front + handlers) that appears in the Miniap
 
 # Building miniapps for AgentUI
 
-A **miniapp** is a small web application you write — a **front** (React, in `src/`) and optional **handlers** (the server side, in `server/`) — that appears in the **Miniapps** tab of AgentUI. It runs inside AgentUI, uses its look and feel, and its data lives on the AgentUI server. Use it when the user wants a persistent tool (tracker, dashboard, list, calculator, small game…) rather than a one-off answer — for a one-off chart or table, use the `agentui_chart` / `agentui_table` widgets instead.
+A **miniapp** is a small web application you write — a **front** (React, in `src/`) and optional **handlers** (the server side, in `server/`) — that appears in the **Miniapps** tab of AgentUI. It runs inside AgentUI, uses its look and feel, and its data lives on the AgentUI server. Use it when the user wants a persistent tool (tracker, dashboard, list, calculator, small game…) rather than a one-off answer — for a one-off chart or table, use the `agentui_chart` / `agentui_table` widgets instead, and for a one-off interactive component (simulator, converter, filterable list…) use `agentui_ui`, which takes a single TSX module written with the same UI kit.
 
 ## Workflow
 

@@ -17,6 +17,47 @@ export const CRON_MESSAGES = [
 /** Scenarios: the first one whose keyword appears in the user's message is played. */
 export const SCENARIOS = [
   {
+    match: /saving|simulat/i,
+    intro: 'Here is a simulator you can play with: change the deposit, the return or the duration.',
+    tools: [
+      ['ui', { code: `import { useState } from 'react';
+import { Card, Stack, Row, Text, TextField, Chart } from '@agentui/ui';
+
+export default function Savings() {
+  const [monthly, setMonthly] = useState('300');
+  const [rate, setRate] = useState('4');
+  const [years, setYears] = useState('20');
+  const m = Math.max(0, Number(monthly) || 0), r = Math.max(0, Number(rate) || 0) / 1200, n = Math.min(60, Math.max(1, Math.round(Number(years) || 1)));
+  const labels = [], capital = [], paid = [];
+  let c = 0;
+  for (let y = 1; y <= n; y++) {
+    for (let i = 0; i < 12; i++) c = c * (1 + r) + m;
+    labels.push(String(y)); capital.push(Math.round(c)); paid.push(m * 12 * y);
+  }
+  const fmt = (v) => Math.round(v).toLocaleString('en-US') + ' €';
+  return (
+    <Card>
+      <Stack>
+        <Text variant="subtitle">Savings simulator</Text>
+        <Row wrap>
+          <TextField style={{ flex: 1, minWidth: 120 }} label="Monthly deposit (€)" type="number" value={monthly} onChange={setMonthly} />
+          <TextField style={{ flex: 1, minWidth: 120 }} label="Yearly return (%)" type="number" value={rate} onChange={setRate} />
+          <TextField style={{ flex: 1, minWidth: 120 }} label="Years" type="number" value={years} onChange={setYears} />
+        </Row>
+        <Row justify="space-between" wrap>
+          <Text>Capital after {n} years : <b>{fmt(c)}</b></Text>
+          <Text muted>Deposited {fmt(m * 12 * n)} · Gains {fmt(c - m * 12 * n)}</Text>
+        </Row>
+        <Chart type="line" labels={labels} series={[{ name: 'Capital after', data: capital }, { name: 'Deposited', data: paid }]} height={200} />
+      </Stack>
+    </Card>
+  );
+}
+` }],
+    ],
+    outro: 'Everything is computed live in the widget.',
+  },
+  {
     match: /sales|revenue/i,
     intro: 'Here is the revenue trend, compared with last year.',
     tools: [

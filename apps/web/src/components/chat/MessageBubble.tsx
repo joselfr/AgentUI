@@ -19,6 +19,7 @@ import TableCard, { parseTable } from '../TableCard';
 import ProgressCard, { parseProgress } from '../ProgressCard';
 import ImageCard, { isRemote, parseImage, type Resolved } from '../ImageCard';
 import CodeCard, { parseCode } from '../CodeCard';
+import UiCard, { parseUi } from '../UiCard';
 import FormCard, { parseForm } from '../FormCard';
 import { t } from '../../i18n';
 
@@ -76,6 +77,7 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
       return <ImageCard gallery={gallery} resolve={resolve} />;
     }
   }
+  if (w?.type === 'ui') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }

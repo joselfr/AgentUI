@@ -215,6 +215,8 @@ export const en: Record<FullKey, string> = {
   'miniapps.deleteTitle': "Delete \"{name}\"?",
   'miniapps.deleteText': "The miniapp, its files and its data will be permanently deleted.",
   'miniapps.error': "The miniapp reported an error",
+  'ui.error': "The widget could not be built",
+  'ui.title': "Dynamic widget",
   'miniapps.notFound': "This miniapp no longer exists.",
   'miniapps.fs.title': "This miniapp asks for access to files on the server",
   'miniapps.fs.button': "File access",

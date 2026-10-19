@@ -29,6 +29,12 @@ export function widgetError(key: string, args: Args): string | undefined {
     if (args.update !== undefined && !/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.update))) return '`update` must be the [[agentui:…]] token returned by the first call.';
   } else if (key === 'map' && !args.points?.length) return 'At least one point is required.';
   else if (key === 'code' && !String(args.code ?? '').trim()) return 'The code is empty.';
+  else if (key === 'ui') {
+    const code = String(args.code ?? '');
+    if (!code.trim()) return 'The code is empty.';
+    if (Buffer.byteLength(code) > 64 * 1024) return 'The code is too large (max 64 KB).';
+    if (!/export\s+default\b/.test(code)) return 'The module must default-export the React component (`export default function Widget() { … }`).';
+  }
   return undefined;
 }
 
