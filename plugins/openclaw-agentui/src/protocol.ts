@@ -72,11 +72,14 @@ export type PluginMessage =
   | { type: 'rpc.result'; id: string; result?: unknown; error?: string }
   /** Request on the agent's miniapps (create, write files…); answered by `miniapp.result`. */
   | { type: 'miniapp.op'; id: string; op: string; args?: unknown }
+  /** Push notification to the user's devices; answered by `notify.result`. */
+  | { type: 'notify'; id: string; title: string; body?: string; url?: string }
   | { type: 'pong' };
 
 export type GatewayMessage =
-  | { type: 'welcome'; protocol: number; miniapps?: boolean }
+  | { type: 'welcome'; protocol: number; miniapps?: boolean; notify?: boolean }
   | { type: 'miniapp.result'; id: string; ok: boolean; result?: unknown; error?: string }
+  | { type: 'notify.result'; id: string; ok: boolean; result?: unknown; error?: string }
   | { type: 'inbound'; conversationId: string; runId: string; text: string; subAgentId?: string; attachments?: Media[] }
   | { type: 'abort'; conversationId: string; runId: string }
   | { type: 'reply'; conversationId: string; runId: string; text: string }

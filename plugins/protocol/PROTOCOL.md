@@ -20,20 +20,22 @@ Protocol between AgentUI (the "gateway", like Telegram for a bot) and a **channe
 | `event` | `conversationId`, `runId`, `event` | A run event, in AgentUI's `AgentEvent` format (see below). |
 | `outbound` | `id`, `conversationId?`, `title?`, `text?`, `media?: Media[]` | **Proactive message** (cron, reminder, `send_message` tool…) outside any run. Without `conversationId`, AgentUI files it in the agent's "home" chat. `title`: proposed title if the chat has to be created (e.g. "⏰ task-name" for a cron). |
 | `rpc.result` | `id`, `result?` \| `error?` | Answer to an `rpc`. |
-| `miniapp.op` | `id`, `op`, `args?` | Operation on the agent's **miniapps** (Miniapps tab): `create`, `write`, `read`, `list`, `delete_file`, `remove`, `logs`. Answer: `miniapp.result`. An agent only touches its own apps. |
+| `miniapp.op` | `id`, `op`, `args?` | Operation on the agent's **miniapps** (Miniapps tab): `create`, `write`, `read`, `list`, `delete_file`, `remove`, `logs`, `data`. Answer: `miniapp.result`. An agent only touches its own apps. |
+| `notify` | `id`, `title`, `body?`, `url?` | **Push notification** to the user's devices (backs the `agentui_notify` tool). `url`: opened on tap — an AgentUI path (`/…`) or an `https://` URL (default `/`). Answer: `notify.result`. |
 | `pong` | — | Answer to `ping`. |
 
 ## AgentUI → plugin messages
 
 | `type` | Fields | Role |
 |---|---|---|
-| `welcome` | `protocol: 1`, `miniapps?: true` | Accepts the `hello`. `miniapps: true`: the server handles `miniapp.op` frames. |
+| `welcome` | `protocol: 1`, `miniapps?: true`, `notify?: true` | Accepts the `hello`. `miniapps: true`: the server handles `miniapp.op` frames; `notify: true`: it handles `notify` frames. |
 | `inbound` | `conversationId`, `runId`, `text`, `subAgentId?`, `attachments?: Media[]` | User message. **Each `conversationId` is a distinct chat** for the platform, hence a distinct session (multiple threads). The `runId` is chosen by AgentUI. |
 | `abort` | `conversationId`, `runId` | Stop the run. |
 | `reply` | `conversationId`, `runId`, `text` | User answer to a question the agent asks **mid-run** (announced by `question.requested`). The plugin hands it to the waiting agent: the run continues and ends normally, it is not a new `inbound`. Optional: AgentUI only sends it while a question is open. |
 | `approval` | `conversationId`, `runId`, `id`, `approve: boolean`, `scope?: "once" \| "session" \| "always"` | Answer to an `approval.request`. |
 | `rpc` | `id`, `method`, `params?` | Optional call. Unknown method: `rpc.result` with `error`. Methods: `listSubAgents` → `[{ id, name, description?, isDefault? }]`; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (if `capabilities.jobs`); `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (if `capabilities.jobControl`); `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (if `capabilities.skills`); `readSkill {skillId, subAgentId?}` → `{ content }` (Markdown of the skill, if `capabilities.skills`); `deleteSession {conversationId}` → `{ ok: true }` (if `capabilities.sessionDelete`); `listModels` → `[{ provider, providerName, id }]`, `setModel {conversationId, model, provider?, subAgentId?}` → `{ model, provider?, message? }` and `sessionUsage {conversationId, subAgentId?}` → `Usage` or `null` (if `capabilities.models`). Dates in milliseconds. |
 | `miniapp.result` | `id`, `ok`, `result?` \| `error?` | Answer to a `miniapp.op`. `ok: false`: `error` is a message readable by the agent (invalid id, miniapp of another agent…). A failing build is **not** an error: `ok: true` with `result = { ok: false, errors: [{ file, line, message }] }`. |
+| `notify.result` | `id`, `ok`, `result?` \| `error?` | Answer to a `notify`. `result = { sent, note? }` (`sent`: devices reached; `0` if none is subscribed). |
 | `ping` | — | Keep-alive. |
 
 ## Events (`event.event`)

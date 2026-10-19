@@ -67,9 +67,11 @@ const APPROVE_RE = /\/approve\s+([A-Za-z0-9_-]+)\s+allow-once/;
 const ASK_TIMEOUT_MS = 30 * 60_000;
 
 const MINIAPP_OP_TIMEOUT_MS = 60_000;
+const NOTIFY_TIMEOUT_MS = 30_000;
 
 export class AgentUIBridge implements RunHost {
   private runs = new Map<string, Run>();
+  private notifyOps = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private miniappOps = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 
   constructor(
@@ -104,6 +106,15 @@ export class AgentUIBridge implements RunHost {
         this.miniappOps.delete(msg.id);
         if (msg.ok) p.resolve(msg.result);
         else p.reject(new Error(msg.error ?? 'Miniapp operation failed.'));
+        return;
+      }
+      case 'notify.result': {
+        const p = this.notifyOps.get(msg.id);
+        if (!p) return;
+        clearTimeout(p.timer);
+        this.notifyOps.delete(msg.id);
+        if (msg.ok) p.resolve(msg.result);
+        else p.reject(new Error(msg.error ?? 'Notification failed.'));
         return;
       }
       default:
@@ -323,6 +334,21 @@ export class AgentUIBridge implements RunHost {
       timer.unref?.();
       this.miniappOps.set(id, { resolve, reject, timer });
       client.send({ type: 'miniapp.op', id, op, args });
+    });
+  }
+
+  notify(title: string, body?: string, url?: string): Promise<unknown> | undefined {
+    const client = this.p.client();
+    if (!client) return undefined;
+    const id = `notify_${randomBytes(6).toString('hex')}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.notifyOps.delete(id);
+        reject(new Error('No answer from AgentUI (is the server up to date? notifications need a recent AgentUI).'));
+      }, NOTIFY_TIMEOUT_MS);
+      timer.unref?.();
+      this.notifyOps.set(id, { resolve, reject, timer });
+      client.send({ type: 'notify', id, title, ...(body ? { body } : {}), ...(url ? { url } : {}) });
     });
   }
 

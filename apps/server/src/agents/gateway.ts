@@ -121,6 +121,8 @@ export class GatewayAdapter implements AgentAdapter {
   /** Miniapp operation requested by the plugin for its agent (frame `miniapp.op`); the result goes back in `miniapp.result`. */
   onMiniappOp?: (op: string, args: unknown) => Promise<unknown>;
   onMiniappOpError?: (e: unknown) => string;
+  /** Push notification requested by the plugin (frame `notify`); the result goes back in `notify.result`. */
+  onNotify?: (n: { title: string; body?: string; url?: string }) => Promise<unknown>;
 
   constructor(private cfg: GatewayConfig) {
     this.id = cfg.id;
@@ -167,14 +169,14 @@ export class GatewayAdapter implements AgentAdapter {
   attach(socket: GatewaySocket, hello: Json) {
     if (hello.mode === 'send-only') {
       // One-off connection (cron outside the gateway, CLI): does not replace the main connection.
-      socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onMiniappOp ? { miniapps: true } : {}) }));
+      socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onMiniappOp ? { miniapps: true } : {}), ...(this.onNotify ? { notify: true } : {}) }));
       socket.on('message', (raw) => void this.onFrame(raw, socket));
       return;
     }
     if (this.socket && this.socket !== socket) this.socket.close(4000, 'replaced by a new connection');
     this.socket = socket;
     this.hello = hello;
-    socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onMiniappOp ? { miniapps: true } : {}) }));
+    socket.send(JSON.stringify({ type: 'welcome', protocol: 1, ...(this.onMiniappOp ? { miniapps: true } : {}), ...(this.onNotify ? { notify: true } : {}) }));
     const version = hello.agent?.version ? ` ${hello.agent.version}` : '';
     this.setState('connected', `${hello.agent?.type ?? 'plugin'}${version}`);
 
@@ -239,6 +241,22 @@ export class GatewayAdapter implements AgentAdapter {
           this.write({ type: 'miniapp.result', id, ok: true, result: await this.onMiniappOp(String(msg.op), msg.args) });
         } catch (e) {
           this.write({ type: 'miniapp.result', id, ok: false, error: this.onMiniappOpError?.(e) ?? (e as Error).message });
+        }
+        return;
+      }
+      case 'notify': {
+        if (from !== this.socket) return;
+        const id = String(msg.id);
+        const title = typeof msg.title === 'string' ? msg.title.trim().slice(0, 80) : '';
+        if (!this.onNotify) return this.write({ type: 'notify.result', id, ok: false, error: 'Notifications are not available on this server.' });
+        if (!title) return this.write({ type: 'notify.result', id, ok: false, error: 'The title is empty.' });
+        try {
+          const body = typeof msg.body === 'string' ? msg.body.slice(0, 300) : undefined;
+          const url = typeof msg.url === 'string' && msg.url.trim() ? msg.url.trim() : undefined;
+          if (url && !/^\/(?![/\\])/.test(url) && !/^https:\/\/\S+$/.test(url)) return this.write({ type: 'notify.result', id, ok: false, error: 'The url must be an AgentUI path starting with "/" or an https:// URL.' });
+          this.write({ type: 'notify.result', id, ok: true, result: await this.onNotify({ title, body, url }) });
+        } catch (e) {
+          this.write({ type: 'notify.result', id, ok: false, error: (e as Error).message });
         }
         return;
       }

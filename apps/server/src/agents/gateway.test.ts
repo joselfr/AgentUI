@@ -295,3 +295,24 @@ test('miniapps: miniapp.op from the plugin is executed for its agent and answere
   expect(p.sent.find((m) => m.id === 'a1')).toEqual({ type: 'miniapp.result', id: 'a1', ok: true, result: { ok: true } });
   expect(p.sent.find((m) => m.id === 'a2')).toMatchObject({ ok: false, error: 'nope' });
 });
+
+test('notify: the plugin asks for a push notification and gets notify.result', async () => {
+  const { adapter } = setup();
+  const seen: unknown[] = [];
+  adapter.onNotify = async (n) => {
+    seen.push(n);
+    return { sent: 2 };
+  };
+  const p = new FakePlugin();
+  adapter.attach(p, hello());
+  expect(p.sent[0]).toMatchObject({ type: 'welcome', notify: true });
+  p.frame({ type: 'notify', id: 'n1', title: ' Done ', body: 'All good' });
+  p.frame({ type: 'notify', id: 'n2', title: '  ' });
+  p.frame({ type: 'notify', id: 'n3', title: 'X', url: 'javascript:alert(1)' });
+  p.frame({ type: 'notify', id: 'n4', title: 'Y', url: '/miniapps/todo' });
+  await tick();
+  expect(seen).toEqual([{ title: 'Done', body: 'All good', url: undefined }, { title: 'Y', body: undefined, url: '/miniapps/todo' }]);
+  expect(p.sent.find((m) => m.id === 'n3')).toMatchObject({ ok: false });
+  expect(p.sent.find((m) => m.id === 'n1')).toEqual({ type: 'notify.result', id: 'n1', ok: true, result: { sent: 2 } });
+  expect(p.sent.find((m) => m.id === 'n2')).toMatchObject({ ok: false, error: 'The title is empty.' });
+});

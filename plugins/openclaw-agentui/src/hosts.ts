@@ -11,6 +11,8 @@ export interface RunHost {
   emitMedia(conversationId: string, media: Media): boolean;
   /** Miniapp operation on the AgentUI server; `undefined` if this bridge is not connected. */
   miniappOp(op: string, args: unknown): Promise<unknown> | undefined;
+  /** Push notification to the user's devices; `undefined` if this bridge is not connected. */
+  notify(title: string, body?: string, url?: string): Promise<unknown> | undefined;
 }
 
 /** Bridges of the connected accounts (accountId → bridge). */
@@ -33,6 +35,15 @@ export function emitMedia(conversationId: string, media: Media): boolean {
 export function miniappOp(op: string, args: unknown): Promise<unknown> {
   for (const host of runHosts.values()) {
     const pending = host.miniappOp(op, args);
+    if (pending) return pending;
+  }
+  return Promise.reject(new Error('AgentUI is not connected.'));
+}
+
+/** Sends a push notification through the first connected account. */
+export function notifyUser(title: string, body?: string, url?: string): Promise<unknown> {
+  for (const host of runHosts.values()) {
+    const pending = host.notify(title, body, url);
     if (pending) return pending;
   }
   return Promise.reject(new Error('AgentUI is not connected.'));

@@ -371,6 +371,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._approvals: Dict[str, str] = {}  # approval id → Hermes session_key
         self._clarifies: Dict[str, Tuple[str, str]] = {}  # chat → (session_key, clarify_id) of the pending question
         self._asks: Dict[str, _Ask] = {}  # chat → question of a pending interactive tool
+        self._notify_ops: Dict[str, concurrent.futures.Future] = {}  # notify id → future resolved by notify.result
         self._miniapp_ops: Dict[str, concurrent.futures.Future] = {}  # miniapp.op id → future resolved by miniapp.result
         self._session_chat: Dict[str, str] = {}  # Hermes session_id (agent or sub-agent) → conversationId
         self._session_subagent: Dict[str, str] = {}  # session_id of a sub-agent → AgentUI sub-agent id
@@ -528,6 +529,14 @@ class AgentUIAdapter(BasePlatformAdapter):
                     fut.set_result(msg.get("result"))
                 else:
                     fut.set_exception(RuntimeError(msg.get("error") or "Miniapp operation failed."))
+        elif kind == "notify.result":
+            with self._lock:
+                fut = self._notify_ops.pop(str(msg.get("id")), None)
+            if fut is not None and not fut.done():
+                if msg.get("ok"):
+                    fut.set_result(msg.get("result"))
+                else:
+                    fut.set_exception(RuntimeError(msg.get("error") or "Notification failed."))
         elif kind == "ping":
             self._post({"type": "pong"})
 
@@ -545,6 +554,26 @@ class AgentUIAdapter(BasePlatformAdapter):
         finally:
             with self._lock:
                 self._miniapp_ops.pop(op_id, None)
+
+    def notify(self, title: str, body: str = "", url: str = "", timeout: float = 30.0) -> Any:
+        """Sends a push notification to the user's devices through AgentUI and waits for its result (agent thread)."""
+        fut: concurrent.futures.Future = concurrent.futures.Future()
+        op_id = f"notify_{uuid.uuid4().hex[:12]}"
+        with self._lock:
+            self._notify_ops[op_id] = fut
+        frame: Dict[str, Any] = {"type": "notify", "id": op_id, "title": title}
+        if body:
+            frame["body"] = body
+        if url:
+            frame["url"] = url
+        self._post(frame)
+        try:
+            return fut.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise RuntimeError("No answer from AgentUI (is the server up to date? notifications need a recent AgentUI).")
+        finally:
+            with self._lock:
+                self._notify_ops.pop(op_id, None)
 
     async def _on_inbound(self, msg: dict) -> None:
         conv, run_id = msg["conversationId"], msg["runId"]
@@ -1279,7 +1308,21 @@ def _register_widget_tools(ctx) -> None:
 
         return handler
 
-    for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler), ("miniappTools", None)):
+    def make_notify_handler(_key: str):
+        def handler(args: Dict[str, Any], **_kw: Any) -> str:
+            adapter = _ACTIVE
+            if adapter is None:
+                return json.dumps({"error": "AgentUI is not connected."}, ensure_ascii=False)
+            if not str(args.get("title", "")).strip():
+                return json.dumps({"error": "The title is empty."}, ensure_ascii=False)
+            try:
+                return json.dumps(adapter.notify(str(args.get("title")), str(args.get("body") or ""), str(args.get("url") or "")), ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": str(e) or type(e).__name__}, ensure_ascii=False)
+
+        return handler
+
+    for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler), ("miniappTools", None), ("notifyTool", make_notify_handler)):
         for key, tool in spec.get(kind, {}).items():
             name = spec["prefix"] + ("miniapp_" if kind == "miniappTools" else "") + key
             ctx.register_tool(

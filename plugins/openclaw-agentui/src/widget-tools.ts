@@ -4,11 +4,11 @@
 import { randomBytes } from 'node:crypto';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
-import { miniappOp, askUser, emitMedia } from './hosts.js';
+import { miniappOp, notifyUser, askUser, emitMedia } from './hosts.js';
 import { imagesError, readLocalImage } from './images.js';
 
 export const MINIAPP_TOOL_PREFIX = `${spec.prefix}miniapp_`;
-export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools), ...Object.keys(spec.blockingTools)].map((k) => spec.prefix + k).concat(Object.keys(spec.miniappTools).map((k) => MINIAPP_TOOL_PREFIX + k));
+export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools), ...Object.keys(spec.blockingTools)].map((k) => spec.prefix + k).concat(Object.keys(spec.miniappTools).map((k) => MINIAPP_TOOL_PREFIX + k), Object.keys(spec.notifyTool).map((k) => spec.prefix + k));
 
 type Args = Record<string, any>;
 
@@ -109,6 +109,18 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
         return { content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result) }], details: { op } };
       },
     }));
-    return [...display, ...blocking, ...miniapps];
+    // Push notification to the user's devices: sent by the AgentUI server (own `notify` frame).
+    const notify = Object.entries(spec.notifyTool).map(([key, tool]) => ({
+      name: spec.prefix + key,
+      label: spec.prefix + key,
+      description: tool.description,
+      parameters: tool.parameters as any,
+      async execute(_id: string, args: Args) {
+        if (!String(args.title ?? '').trim()) throw new Error('The title is empty.');
+        const result = await notifyUser(String(args.title), args.body === undefined ? undefined : String(args.body), args.url === undefined ? undefined : String(args.url));
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], details: { op: key } };
+      },
+    }));
+    return [...display, ...blocking, ...miniapps, ...notify];
   }, { names: WIDGET_TOOL_NAMES });
 }
