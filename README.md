@@ -38,3 +38,6 @@ Tests: `npm run e2e` (interface) and `npm run e2e:push` (see the header of `e2e/
 
 ## Presentation site
 Bilingual static page in [`docs/`](docs/index.html) (French) and [`docs/en/`](docs/en/index.html) (English), published by GitHub Pages (`main` branch, `/docs` folder). To edit it or redo its screenshots: `update-site` skill (`.claude/skills/update-site/SKILL.md`).
+
+## License
+MIT, see [`LICENSE`](LICENSE).

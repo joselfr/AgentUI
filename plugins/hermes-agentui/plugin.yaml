@@ -2,6 +2,7 @@ name: agentui-platform
 label: AgentUI
 kind: platform
 version: 0.1.0
+license: MIT
 description: >
   AgentUI channel for Hermes Agent: the Hermes gateway connects to AgentUI
   (outgoing WebSocket) and relays messages, streaming, tools, approvals

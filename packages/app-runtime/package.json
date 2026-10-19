@@ -1,6 +1,7 @@
 {
   "name": "@agentui/app-runtime",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "Runtime served to the miniapp iframes: React, chart.js and the @agentui/ui kit (themed with --au-* CSS variables).",

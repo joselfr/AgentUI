@@ -1,6 +1,7 @@
 {
   "name": "@agentui/openclaw-agentui",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "description": "AgentUI channel for OpenClaw (AgentUI Channel Protocol v1)",
   "type": "module",
