@@ -91,16 +91,39 @@ try {
   await mtext.waitFor({ timeout: 15000 });
   check('mobile: the ⋯ button is not shown', (await m.locator('.bubble-more').first().evaluate((e) => getComputedStyle(e).display)) === 'none');
   check('mobile: no Reply / Copy buttons on messages', (await m.getByRole('button', { name: 'Reply', exact: true }).count()) === 0);
-  await m.evaluate(() => { const el = [...document.querySelectorAll('p')].find((p) => p.textContent.startsWith('Here is the revenue')); const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
   const mbar = m.getByTestId('selection-quote');
+
+  // 4. mobile long press: our menu (paragraph / message / select text), no native selection by default
+  const cdp = await mctx.newCDPSession(m);
+  const longPress = async (loc) => {
+    await loc.scrollIntoViewIfNeeded();
+    const b = await loc.boundingBox();
+    const pt = { x: b.x + 30, y: b.y + b.height / 2 };
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt] });
+    await m.waitForTimeout(700);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  const para = m.locator('[data-bubble][data-role="assistant"] p', { hasText: 'Here is the revenue trend' }).first();
+  check('mobile: message text is not selectable by default', (await para.evaluate((e) => getComputedStyle(e).userSelect)) === 'none');
+  await longPress(para);
+  await m.getByRole('menuitem', { name: 'Reply to this paragraph' }).waitFor({ timeout: 3000 });
+  check('mobile: long press opens our menu (paragraph / message / copy / select)', (await m.getByRole('menuitem').count()) === 5);
+  check('mobile: no native selection was started', (await m.evaluate(() => getSelection().toString())) === '');
+  await m.getByRole('menuitem', { name: 'Reply to this paragraph' }).click();
+  await m.getByTestId('composer-quote').waitFor({ timeout: 3000 });
+  check('mobile: Reply to this paragraph quotes the pressed paragraph', (await m.getByTestId('composer-quote').innerText()).includes('Here is the revenue trend'));
+  await m.getByRole('button', { name: 'Remove the quote' }).click();
+  await longPress(para);
+  await m.getByRole('menuitem', { name: 'Select text' }).click();
+  await m.waitForTimeout(500);
+  check('mobile: Select text turns native selection on for that message and selects the paragraph', (await m.evaluate(() => getSelection().toString())).includes('Here is the revenue trend'));
   await mbar.waitFor({ timeout: 3000 });
   const pos = await mbar.boundingBox();
-  const textPos = await mtext.boundingBox();
-  check('mobile: the selection bar is docked at the bottom, away from the selection', pos.y > textPos.y + textPos.height + 40 && pos.y + pos.height < 780, `bar y=${Math.round(pos.y)} text y=${Math.round(textPos.y)}`);
+  check('mobile: the selection bar is docked at the bottom, away from the system menu', pos.y > 780 * 0.7 && pos.y + pos.height < 780, `bar y=${Math.round(pos.y)}`);
   await m.screenshot({ path: join(shots, 'quote-mobile.png') });
   await mbar.getByRole('button', { name: 'Message', exact: true }).click();
   await m.getByTestId('composer-quote').waitFor({ timeout: 3000 });
-  check('mobile: Message button quotes the full message', true);
+  check('mobile: the Message button of the bar quotes the full message', true);
 } catch (e) { check('run', false, String(e).slice(0, 300)); await page.screenshot({ path: join(shots, 'fail.png') }); }
 await browser.close();
 process.exit(ok.every(Boolean) ? 0 : 1);

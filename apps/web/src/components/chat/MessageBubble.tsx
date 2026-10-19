@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import { Avatar, Box, Chip, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Paper, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
 import FormatQuote from '@mui/icons-material/FormatQuote';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import MoreHoriz from '@mui/icons-material/MoreHoriz';
+import TextFields from '@mui/icons-material/TextFields';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // a line break = a line (cron outputs, short messages)
@@ -26,6 +27,7 @@ import UiCard, { parseUi } from '../UiCard';
 import FormCard, { parseForm } from '../FormCard';
 import { splitQuote, plainText } from './quote';
 import { copyText } from './copy';
+import { isTouch, useLongPress } from './touch';
 import { t } from '../../i18n';
 
 const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
@@ -100,12 +102,22 @@ function UserText({ text }: { text: string }) {
   );
 }
 
-/** Menu of a bubble (right click, or the discreet ⋯ shown on hover with a mouse): reply to the message, copy it. */
-function BubbleMenu({ at, text, onQuote, onClose }: { at: { x: number; y: number } | null; text: string; onQuote?: (t: string) => void; onClose: () => void }) {
+/**
+ * Menu of a bubble: right click or the discreet ⋯ with a mouse (reply to / copy the message); long press on a touch screen, where the
+ * system selection menu cannot be turned off (reply to / copy the paragraph or the message, or switch the message to native selection).
+ */
+function BubbleMenu({ at, text, block, onQuote, onSelect, onClose }: {
+  at: { x: number; y: number } | null; text: string; block?: string; onQuote?: (t: string) => void; onSelect?: () => void; onClose: () => void;
+}) {
+  const item = (icon: ReactElement, label: string, run: () => void) => <MenuItem onClick={() => { run(); onClose(); }}><ListItemIcon>{icon}</ListItemIcon><ListItemText>{label}</ListItemText></MenuItem>;
+  const quote = <FormatQuote fontSize="small" />, copy = <ContentCopy fontSize="small" />;
   return (
-    <Menu open={!!at} onClose={onClose} anchorReference="anchorPosition" anchorPosition={at ? { top: at.y, left: at.x } : undefined} slotProps={{ paper: { sx: { minWidth: 160 } } }}>
-      {onQuote && <MenuItem onClick={() => { onQuote(text); onClose(); }}><ListItemIcon><FormatQuote fontSize="small" /></ListItemIcon><ListItemText>{t('chat.reply')}</ListItemText></MenuItem>}
-      <MenuItem onClick={() => { void copyText(text); onClose(); }}><ListItemIcon><ContentCopy fontSize="small" /></ListItemIcon><ListItemText>{t('chat.copy')}</ListItemText></MenuItem>
+    <Menu open={!!at} onClose={onClose} anchorReference="anchorPosition" anchorPosition={at ? { top: at.y, left: at.x } : undefined} slotProps={{ paper: { sx: { minWidth: 200 } } }}>
+      {onQuote && block && item(quote, t('chat.replyBlock'), () => onQuote(block))}
+      {onQuote && item(quote, block ? t('chat.replyMessage') : t('chat.reply'), () => onQuote(text))}
+      {block && item(copy, t('chat.copyBlock'), () => void copyText(block))}
+      {item(copy, block ? t('chat.copyMessage') : t('chat.copy'), () => void copyText(text))}
+      {onSelect && item(<TextFields fontSize="small" />, t('chat.selectText'), onSelect)}
     </Menu>
   );
 }
@@ -121,14 +133,31 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
   allTools?: ToolCallLike[];
 }) {
   const mine = m.role === 'user';
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; block?: HTMLElement } | null>(null);
+  const touch = isTouch();
+  // Touch screens: the text is not selectable until "Select text" is chosen from the long-press menu (the system menu would get in the way).
+  const [selectable, setSelectable] = useState(false);
+  const blockText = (el?: HTMLElement) => (el?.innerText ?? '').trim() || undefined;
   const quotable = m.status !== 'streaming' && !!plainText(m.text);
   // Right click opens the bubble menu, except on a selection, a link, an image or a control: the browser's own menu stays there for those.
   const onContextMenu = (e: MouseEvent<HTMLElement>) => {
-    if (!quotable || !window.getSelection()?.isCollapsed || (e.target as Element).closest('a, button, input, textarea, img, [role="button"]')) return;
+    if (!quotable || (e.target as Element).closest('a, button, input, textarea, img, [role="button"]')) return;
+    if (touch) { e.preventDefault(); return; } // the long press (below) opens the menu; never the system one
+    if (!window.getSelection()?.isCollapsed) return;
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY });
   };
+  const press = useLongPress((p) => setMenu({ x: p.x, y: p.y, block: p.block }), touch && quotable && !selectable);
+  // "Select text": native selection for this message, started on the pressed paragraph; back to the default once the selection is gone.
+  const picked = useRef<HTMLElement>();
+  useEffect(() => {
+    if (!selectable) return;
+    if (picked.current?.isConnected) window.getSelection()?.selectAllChildren(picked.current);
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => { clearTimeout(timer); timer = setTimeout(() => { if (window.getSelection()?.isCollapsed) setSelectable(false); }, 400); };
+    document.addEventListener('selectionchange', check);
+    return () => { clearTimeout(timer); document.removeEventListener('selectionchange', check); };
+  }, [selectable]);
   // The widget of an `agentui_<type>` tool takes the place of the token the agent wrote in its text; the call is also still listed with the other tools.
   // Widgets that evolve during the run (progress): shown as soon as their tool call, without waiting for the agent's text.
   const live = useMemo(() => (m.role === 'user' ? [] : outOfTextWidgets(m.toolCalls ?? [], allTools)), [m.role, m.toolCalls, allTools]);
@@ -168,7 +197,8 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
       {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
         '--halo': (t) => alpha(t.palette.primary.main, 0.5), animation: working ? `${halo} 1.6s infinite` : 'none' }}>{agentName[0]}</Avatar>}
-      <Paper data-role={m.role} data-bubble="" data-mid={m.id} onContextMenu={onContextMenu} sx={{
+      <Paper data-role={m.role} data-bubble="" data-mid={m.id} onContextMenu={onContextMenu} {...press} sx={{
+        ...(touch && !selectable ? { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } : {}),
         position: 'relative', '&:hover .bubble-more, &:focus-within .bubble-more': { opacity: 1 },
         maxWidth: mine ? 'min(640px, 88%)' : 'min(760px, calc(100% - 44px))', px: 2, py: 1.25, borderRadius: mine ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
         bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
@@ -197,7 +227,8 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
           <>
             <IconButton className="bubble-more" size="small" aria-label={t('chat.more')} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.right, y: r.bottom }); }}
               sx={{ display: 'none', '@media (hover: hover)': { display: 'inline-flex' }, position: 'absolute', top: 2, right: 2, opacity: 0, transition: 'opacity .12s', color: 'text.secondary' }}><MoreHoriz fontSize="small" /></IconButton>
-            <BubbleMenu at={menu} text={plainText(m.text)} onQuote={onQuote} onClose={() => setMenu(null)} />
+            <BubbleMenu at={menu} text={plainText(m.text)} block={blockText(menu?.block)} onQuote={onQuote} onClose={() => setMenu(null)}
+              onSelect={touch ? () => { picked.current = menu?.block; setSelectable(true); } : undefined} />
           </>)}
         {working && <Working m={m} />}
         {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">{t('chat.aborted')}</Typography>}

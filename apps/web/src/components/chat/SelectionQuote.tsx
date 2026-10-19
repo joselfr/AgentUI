@@ -5,10 +5,9 @@ import ContentCopy from '@mui/icons-material/ContentCopy';
 import ChatBubbleOutline from '@mui/icons-material/ChatBubbleOutline';
 import { t } from '../../i18n';
 import { copyText } from './copy';
+import { isTouch } from './touch';
 
 const BUBBLE = '[data-bubble]';
-/** Touch screens: the system shows its own menu above the selection, so the bar is docked at the bottom, out of its way. */
-const touch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 const bubbleOf = (n: Node | null) => (n instanceof Element ? n : n?.parentElement)?.closest(BUBBLE) ?? null;
 
 /**
@@ -26,7 +25,7 @@ export default function SelectionQuote({ onQuote, onQuoteMessage }: { onQuote?: 
       if (!s || s.isCollapsed || !text || !bubbleOf(s.anchorNode) || !bubbleOf(s.focusNode)) return setSel(null);
       const r = s.getRangeAt(0).getBoundingClientRect();
       const top = r.top > 52 ? r.top - 44 : r.bottom + 8;
-      setSel({ text, top, left: Math.min(Math.max(8, r.left + r.width / 2 - 90), window.innerWidth - 188), id: bubbleOf(s.anchorNode)?.getAttribute('data-mid') ?? undefined, docked: touch() });
+      setSel({ text, top, left: Math.min(Math.max(8, r.left + r.width / 2 - 90), window.innerWidth - 188), id: bubbleOf(s.anchorNode)?.getAttribute('data-mid') ?? undefined, docked: isTouch() });
     };
     // Debounced: the bar appears once the selection settles, not while the pointer is still dragging.
     const onChange = () => { clearTimeout(timer); timer = setTimeout(read, 250); };
