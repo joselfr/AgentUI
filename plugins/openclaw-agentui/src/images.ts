@@ -1,4 +1,4 @@
-// `agentui_image` widget: a source is an https URL or an absolute path of a file on the agent's machine, which the
+// `agentui_widget_image` widget: a source is an https URL or an absolute path of a file on the agent's machine, which the
 // plugin copies into the chat (message.media) so that the user can see it.
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

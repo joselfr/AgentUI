@@ -23,7 +23,7 @@ describe('parseTable', () => {
   it('rejects more than 200 rows', () => {
     expect(parseTable({ columns: [{ label: 'A' }], rows: Array.from({ length: 201 }, () => ['x']) })).toBeUndefined();
   });
-  it("the agentui_table tool is a display widget", () => {
-    expect(widgetOfTool({ name: 'agentui_table', args: ok })?.type).toBe('table');
+  it("the agentui_widget_table tool is a display widget", () => {
+    expect(widgetOfTool({ name: 'agentui_widget_table', args: ok })?.type).toBe('table');
   });
 });

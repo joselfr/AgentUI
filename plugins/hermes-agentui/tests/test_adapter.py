@@ -171,17 +171,17 @@ class FakeAgent:
                 return "fait"
             if event.text == "prog-widget":  # progress widget: the 2nd call (update) returns the same token
                 steps = [{"label": "A", "status": "running"}]
-                first = json.loads(Ctx.tools["agentui_progress"]({"steps": steps}))
-                again = json.loads(Ctx.tools["agentui_progress"]({"steps": [{"label": "A", "status": "done"}], "update": first["widget"]}))
-                bad = json.loads(Ctx.tools["agentui_progress"]({"steps": steps, "update": "abc"}))
+                first = json.loads(Ctx.tools["agentui_widget_progress"]({"steps": steps}))
+                again = json.loads(Ctx.tools["agentui_widget_progress"]({"steps": [{"label": "A", "status": "done"}], "update": first["widget"]}))
+                bad = json.loads(Ctx.tools["agentui_widget_progress"]({"steps": steps, "update": "abc"}))
                 self.answers[chat] = (first, again, bad)
                 return "fait"
-            if event.text == "image-tool":  # agentui_image: copy of a local file into message.media + mapping in the result
+            if event.text == "image-tool":  # agentui_widget_image: copy of a local file into message.media + mapping in the result
                 png = Path(tempfile.mkdtemp()) / "plage.png"
                 png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
                 txt = png.with_name("note.png")
                 txt.write_text("some text")
-                call = lambda images: json.loads(Ctx.tools["agentui_image"]({"images": images}))
+                call = lambda images: json.loads(Ctx.tools["agentui_widget_image"]({"images": images}))
                 self.answers[chat] = (
                     call([{"src": "https://exemple.org/a.jpg"}, {"src": str(png)}, {"src": str(png)}]),
                     call([{"src": str(txt)}]),

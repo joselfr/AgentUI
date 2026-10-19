@@ -66,12 +66,12 @@ the agent places this token in its text. AgentUI replaces it at display time wit
 Schemas: `widget-tools.json` (copied into each plugin by `plugins/sync-widget-tools.mjs`). An agent without the plugin therefore does not have
 these widgets.
 
-A display widget can be **updated**: `agentui_progress` (checklist of steps) accepts `update` = the token
+A display widget can be **updated**: `agentui_widget_progress` (checklist of steps) accepts `update` = the token
 returned by the first call, with the full state. The tool then returns the same token (`"updated": true`); the front end
 displays, in place of the token, the arguments of the **latest** call, during streaming as well as after, without a second component.
 Plugins have no state to keep.
 
-`agentui_image` accepts, per image, an `https://…` URL (loaded directly by the browser) or an **absolute path** of a
+`agentui_widget_image` accepts, per image, an `https://…` URL (loaded directly by the browser) or an **absolute path** of a
 file on the agent's machine. The plugin reads that file (png, jpeg, gif or webp recognized by their first bytes, 20 MB
 at most), pushes it through a `message.media` event named `agentui-img-<fingerprint>-<file>` and returns in the tool
 result `files` = `{ path → attachment name }`. The front end links the path to the message attachment and does not display it
@@ -83,7 +83,7 @@ over plain text, and models rarely pick a widget on their own. The plugins there
 AgentUI chats only: Hermes through `platform_hint`, OpenClaw through a `before_prompt_build` hook (`appendSystemContext`) filtered on
 AgentUI sessions.
 
-`agentui_custom_widget` is the **dynamic** display widget: its `code` argument is a single TSX module (default-exported React component)
+`agentui_widget_custom` is the **dynamic** display widget: its `code` argument is a single TSX module (default-exported React component)
 that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js` only). Plugins only validate it (non-empty, ≤ 64 KB, has an
 `export default`); the front end sends the code to `POST /api/widgets`, which compiles it (esbuild, cached by hash) and returns the
 URL of a token-protected sandboxed iframe (`/w/<hash>/<token>/`, same runtime and CSP as a miniapp, no backend, no `/api`).
@@ -97,19 +97,19 @@ reaches the agent as if the user had typed it, the host only accepts it when the
 question), the iframe has the focus (the user clicked in it), at most once every 1.5 s, and for 1 to 2000 characters. `useCanReply()` tells the widget
 when it would be refused.
 
-**Live widgets (two-way).** A `agentui_custom_widget` widget becomes a *live widget* when the agent keeps a session open with it: it talks to its agent over a connection the agent keeps open, like `agentui_ask`, but for as long as
+**Live widgets (two-way).** A `agentui_widget_custom` widget becomes a *live widget* when the agent keeps a session open with it: it talks to its agent over a connection the agent keeps open, like `agentui_ask`, but for as long as
 it wants. It is a loop of the agent inside **one run**, and so inside the single chat message that holds the widget:
-1. `agentui_custom_widget` creates the widget (`code`, initial `state`) and returns its token;
-2. `agentui_custom_widget_wait` (`token`, `timeout_s` default 600, max 1800; `blockingTools` section) blocks like `agentui_ask` — `question.requested`, then
+1. `agentui_widget_custom` creates the widget (`code`, initial `state`) and returns its token;
+2. `agentui_widget_custom_wait` (`token`, `timeout_s` default 600, max 1800; `blockingTools` section) blocks like `agentui_ask` — `question.requested`, then
    `question.resolved` on the answer — but displays nothing (no ```` ```widget ```` block: the widget is already there). It returns
    `{"from":"widget","widget":<token>,"event":<text>}` for an event of the widget, `{"from":"user","message":<text>}` if the user typed in the
    chat meanwhile, or `{"timeout":true}` (a normal outcome, the agent may listen again). Cancelling the run ends it with an error as usual;
-3. `agentui_custom_widget` with `update` (the token) and `state` (any JSON, ≤ 32 KB, replaces the previous one) pushes the new state; like
-   `agentui_progress`, it returns the same token with `updated: true` and creates no component. The front keeps the code of the first call and
+3. `agentui_widget_custom` with `update` (the token) and `state` (any JSON, ≤ 32 KB, replaces the previous one) pushes the new state; like
+   `agentui_widget_progress`, it returns the same token with `updated: true` and creates no component. The front keeps the code of the first call and
    posts the `state` of the latest one into the running iframe (`agentui:state`), where `useAgentState()` returns it. The iframe is neither
    reloaded nor remounted (a live widget stays mounted while the agent thinks), so the component keeps its own React state; after a page reload
    it starts again from the latest `state`;
-4. back to 2, until the agent stops calling `agentui_custom_widget_wait`: that is how it closes the session, then the run ends normally.
+4. back to 2, until the agent stops calling `agentui_widget_custom_wait`: that is how it closes the session, then the run ends normally.
 
 In the component, `reply(text, { silent: true })` posts an event: `POST /api/conversations/:id/send` with `widget: { token }` (the front gives
 the component its token). It is only accepted while the agent waits (`awaitingReply`, otherwise 409): the server hands it to the adapter as the

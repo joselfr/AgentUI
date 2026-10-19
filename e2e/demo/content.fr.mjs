@@ -20,7 +20,7 @@ export const SCENARIOS = [
     match: /sélection|selection/i,
     intro: 'Voici trois offres. Utilisez les boutons pour m’en demander plus.',
     tools: [
-      ['custom_widget', { code: `import { Card, Stack, Row, Text, Button, Chip, useCanReply, reply, toast } from '@agentui/ui';
+      ['custom', { code: `import { Card, Stack, Row, Text, Button, Chip, useCanReply, reply, toast } from '@agentui/ui';
 
 const OFFERS = [
   { name: 'Nimbus Start', price: '9 €/mois', tag: 'Le moins cher' },
@@ -57,7 +57,7 @@ export default function Offers() {
     match: /épargne|epargne|simul/i,
     intro: 'Voici un simulateur avec lequel jouer : modifiez le versement, le rendement ou la durée.',
     tools: [
-      ['custom_widget', { code: `import { useState } from 'react';
+      ['custom', { code: `import { useState } from 'react';
 import { Card, Stack, Row, Text, TextField, Chart } from '@agentui/ui';
 
 export default function Savings() {

@@ -286,7 +286,7 @@ async function main() {
         if (b.attachments.length) return reply.code(400).send({ error: 'No attachment in an answer' });
         return await runs.reply(req.params.id, b.text, widget);
       }
-      // A widget event only travels over the live session of the agent (agentui_custom_widget_wait): without it there is nobody to hear it.
+      // A widget event only travels over the live session of the agent (agentui_widget_custom_wait): without it there is nobody to hear it.
       if (widget) return reply.code(409).send({ error: 'The agent is not listening to this widget' });
       return await runs.start(req.params.id, b.text, b.attachments);
     } catch (e) {

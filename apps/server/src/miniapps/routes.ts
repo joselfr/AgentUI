@@ -211,7 +211,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     return sendFile(reply, file, 'public, max-age=300');
   };
 
-  // ---------- Widgets of the `agentui_custom_widget` tool: compiled on demand, same runtime and sandbox as the miniapps ----------
+  // ---------- Widgets of the `agentui_widget_custom` tool: compiled on demand, same runtime and sandbox as the miniapps ----------
   /** Compiles the code of a widget; answers the iframe base URL (token-protected, like a miniapp's) or the build errors. */
   app.post<{ Body: { code?: unknown } }>('/api/widgets', async (req) => {
     const r = await widgets.compile(String(req.body?.code ?? ''));

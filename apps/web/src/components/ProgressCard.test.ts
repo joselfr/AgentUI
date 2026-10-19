@@ -18,8 +18,8 @@ describe('parseProgress', () => {
     expect(parseProgress({ steps: [{ label: 'A', status: 'fini' }] })).toBeUndefined();
     expect(parseProgress({ steps: [{ status: 'done' }] })).toBeUndefined();
   });
-  it("the agentui_progress tool is a display widget", () => {
-    expect(widgetOfTool({ name: 'agentui_progress', args: ok })?.type).toBe('progress');
+  it("the agentui_widget_progress tool is a display widget", () => {
+    expect(widgetOfTool({ name: 'agentui_widget_progress', args: ok })?.type).toBe('progress');
   });
 });
 

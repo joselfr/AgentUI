@@ -1,4 +1,4 @@
-// One tool per widget (`agentui_chart`, `agentui_map`, `agentui_code`): the model validates its arguments with the tool's schema
+// One tool per widget (`agentui_widget_chart`, `agentui_widget_map`, `agentui_widget_code`): the model validates its arguments with the tool's schema
 // instead of writing a ```widget block. The tool returns a `[[agentui:<id>]]` token that the agent places in its text;
 // AgentUI replaces it with the widget (arguments of `tool.started`, token in the result of `tool.completed`).
 import { randomBytes } from 'node:crypto';
@@ -8,7 +8,9 @@ import { miniappOp, notifyUser, askUser, emitMedia } from './hosts.js';
 import { imagesError, readLocalImage } from './images.js';
 
 export const MINIAPP_TOOL_PREFIX = `${spec.prefix}miniapp_`;
-export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools), ...Object.keys(spec.blockingTools)].map((k) => spec.prefix + k).concat(Object.keys(spec.miniappTools).map((k) => MINIAPP_TOOL_PREFIX + k), Object.keys(spec.notifyTool).map((k) => spec.prefix + k));
+/** Prefix of a tool: `agentui_widget_` for the widgets (and what belongs to a widget, like its live session), `agentui_` for the interactions (ask, confirm, form). */
+const toolPrefix = (t: object) => ('widget' in t && t.widget ? spec.widgetPrefix : spec.prefix);
+export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools).map((k) => spec.widgetPrefix + k), ...Object.entries(spec.blockingTools).map(([k, t]) => toolPrefix(t) + k)].concat(Object.keys(spec.miniappTools).map((k) => MINIAPP_TOOL_PREFIX + k), Object.keys(spec.notifyTool).map((k) => spec.prefix + k));
 
 type Args = Record<string, any>;
 
@@ -29,7 +31,7 @@ export function widgetError(key: string, args: Args): string | undefined {
     if (args.update !== undefined && !/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.update))) return '`update` must be the [[agentui:…]] token returned by the first call.';
   } else if (key === 'map' && !args.points?.length) return 'At least one point is required.';
   else if (key === 'code' && !String(args.code ?? '').trim()) return 'The code is empty.';
-  else if (key === 'custom_widget') {
+  else if (key === 'custom') {
     if (args.state !== undefined && Buffer.byteLength(JSON.stringify(args.state)) > 32 * 1024) return 'The state is too large (max 32 KB).';
     if (args.update !== undefined) {
       if (!/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.update))) return '`update` must be the [[agentui:…]] token of the widget to update.';
@@ -46,7 +48,7 @@ export function widgetError(key: string, args: Args): string | undefined {
 
 /** Checks of the interactive tools (ask / confirm / form), like `widgetError` for display widgets. */
 export function askError(key: string, args: Args): string | undefined {
-  if (key === 'custom_widget_wait' && !/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.widget ?? ''))) return '`widget` must be the [[agentui:…]] token of the widget returned by agentui_custom_widget.';
+  if (key === 'custom_wait' && !/^\[\[agentui:[0-9a-f]+\]\]$/.test(String(args.widget ?? ''))) return '`widget` must be the [[agentui:…]] token of the widget returned by agentui_widget_custom.';
   if (key === 'ask' && !String(args.question ?? '').trim()) return 'The question is empty.';
   if (key === 'confirm' && !String(args.title ?? '').trim()) return 'The title is empty.';
   if (key === 'form') {
@@ -61,7 +63,7 @@ export function askError(key: string, args: Args): string | undefined {
 }
 
 /**
- * Result of `agentui_custom_widget_wait` from what the user's side delivered: a widget event (the server wraps it in a small JSON object so that it
+ * Result of `agentui_widget_custom_wait` from what the user's side delivered: a widget event (the server wraps it in a small JSON object so that it
  * is not mistaken for a chat message), a chat message typed meanwhile, or the end of the wait.
  */
 export function waitResult(answer: string): Record<string, unknown> {
@@ -97,8 +99,8 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
     if (ctx.messageChannel !== 'agentui') return null;
     const conversationId = conversationOf(ctx);
     const blocking = Object.entries(spec.blockingTools).map(([key, tool]) => ({
-      name: spec.prefix + key,
-      label: spec.prefix + key,
+      name: toolPrefix(tool) + key,
+      label: toolPrefix(tool) + key,
       description: tool.description,
       parameters: tool.parameters as any,
       // Blocks until the user's answer (`reply` frame), which becomes the tool result.
@@ -108,13 +110,13 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
         if (!conversationId) throw new Error("AgentUI chat not found for this tool call.");
         const res = await askUser(conversationId, key, args, signal);
         if ('error' in res) throw new Error(res.error);
-        const out = key === 'custom_widget_wait' ? waitResult(res.answer) : { answer: res.answer };
+        const out = key === 'custom_wait' ? waitResult(res.answer) : { answer: res.answer };
         return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], details: out };
       },
     }));
     const display = Object.entries(spec.tools).map(([key, tool]) => ({
-      name: spec.prefix + key,
-      label: spec.prefix + key,
+      name: spec.widgetPrefix + key,
+      label: spec.widgetPrefix + key,
       description: tool.description,
       parameters: tool.parameters as any, // raw JSON schema (no dependency on typebox, absent from a plugin install)
       async execute(_id: string, args: Args) {
@@ -130,7 +132,7 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
             files[im.src] = media.name;
           }
         }
-        if ((key === 'progress' || key === 'custom_widget') && args.update) {
+        if ((key === 'progress' || key === 'custom') && args.update) {
           // Update: same token, the front shows the state of the latest call.
           return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: args.update, updated: true, instruction: spec.updateInstruction }) }], details: { token: args.update } };
         }

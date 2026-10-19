@@ -43,7 +43,7 @@ test('run: persistence of text and tools, replayable events', async () => {
   expect(runs.isRunning(conv.id)).toBe(false);
 });
 
-test('widget event: travels as the answer of the live session (agentui_custom_widget_wait), tagged with the widget, stored hidden', async () => {
+test('widget event: travels as the answer of the live session (agentui_widget_custom_wait), tagged with the widget, stored hidden', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const replies: string[] = [];
   const queue: AgentEvent[] = [];
@@ -67,7 +67,7 @@ test('widget event: travels as the answer of the live session (agentui_custom_wi
   const runs = new RunManager(db, new Map([['a', adapter]]));
   const conv = runs.createConversation('a');
   await runs.start(conv.id, 'play chess');
-  push({ type: 'question.requested', id: 'w1' }); // the agent is in agentui_custom_widget_wait
+  push({ type: 'question.requested', id: 'w1' }); // the agent is in agentui_widget_custom_wait
   await vi.waitFor(() => expect(runs.awaitingReply(conv.id)).toBe(true));
   await runs.reply(conv.id, 'move e2e4', { token: '[[agentui:a1b2c3]]' });
   expect(JSON.parse(replies[0]!)).toEqual({ agentui: 'widget-event', widget: '[[agentui:a1b2c3]]', text: 'move e2e4' });

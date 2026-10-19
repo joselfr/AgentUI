@@ -30,10 +30,10 @@ export default function Chat(props: {
   const attachments = useAttachments(props.attach);
   const scroll = useStickToBottom(props.messages);
   const lastAssistant = props.messages.findLastIndex((m) => m.role === 'assistant');
-  // The widget the agent is listening to (the pending agentui_custom_widget_wait): only that one is live while the agent waits, the others stay inactive.
+  // The widget the agent is listening to (the pending agentui_widget_custom_wait): only that one is live while the agent waits, the others stay inactive.
   const liveWidget = useMemo(() => {
     const calls = props.messages.findLast((m) => m.role === 'assistant')?.toolCalls ?? [];
-    const w = calls.findLast((c) => /custom_widget_wait$/.test(c.name) && c.status === 'running')?.args as { widget?: unknown } | undefined;
+    const w = calls.findLast((c) => /custom_(widget_)?wait$/.test(c.name) && c.status === 'running')?.args as { widget?: unknown } | undefined;
     return typeof w?.widget === 'string' ? w.widget : undefined;
   }, [props.messages]);
   const replyFor: ReplyFor = (widget) =>

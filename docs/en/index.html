@@ -232,7 +232,7 @@
           <h3>Lines, bars and pies that respond to your touch.</h3>
           <p>The agent passes its series, AgentUI draws. Hover tooltips, readable ticks, interactive donut, one-click data copy.</p>
           <ul><li>Lines, bars, pies</li><li>Automatic units and legends</li><li>Light and dark</li></ul>
-          <p><span class="tag">agentui_chart</span></p>
+          <p><span class="tag">agentui_widget_chart</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="../img/en/desktop-dark-chart.webp" alt="Chart widget: monthly revenue" width="1600" height="1067" loading="lazy"></div>
@@ -246,7 +246,7 @@
           <h3>Sortable data, ready to copy.</h3>
           <p>Typed columns, aligned numbers, units and CSV export. Up to 200 rows without leaving the conversation.</p>
           <ul><li>Numeric and alphabetical sorting</li><li>Per-column units</li><li>Copy as CSV</li></ul>
-          <p><span class="tag">agentui_table</span></p>
+          <p><span class="tag">agentui_widget_table</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="../img/en/desktop-dark-table.webp" alt="Table widget: plan comparison" width="1600" height="1067" loading="lazy"></div>
@@ -260,7 +260,7 @@
           <h3>A route, places, and an “Open in Maps” button.</h3>
           <p>Up to ten points with Markdown popups, and a direct link to your maps app for navigation.</p>
           <ul><li>Map style that follows the theme</li><li>Detailed popup for each point</li><li>Opens in Maps</li></ul>
-          <p><span class="tag">agentui_map</span></p>
+          <p><span class="tag">agentui_widget_map</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="../img/en/desktop-dark-map.webp" alt="Map widget: Thursday’s round in Toulouse" width="1600" height="1067" loading="lazy"></div>
@@ -274,7 +274,7 @@
           <h3>Watch the agent work, step by step.</h3>
           <p>A living checklist: the agent updates the same component as it goes, with the duration of each step and a live counter for the current one.</p>
           <ul><li>Statuses: pending, running, done, failed, skipped</li><li>Detail and duration per step</li><li>A single component, updated in place</li></ul>
-          <p><span class="tag">agentui_progress</span></p>
+          <p><span class="tag">agentui_widget_progress</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="../img/en/desktop-dark-progress.webp" alt="Progress widget: database migration" width="1600" height="1067" loading="lazy"></div>
@@ -288,7 +288,7 @@
           <h3>Readable code, with changes in color.</h3>
           <p>Syntax highlighting, line numbers, highlighted lines and a diff view to show exactly what changes.</p>
           <ul><li>Per-language highlighting</li><li>Added / removed diff lines</li><li>Copy button</li></ul>
-          <p><span class="tag">agentui_code</span></p>
+          <p><span class="tag">agentui_widget_code</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="../img/en/desktop-dark-code.webp" alt="Code widget: a fix shown as a diff" width="1600" height="1067" loading="lazy"></div>
@@ -316,7 +316,7 @@
           <h3>When nothing fits, the agent codes the widget.</h3>
           <p>Simulator, converter, filterable list, mini quiz: the agent writes a React component with <strong>the same library as the miniapps</strong>. It shows up in the conversation, follows the theme and reacts to your input live.</p>
           <ul><li>Runs in an isolated iframe, with no access to your session</li><li>Same components and colors as the miniapps</li><li>Its buttons can write in the conversation: “Details”, “Book”… the agent receives the answer as a message</li><li>To keep the tool, the agent turns it into a miniapp</li></ul>
-          <p><span class="tag">agentui_custom_widget</span></p>
+          <p><span class="tag">agentui_widget_custom</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="../img/en/desktop-dark-ui.webp" alt="Dynamic widget: savings simulator" width="1600" height="1067" loading="lazy"></div>
@@ -476,7 +476,7 @@
           <div class="step"><div><h3>The interface does the rest</h3><p>The agent calls the tool and places the token in its answer. AgentUI swaps it for the component, live while streaming.</p></div></div>
         </div>
         <pre class="reveal"><span class="c">// The agent calls a tool…</span>
-<span class="n">agentui_chart</span>({
+<span class="n">agentui_widget_chart</span>({
   <span class="k">kind</span>: <span class="s">"line"</span>,
   <span class="k">title</span>: <span class="s">"Monthly revenue"</span>,
   <span class="k">unit</span>: <span class="s">" k€"</span>,

@@ -69,7 +69,7 @@ function Attachments({ m }: { m: Message }) {
 /** What a dynamic widget may do for the chat: `undefined` while it must stay inactive. `widget` is the widget's own token, to tell the live one apart. */
 export type ReplyFor = (widget?: string) => ((text: string, event?: WidgetEvent) => Promise<boolean>) | undefined;
 
-/** Display widgets (no answer): ```widget block or `agentui_<type>` tool. `undefined` if the type or arguments are invalid. */
+/** Display widgets (no answer): ```widget block or `agentui_widget_<type>` tool. `undefined` if the type or arguments are invalid. */
 function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message, onReply?: ReplyFor): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
@@ -87,7 +87,7 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
       return <ImageCard gallery={gallery} resolve={resolve} />;
     }
   }
-  if (w?.type === 'custom_widget') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply?.(ui.token)} />; }
+  if (w?.type === 'custom') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply?.(ui.token)} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }
@@ -161,7 +161,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
     document.addEventListener('selectionchange', check);
     return () => { clearTimeout(timer); document.removeEventListener('selectionchange', check); };
   }, [selectable]);
-  // The widget of an `agentui_<type>` tool takes the place of the token the agent wrote in its text; the call is also still listed with the other tools.
+  // The widget of an `agentui_widget_<type>` tool takes the place of the token the agent wrote in its text; the call is also still listed with the other tools.
   // Widgets that evolve during the run (progress): shown as soon as their tool call, without waiting for the agent's text.
   const live = useMemo(() => (m.role === 'user' ? [] : outOfTextWidgets(m.toolCalls ?? [], allTools)), [m.role, m.toolCalls, allTools]);
   const text = useMemo(() => (m.role === 'user' ? m.text : dropStrayFence(expandWidgetTokens(m.text, m.toolCalls ?? [], allTools, m.status !== 'streaming'))), [m.role, m.text, m.toolCalls, m.status, allTools]);
@@ -176,8 +176,8 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
       const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
       // While streaming, only the image gallery and the dynamic widgets are already shown (the block comes from an expanded token, hence complete): the
-      // gallery's local files arrive one by one, and a live widget (agentui_custom_widget_wait) must stay mounted while the agent thinks, or it would lose its state.
-      const early = lang === 'widget' && m.status === 'streaming' && ['image', 'custom_widget'].includes(parseWidget(raw)?.type ?? '');
+      // gallery's local files arrive one by one, and a live widget (agentui_widget_custom_wait) must stay mounted while the agent thinks, or it would lose its state.
+      const early = lang === 'widget' && m.status === 'streaming' && ['image', 'custom'].includes(parseWidget(raw)?.type ?? '');
       // An interactive block is added whole to the text by the plugin: once its fence is closed it stays a widget (frozen, with its answer)
       // while the run goes on after the user's reply, instead of falling back to raw JSON until the end of the run.
       const answered = (lang === 'widget' || lang === 'ask') && interactiveBlocks(m.text).includes(raw);

@@ -7,7 +7,7 @@ description: Build a miniapp (React front + handlers) that appears in the Miniap
 
 # Building miniapps for AgentUI
 
-A **miniapp** is a small web application you write — a **front** (React, in `src/`) and optional **handlers** (the server side, in `server/`) — that appears in the **Miniapps** tab of AgentUI. It runs inside AgentUI, uses its look and feel, and its data lives on the AgentUI server. Use it when the user wants a persistent tool (tracker, dashboard, list, calculator, small game…) rather than a one-off answer — for a one-off chart or table, use the `agentui_chart` / `agentui_table` widgets instead, and for a one-off interactive component (simulator, converter, filterable list…) use `agentui_custom_widget`, which takes a single TSX module written with the same UI kit.
+A **miniapp** is a small web application you write — a **front** (React, in `src/`) and optional **handlers** (the server side, in `server/`) — that appears in the **Miniapps** tab of AgentUI. It runs inside AgentUI, uses its look and feel, and its data lives on the AgentUI server. Use it when the user wants a persistent tool (tracker, dashboard, list, calculator, small game…) rather than a one-off answer — for a one-off chart or table, use the `agentui_widget_chart` / `agentui_widget_table` widgets instead, and for a one-off interactive component (simulator, converter, filterable list…) use `agentui_widget_custom`, which takes a single TSX module written with the same UI kit.
 
 ## Workflow
 
@@ -96,7 +96,7 @@ export default function App() {
 
 Icon names (`Icon`, `Button icon`, `IconButton icon`): add, close, check, delete, edit, search, refresh, back, forward, star, heart, info, warning, error, chevron-right, chevron-down, send, download, play, pause, more, home, person, apps, checklist.
 
-Helpers: `useWidth()` → width in px available to the component (for `agentui_custom_widget` it is the chat bubble, about 250-330 px on a phone: size canvases and boards with it, never a fixed width); `requestFullscreen()` / `exitFullscreen()` / `useFullscreen()` / `useHeight()` (only for `agentui_custom_widget` in the chat: a miniapp already has its own page, the request just answers `false`); `toast(message)`; `openUrl(url)` (opens an external link in a new tab); `useTheme()` → `{ mode: 'light'|'dark', lang }`; `useLang()` → `'fr'` / `'en'`… (translate your texts for the user's language); `chartColors()` → palette for custom chart.js charts.
+Helpers: `useWidth()` → width in px available to the component (for `agentui_widget_custom` it is the chat bubble, about 250-330 px on a phone: size canvases and boards with it, never a fixed width); `requestFullscreen()` / `exitFullscreen()` / `useFullscreen()` / `useHeight()` (only for `agentui_widget_custom` in the chat: a miniapp already has its own page, the request just answers `false`); `toast(message)`; `openUrl(url)` (opens an external link in a new tab); `useTheme()` → `{ mode: 'light'|'dark', lang }`; `useLang()` → `'fr'` / `'en'`… (translate your texts for the user's language); `chartColors()` → palette for custom chart.js charts.
 
 ### Calling the handlers
 

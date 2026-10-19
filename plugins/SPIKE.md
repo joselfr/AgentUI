@@ -54,7 +54,7 @@ Conclusion: **both platforms expose enough to a plugin to keep most of the rich 
 - Neither was run against a real instance during this spike (the agents run on jlfr.io). It will need to be validated
   with `dev/mock-gateway.mjs`.
 
-## Widgets as plugin tools (`agentui_chart`, `agentui_map`, `agentui_code`): tokens
+## Widgets as plugin tools (`agentui_widget_chart`, `agentui_widget_map`, `agentui_widget_code`): tokens
 
 Instead of the ```` ```widget ```` block, each display widget is a tool provided by the plugin. The tool validates its arguments
 (JSON schema + semantic checks: length of `y`, a single pie…) and returns a **token** `[[agentui:<id>]]` that the

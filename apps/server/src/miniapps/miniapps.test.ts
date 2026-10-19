@@ -373,7 +373,7 @@ describe('ctx.crypto signatures', () => {
   });
 });
 
-describe('widgets (agentui_custom_widget)', () => {
+describe('widgets (agentui_widget_custom)', () => {
   it('compiles in a sandbox: only the runtime modules, cached by hash', async () => {
     const w = new WidgetStore(dir);
     const code = "import { Card, Text } from '@agentui/ui'; import { useState } from 'react'; export default function W() { const [n] = useState(1); return <Card><Text>{n}</Text></Card>; }";

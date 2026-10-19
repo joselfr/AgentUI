@@ -42,18 +42,26 @@ export function interactiveBlocks(text: string): string[] {
   return out;
 }
 
-/** Plugins expose each display widget as an `agentui_<type>` tool (e.g. `agentui_chart`): its arguments are the widget's. */
-const WIDGET_TOOL_PREFIX = 'agentui_';
+/** Plugins expose each display widget as an `agentui_widget_<type>` tool (e.g. `agentui_widget_chart`): its arguments are the widget's. */
+const WIDGET_TOOL_PREFIX = 'agentui_widget_';
 export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string; startedAt?: number; endedAt?: number };
-const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image', 'custom_widget']);
-/** Name of the tool before it was renamed: conversations that already used it keep rendering. */
-const LEGACY_UI_TOOL = `${WIDGET_TOOL_PREFIX}ui`;
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image', 'custom']);
+/** Tool names from before the `agentui_widget_` prefix (`agentui_chart`, `agentui_ui`, `agentui_custom_widget`…): conversations that used them keep rendering. */
+const LEGACY_TOOL_PREFIX = 'agentui_';
+const LEGACY_CUSTOM = new Set(['ui', 'custom_widget']);
+
+/** Widget type of a tool name (`agentui_widget_chart`, or the legacy `agentui_chart`); `undefined` if the tool is not a display widget. */
+function widgetTypeOfTool(name: string): string | undefined {
+  const type = name.startsWith(WIDGET_TOOL_PREFIX) ? name.slice(WIDGET_TOOL_PREFIX.length)
+    : name.startsWith(LEGACY_TOOL_PREFIX) ? (LEGACY_CUSTOM.has(name.slice(LEGACY_TOOL_PREFIX.length)) ? 'custom' : name.slice(LEGACY_TOOL_PREFIX.length))
+    : undefined;
+  return type && DISPLAY_WIDGETS.has(type) ? type : undefined;
+}
 
 export function widgetOfTool(t: { name: string; args?: unknown }): { type: string; arguments: Record<string, unknown> } | undefined {
-  if (!t.name.startsWith(WIDGET_TOOL_PREFIX)) return undefined;
-  const type = t.name === LEGACY_UI_TOOL ? 'custom_widget' : t.name.slice(WIDGET_TOOL_PREFIX.length);
+  const type = widgetTypeOfTool(t.name);
   const args = t.args;
-  if (!DISPLAY_WIDGETS.has(type) || !args || typeof args !== 'object' || Array.isArray(args)) return undefined;
+  if (!type || !args || typeof args !== 'object' || Array.isArray(args)) return undefined;
   return { type, arguments: args as Record<string, unknown> };
 }
 
@@ -69,8 +77,8 @@ function stripPartialToken(text: string): string {
 }
 const fence = (w: { type: string; arguments: Record<string, unknown> }) => '\n\n```widget\n' + JSON.stringify(w) + '\n```\n\n';
 
-/** `agentui_custom_widget` call that only pushes a new state to a widget already displayed (`update` = its token): it creates no component. */
-const isUiUpdate = (t: ToolCallLike) => widgetOfTool(t)?.type === 'custom_widget' && typeof (t.args as { update?: unknown } | undefined)?.update === 'string';
+/** `agentui_widget_custom` call that only pushes a new state to a widget already displayed (`update` = its token): it creates no component. */
+const isUiUpdate = (t: ToolCallLike) => widgetOfTool(t)?.type === 'custom' && typeof (t.args as { update?: unknown } | undefined)?.update === 'string';
 
 const sameCall = (a: ToolCallLike, b: ToolCallLike) => (a.id !== undefined && b.id !== undefined ? a.id === b.id : a === b);
 
@@ -141,7 +149,7 @@ export const WIDGET_ATTACHMENT_PREFIX = 'agentui-img-';
 const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[agentui:([0-9a-f]+)\]\]/)?.[1];
 
 /**
-   * Replaces with their widget the tokens the agent placed in its text after an `agentui_<type>` tool call.
+   * Replaces with their widget the tokens the agent placed in its text after an `agentui_widget_<type>` tool call.
    * The widget arguments are those of the call (`own`: tools of the message; `all`: whole chat, since the agent may
    * reuse a token from an earlier message). An unknown or in-progress token disappears; a widget whose token
    * was never written is appended at the end of the message once it is finished, so that it is not lost.
@@ -156,7 +164,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
       // State update of a dynamic widget: the code stays that of the first call, only `state` follows the latest call.
       if (isUiUpdate(t)) { if (prev) widgets.set(id, { ...prev, arguments: { ...prev.arguments, state: w.arguments.state } }); continue; }
       // A dynamic widget knows its token: its events to the agent say which widget they come from.
-      widgets.set(id, w.type === 'image' ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w.type === 'custom_widget' ? { ...w, arguments: { ...w.arguments, token: `[[agentui:${id}]]` } } : w);
+      widgets.set(id, w.type === 'image' ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w.type === 'custom' ? { ...w, arguments: { ...w.arguments, token: `[[agentui:${id}]]` } } : w);
     }
   }
   const used = new Set<string>();

@@ -490,7 +490,7 @@ export class RunManager {
 
   /**
    * Passes the user's answer to the question asked by the agent; the current run continues. An event of a dynamic widget (`widget`) is
-   * the same thing over the live session the agent keeps open with `agentui_custom_widget_wait`: the agent gets it tagged with the widget, and the
+   * the same thing over the live session the agent keeps open with `agentui_widget_custom_wait`: the agent gets it tagged with the widget, and the
    * message is stored hidden (the widget shows its effect, the chat does not).
    */
   async reply(convId: string, text: string, widget?: { token?: string }): Promise<{ runId: string; messageId: string }> {

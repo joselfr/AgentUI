@@ -1,4 +1,4 @@
-// E2E of the `agentui_custom_widget` widget against the demo instance (e2e/demo/demo.sh up): the fake agent plays the savings simulator,
+// E2E of the `agentui_widget_custom` widget against the demo instance (e2e/demo/demo.sh up): the fake agent plays the savings simulator,
 // a browser checks that it renders in the sandboxed iframe, reacts to input, follows the theme and cannot reach /api.
 //   node e2e/ui-widget.mjs [screenshots-folder]
 import { mkdirSync } from 'node:fs';

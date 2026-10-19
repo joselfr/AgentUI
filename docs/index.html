@@ -232,7 +232,7 @@
           <h3>Des courbes, barres et camemberts qui répondent au doigt.</h3>
           <p>L’agent passe ses séries, AgentUI trace. Info-bulles au survol, graduations lisibles, donut interactif, copie des données en un clic.</p>
           <ul><li>Courbes, barres, camemberts</li><li>Unités et légendes automatiques</li><li>Clair et sombre</li></ul>
-          <p><span class="tag">agentui_chart</span></p>
+          <p><span class="tag">agentui_widget_chart</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="img/desktop-dark-chart.webp" alt="Widget graphique : chiffre d’affaires mensuel" width="1600" height="1067" loading="lazy"></div>
@@ -246,7 +246,7 @@
           <h3>Des données triables, prêtes à être copiées.</h3>
           <p>Colonnes typées, nombres alignés, unités affichées et export CSV. Jusqu’à 200 lignes sans quitter la conversation.</p>
           <ul><li>Tri numérique et alphabétique</li><li>Unités par colonne</li><li>Copie au format CSV</li></ul>
-          <p><span class="tag">agentui_table</span></p>
+          <p><span class="tag">agentui_widget_table</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="img/desktop-dark-table.webp" alt="Widget tableau : comparatif d’offres" width="1600" height="1067" loading="lazy"></div>
@@ -260,7 +260,7 @@
           <h3>Un itinéraire, des lieux, un bouton « Ouvrir dans Maps ».</h3>
           <p>Jusqu’à dix points avec leur popup en Markdown, et un lien direct vers votre application de cartes pour la navigation.</p>
           <ul><li>Fond de carte adapté au thème</li><li>Popups détaillées par point</li><li>Ouverture dans Maps</li></ul>
-          <p><span class="tag">agentui_map</span></p>
+          <p><span class="tag">agentui_widget_map</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="img/desktop-dark-map.webp" alt="Widget carte : tournée du jeudi à Toulouse" width="1600" height="1067" loading="lazy"></div>
@@ -274,7 +274,7 @@
           <h3>Voyez l’agent travailler, étape par étape.</h3>
           <p>Une checklist vivante : l’agent met à jour le même composant au fil de l’eau, avec la durée de chaque étape et un compteur en direct pour celle en cours.</p>
           <ul><li>Statuts : en attente, en cours, terminé, échec, ignoré</li><li>Détail et durée par étape</li><li>Un seul composant, mis à jour sur place</li></ul>
-          <p><span class="tag">agentui_progress</span></p>
+          <p><span class="tag">agentui_widget_progress</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="img/desktop-dark-progress.webp" alt="Widget progression : migration de base de données" width="1600" height="1067" loading="lazy"></div>
@@ -288,7 +288,7 @@
           <h3>Du code lisible, avec les changements en couleur.</h3>
           <p>Coloration syntaxique, numéros de ligne, lignes mises en évidence et rendu diff pour montrer exactement ce qui change.</p>
           <ul><li>Coloration par langage</li><li>Diff ajouté / supprimé</li><li>Bouton Copier</li></ul>
-          <p><span class="tag">agentui_code</span></p>
+          <p><span class="tag">agentui_widget_code</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="img/desktop-dark-code.webp" alt="Widget code : correctif au format diff" width="1600" height="1067" loading="lazy"></div>
@@ -316,7 +316,7 @@
           <h3>Quand rien ne convient, l’agent code le widget.</h3>
           <p>Simulateur, convertisseur, liste filtrable, mini-quiz : l’agent écrit un composant React avec <strong>la même bibliothèque que les miniapps</strong>. Il s’affiche dans la conversation, suit le thème et réagit à vos saisies en direct.</p>
           <ul><li>Exécuté dans un iframe isolé, sans accès à votre session</li><li>Mêmes composants et mêmes couleurs que les miniapps</li><li>Ses boutons peuvent écrire dans la conversation : « Détails », « Réserver »… l’agent reçoit la réponse comme un message</li><li>Pour garder l’outil, l’agent en fait une miniapp</li></ul>
-          <p><span class="tag">agentui_custom_widget</span></p>
+          <p><span class="tag">agentui_widget_custom</span></p>
         </div>
         <div class="shot">
           <div class="frame"><img src="img/desktop-dark-ui.webp" alt="Widget dynamique : simulateur d’épargne" width="1600" height="1067" loading="lazy"></div>
@@ -476,7 +476,7 @@
           <div class="step"><div><h3>L’interface fait le reste</h3><p>L’agent appelle l’outil et place le jeton dans sa réponse. AgentUI le remplace par le composant, en direct pendant le streaming.</p></div></div>
         </div>
         <pre class="reveal"><span class="c">// L’agent appelle un outil…</span>
-<span class="n">agentui_chart</span>({
+<span class="n">agentui_widget_chart</span>({
   <span class="k">kind</span>: <span class="s">"line"</span>,
   <span class="k">title</span>: <span class="s">"Chiffre d’affaires mensuel"</span>,
   <span class="k">unit</span>: <span class="s">" k€"</span>,

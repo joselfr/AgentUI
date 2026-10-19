@@ -1,5 +1,5 @@
-// E2E of live two-way dynamic widgets (demo instance, DEMO_LANG=en): the agent keeps a session open (agentui_custom_widget_wait); each click in the
-// widget (reply(…, { silent: true })) reaches it as an event, it pushes a new state to the SAME widget (agentui_custom_widget update) and listens again.
+// E2E of live two-way dynamic widgets (demo instance, DEMO_LANG=en): the agent keeps a session open (agentui_widget_custom_wait); each click in the
+// widget (reply(…, { silent: true })) reaches it as an event, it pushes a new state to the SAME widget (agentui_widget_custom update) and listens again.
 // No new run, no new bubble, no hidden turn; the widget is only live while the agent listens.
 //   DEMO_LANG=en e2e/demo/demo.sh up && node e2e/ui-twoway.mjs
 import { chromium } from 'playwright-core';

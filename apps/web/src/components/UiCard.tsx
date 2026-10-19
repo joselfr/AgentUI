@@ -91,7 +91,7 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
   }, []);
   useEffect(postChat, [postChat, !!onReply]);
 
-  // State pushed by the agent (`agentui_custom_widget` with `update` + `state`): sent to the running widget, which is neither reloaded nor remounted.
+  // State pushed by the agent (`agentui_widget_custom` with `update` + `state`): sent to the running widget, which is neither reloaded nor remounted.
   const state = useRef(ui.state);
   state.current = ui.state;
   const postState = useCallback(() => {

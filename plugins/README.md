@@ -20,7 +20,7 @@ On the AgentUI side: declare the agent in `agents.config.yaml` (`type: gateway`,
 The plugin connects to `ws(s)://<agentui>/gateway`; in Docker on the same network: `ws://agentui:8080/gateway`.
 The old direct adapters (`hermes` via api_server, `openclaw` via the operator WebSocket) were removed.
 
-The `chart`, `map` and `code` widgets are also exposed as plugin tools (`agentui_chart`, `agentui_map`, `agentui_code`,
+The `chart`, `map` and `code` widgets are also exposed as plugin tools (`agentui_widget_chart`, `agentui_widget_map`, `agentui_widget_code`,
 see `SPIKE.md`), and the interactive widgets `ask`, `confirm` and `form` as **blocking** tools (`agentui_ask`,
 `agentui_confirm`, `agentui_form`: the tool displays the widget, waits for the `reply` frame and returns the user's answer
 to the agent, without ending its turn). Their schemas are in `protocol/widget-tools.json`: after editing, run

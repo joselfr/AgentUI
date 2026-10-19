@@ -966,7 +966,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         """Interactive tool (agent thread): displays the `key` widget then waits for the user's answer,
         which arrives through the `reply` frame as for `clarify`. Returns `{"answer": …}` or `{"error": …}`."""
         ask = _Ask(id=uuid.uuid4().hex[:12])
-        live = key == "custom_widget_wait"
+        live = key == "custom_wait"
         try:
             wait = min(max(float(args.get("timeout_s") or 600), 1.0), 1800.0) if live else ASK_TIMEOUT
         except (TypeError, ValueError):
@@ -978,7 +978,7 @@ class AgentUIAdapter(BasePlatformAdapter):
             if chat in self._asks:
                 return {"error": "A question is already awaiting an answer: wait for it before asking another one."}
             self._asks[chat] = ask
-            if not live:  # `custom_widget_wait` (live session with a widget) displays nothing: the widget is already there
+            if not live:  # `custom_wait` (live session with a widget) displays nothing: the widget is already there
                 run.bubbles[uuid.uuid4().hex] = "```widget\n" + json.dumps({"type": key, "arguments": args}, ensure_ascii=False) + "\n```"
         # Before the widget: when it arrives, AgentUI already knows the answer is expected.
         self._emit(chat, {"type": "question.requested", "id": ask.id})
@@ -1236,7 +1236,7 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
         return "At least one point is required."
     elif key == "code" and not str(args.get("code") or "").strip():
         return "The code is empty."
-    elif key == "custom_widget":
+    elif key == "custom":
         state = args.get("state")
         if state is not None and len(json.dumps(state, ensure_ascii=False).encode("utf-8")) > 32 * 1024:
             return "The state is too large (max 32 KB)."
@@ -1258,7 +1258,7 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
 
 
 def _wait_result(answer: str) -> Dict[str, Any]:
-    """Result of `agentui_custom_widget_wait`: a widget event (wrapped by the server in a small JSON object so it is not mistaken for a chat
+    """Result of `agentui_widget_custom_wait`: a widget event (wrapped by the server in a small JSON object so it is not mistaken for a chat
     message) or a chat message the user typed meanwhile."""
     try:
         o = json.loads(answer)
@@ -1271,8 +1271,8 @@ def _wait_result(answer: str) -> Dict[str, Any]:
 
 def _ask_error(key: str, args: Dict[str, Any]) -> Optional[str]:
     """Semantic checks of the interactive tools (the JSON schema cannot express them)."""
-    if key == "custom_widget_wait" and not re.fullmatch(r"\[\[agentui:[0-9a-f]+\]\]", str(args.get("widget") or "")):
-        return "`widget` must be the [[agentui:…]] token of the widget returned by agentui_custom_widget."
+    if key == "custom_wait" and not re.fullmatch(r"\[\[agentui:[0-9a-f]+\]\]", str(args.get("widget") or "")):
+        return "`widget` must be the [[agentui:…]] token of the widget returned by agentui_widget_custom."
     if key == "ask" and not str(args.get("question") or "").strip():
         return "The question is empty."
     if key == "confirm" and not str(args.get("title") or "").strip():
@@ -1307,7 +1307,7 @@ def _sniff_image(b: bytes) -> Optional[str]:
 
 
 def _images_error(args: Dict[str, Any]) -> Optional[str]:
-    """Shape check of the `agentui_image` sources (before any file read)."""
+    """Shape check of the `agentui_widget_image` sources (before any file read)."""
     images = args.get("images") or []
     if not images or len(images) > MAX_IMAGES:
         return f"Between 1 and {MAX_IMAGES} images are required."
@@ -1344,7 +1344,7 @@ def _usage_guide() -> str:
 
 
 def _register_widget_tools(ctx) -> None:
-    """One tool per widget (`agentui_chart`, `agentui_map`, `agentui_code`, `agentui_table`): the model validates its arguments with the tool's
+    """One tool per widget (`agentui_widget_chart`, `agentui_widget_map`, `agentui_widget_code`, `agentui_widget_table`): the model validates its arguments with the tool's
     schema instead of writing a ```widget block. The tool returns a `[[agentui:<id>]]` token that the agent places in its
     text; AgentUI replaces it with the widget (arguments of `tool.started`, token in the result of `tool.completed`)."""
     spec = json.loads((Path(__file__).parent / "widget_tools.json").read_text(encoding="utf-8"))
@@ -1383,7 +1383,7 @@ def _register_widget_tools(ctx) -> None:
                     if not chat or _ACTIVE is None or not _ACTIVE._emit(chat, {"type": "message.media", **media}):
                         return json.dumps({"error": "No AgentUI exchange in progress: cannot copy the image."}, ensure_ascii=False)
                     files[src] = media["name"]
-            update = args.get("update") if key in ("progress", "custom_widget") else None
+            update = args.get("update") if key in ("progress", "custom") else None
             if update:  # update: same token, the front shows the state of the latest call
                 return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
             instruction = spec["progressInstruction"] if key == "progress" else spec["tokenInstruction"]
@@ -1446,7 +1446,7 @@ def _register_widget_tools(ctx) -> None:
 
     for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler), ("miniappTools", None), ("notifyTool", make_notify_handler)):
         for key, tool in spec.get(kind, {}).items():
-            name = spec["prefix"] + ("miniapp_" if kind == "miniappTools" else "") + key
+            name = (spec["widgetPrefix"] if kind == "tools" or (kind == "blockingTools" and tool.get("widget")) else spec["prefix"]) + ("miniapp_" if kind == "miniappTools" else "") + key
             ctx.register_tool(
                 name=name,
                 toolset="agentui",

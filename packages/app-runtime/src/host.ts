@@ -75,7 +75,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Sends `text` in the chat as the user's next message (chat widgets, `agentui_custom_widget` only: miniapps have no chat). It answers `true`
+ * Sends `text` in the chat as the user's next message (chat widgets, `agentui_widget_custom` only: miniapps have no chat). It answers `true`
  * once sent, `false` when it was refused: the agent is busy, the click did not come from the user, the text is empty or over
  * 2000 characters. Call it from a click handler, e.g. `<Button onClick={() => reply(`Tell me more about ${offer.name}`)}>Details</Button>`.
  * With `{ silent: true }` the message reaches the agent but is not shown in the chat: use it for the moves of a game or any
@@ -91,7 +91,7 @@ export function reply(text: string, opts?: { silent?: boolean }): Promise<boolea
 }
 
 /**
- * Latest state the agent pushed to this widget (`agentui_custom_widget` called with `update` + `state`), `initial` until the first one.
+ * Latest state the agent pushed to this widget (`agentui_widget_custom` called with `update` + `state`), `initial` until the first one.
  * The widget is not reloaded between two states: its own React state (selection, animation…) is kept.
  */
 export function useAgentState<T = unknown>(initial?: T): T | undefined {
@@ -120,7 +120,7 @@ export function useWidth(): number {
 }
 
 /**
- * Opens this widget over the whole screen (chat widgets, `agentui_custom_widget` only: miniapps already have their own page). The same component
+ * Opens this widget over the whole screen (chat widgets, `agentui_widget_custom` only: miniapps already have their own page). The same component
  * keeps running, nothing is reloaded: its state, timers and canvas stay as they are, only its size changes (see `useWidth` / `useHeight`).
  * It answers `true` once open, `false` when refused: the user did not just click in the widget (call it from a click handler), or the widget is
  * not displayed in a chat. The host draws a close button above the widget, and Escape closes it too.

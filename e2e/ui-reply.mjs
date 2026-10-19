@@ -1,4 +1,4 @@
-// E2E of `reply()` for agentui_custom_widget widgets (demo instance, DEMO_LANG=en): a click on "Details" sends a user message in the chat;
+// E2E of `reply()` for agentui_widget_custom widgets (demo instance, DEMO_LANG=en): a click on "Details" sends a user message in the chat;
 // a reply that does not come from a click in the widget is refused.
 //   DEMO_LANG=en e2e/demo/demo.sh up && node e2e/ui-reply.mjs
 import { chromium } from 'playwright-core';

@@ -1,5 +1,5 @@
 // Fake channel plugin for the presentation site captures: it connects to AgentUI (/gateway) like Hermes or
-// OpenClaw and plays scripted replies with real `agentui_<widget>` tool calls.
+// OpenClaw and plays scripted replies with real `agentui_widget_<type>` tool calls.
 //   node e2e/demo/fake-agent.mjs ws://localhost:8080/gateway <token> [name]
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
@@ -38,8 +38,8 @@ async function createMiniapps() {
 const questions = new Map(); // conversationId → open question (resolved when the user's answer arrives)
 const widgetText = (type, args) => `\n\n\`\`\`widget\n${JSON.stringify({ type, arguments: args })}\n\`\`\`\n`;
 
-// Tic-tac-toe (e2e/ui-twoway.mjs): a live session like a real agent's agentui_custom_widget_wait loop. The run stays open; each widget event arrives as the
-// answer of the pending wait, the agent pushes the new state (agentui_custom_widget update) and listens again.
+// Tic-tac-toe (e2e/ui-twoway.mjs): a live session like a real agent's agentui_widget_custom_wait loop. The run stays open; each widget event arrives as the
+// answer of the pending wait, the agent pushes the new state (agentui_widget_custom update) and listens again.
 const games = new Map(); // conversationId → { token, state, qid }
 async function gameTool(conversationId, runId, name, args, result) {
   const ev = (event) => send({ type: 'event', conversationId, runId, event });
@@ -52,14 +52,14 @@ async function gameTool(conversationId, runId, name, args, result) {
 async function listen(conversationId, runId, g) {
   const ev = (event) => send({ type: 'event', conversationId, runId, event });
   g.qid = `q${hex()}`;
-  g.waitTool = await gameTool(conversationId, runId, 'agentui_custom_widget_wait', { widget: g.token });
+  g.waitTool = await gameTool(conversationId, runId, 'agentui_widget_custom_wait', { widget: g.token });
   ev({ type: 'question.requested', id: g.qid }); // no widget block: the widget is already displayed
 }
 async function startGame(conversationId, runId) {
   const ev = (event) => send({ type: 'event', conversationId, runId, event });
   const g = { token: `[[agentui:${hex()}]]`, state: newGame() };
   games.set(conversationId, g);
-  await gameTool(conversationId, runId, 'agentui_custom_widget', { code: GAME_CODE, state: g.state }, { widget: g.token });
+  await gameTool(conversationId, runId, 'agentui_widget_custom', { code: GAME_CODE, state: g.state }, { widget: g.token });
   ev({ type: 'message.delta', text: `Let's play! You are X.\n\n${g.token}` });
   await listen(conversationId, runId, g);
 }
@@ -69,7 +69,7 @@ async function gameEvent(m) {
   const g = games.get(conversationId);
   ev({ type: 'question.resolved', id: g.qid });
   const e = (() => { try { return JSON.parse(m.text); } catch { return null; } })();
-  ev({ type: 'tool.completed', id: g.waitTool, name: 'agentui_custom_widget_wait', result: JSON.stringify(e?.agentui === 'widget-event' ? { from: 'widget', event: e.text } : { from: 'user', message: m.text }) });
+  ev({ type: 'tool.completed', id: g.waitTool, name: 'agentui_widget_custom_wait', result: JSON.stringify(e?.agentui === 'widget-event' ? { from: 'widget', event: e.text } : { from: 'user', message: m.text }) });
   const i = e?.agentui === 'widget-event' ? Number(/^move (\d)$/.exec(e.text)?.[1]) : NaN;
   if (Number.isNaN(i)) return listen(conversationId, runId, g); // a chat message: nothing to play
   const cells = [...g.state.cells];
@@ -77,7 +77,7 @@ async function gameEvent(m) {
   const free = cells.findIndex((c) => !c);
   if (free >= 0) cells[free] = 'O';
   g.state = { cells, note: free >= 0 ? `I played ${free + 1}. Your turn` : 'Draw' };
-  await gameTool(conversationId, runId, 'agentui_custom_widget', { update: g.token, state: g.state }, { widget: g.token, updated: true });
+  await gameTool(conversationId, runId, 'agentui_widget_custom', { update: g.token, state: g.state }, { widget: g.token, updated: true });
   if (free < 0) { ev({ type: 'message.delta', text: '\n\nDraw, well played!' }); ev({ type: 'run.completed' }); games.delete(conversationId); return; }
   await listen(conversationId, runId, g);
 }
@@ -93,24 +93,24 @@ async function play(conversationId, runId, text) {
   await say(sc.intro);
   for (const [kind, args] of sc.tools ?? []) {
     const id = `t${hex()}`; const tok = `[[agentui:${hex()}]]`;
-    ev({ type: 'tool.started', id, name: `agentui_${kind}`, args });
+    ev({ type: 'tool.started', id, name: `agentui_widget_${kind}`, args });
     await sleep(250);
-    ev({ type: 'tool.completed', id, name: `agentui_${kind}`, result: JSON.stringify({ widget: tok }) });
+    ev({ type: 'tool.completed', id, name: `agentui_widget_${kind}`, result: JSON.stringify({ widget: tok }) });
     await say(`\n\n${tok}`);
   }
   if (sc.progress) {
     const id = `t${hex()}`; const tok = `[[agentui:${hex()}]]`;
     const steps = (done, detail) => sc.progress.steps.map(([label, d], i) => ({ label, status: i < done ? 'done' : i === done ? 'running' : 'pending', ...((i === done ? detail ?? d : d) ? { detail: i === done ? detail ?? d : d } : {}) }));
-    ev({ type: 'tool.started', id, name: 'agentui_progress', args: { title: sc.progress.title, steps: steps(0) } });
+    ev({ type: 'tool.started', id, name: 'agentui_widget_progress', args: { title: sc.progress.title, steps: steps(0) } });
     await sleep(150);
-    ev({ type: 'tool.completed', id, name: 'agentui_progress', result: JSON.stringify({ widget: tok }) });
+    ev({ type: 'tool.completed', id, name: 'agentui_widget_progress', result: JSON.stringify({ widget: tok }) });
     await say(`\n\n${tok}\n\n`);
     for (let i = 1; i <= sc.progress.steps.length; i++) {
       await sleep(i === 3 ? 2200 : 900);
       const uid = `t${hex()}`;
       const args = { title: sc.progress.title, update: tok, steps: i === sc.progress.steps.length ? steps(i) : steps(i) };
-      ev({ type: 'tool.started', id: uid, name: 'agentui_progress', args });
-      ev({ type: 'tool.completed', id: uid, name: 'agentui_progress', result: JSON.stringify({ widget: tok, updated: true }) });
+      ev({ type: 'tool.started', id: uid, name: 'agentui_widget_progress', args });
+      ev({ type: 'tool.completed', id: uid, name: 'agentui_widget_progress', result: JSON.stringify({ widget: tok, updated: true }) });
     }
   }
   if (sc.blocking) {

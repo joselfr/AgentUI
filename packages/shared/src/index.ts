@@ -165,7 +165,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   text: string;
-  /** Event of a dynamic widget (`reply(text, { silent: true })`) sent to the agent over its live session (`agentui_custom_widget_wait`): not shown in the chat. */
+  /** Event of a dynamic widget (`reply(text, { silent: true })`) sent to the agent over its live session (`agentui_widget_custom_wait`): not shown in the chat. */
   hidden?: boolean;
   reasoning?: string;
   toolCalls?: ToolCall[];

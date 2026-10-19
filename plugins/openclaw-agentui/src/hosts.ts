@@ -1,4 +1,4 @@
-// Bridge between the plugin's tools (`agentui_ask`…, `agentui_image`) and an account's bridge: the tool runs in the
+// Bridge between the plugin's tools (`agentui_ask`…, `agentui_widget_image`) and an account's bridge: the tool runs in the
 // gateway process, the bridge holds the run and the connection to AgentUI.
 import type { Media } from './protocol.js';
 

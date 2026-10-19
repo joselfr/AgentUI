@@ -2,23 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { dropStrayFence, expandWidgetTokens, outOfTextWidgets, stepTimes } from './widget';
 
 const chart = { kind: 'bar', x: ['a'], series: [{ name: 's', y: [1] }] };
-const tool = (id: string, token = 'a3f9c1', args: unknown = chart, name = 'agentui_chart') =>
+const tool = (id: string, token = 'a3f9c1', args: unknown = chart, name = 'agentui_widget_chart') =>
   ({ id, name, args, resultPreview: `{"widget": "[[agentui:${token}]]", "instruction": "…"}` });
 const widget = `\`\`\`widget\n${JSON.stringify({ type: 'chart', arguments: chart })}\n\`\`\``;
 
-describe('agentui_custom_widget state updates', () => {
+describe('agentui_widget_custom state updates', () => {
   const code = 'export default function W() { return null; }';
-  const create = tool('t1', 'a3f9c1', { code, state: { n: 0 } }, 'agentui_custom_widget');
-  const update = (id: string, n: number) => ({ id, name: 'agentui_custom_widget', args: { update: '[[agentui:a3f9c1]]', state: { n } }, resultPreview: '{"widget": "[[agentui:a3f9c1]]", "updated": true}' });
+  const create = tool('t1', 'a3f9c1', { code, state: { n: 0 } }, 'agentui_widget_custom');
+  const update = (id: string, n: number) => ({ id, name: 'agentui_widget_custom', args: { update: '[[agentui:a3f9c1]]', state: { n } }, resultPreview: '{"widget": "[[agentui:a3f9c1]]", "updated": true}' });
   const arg = (out: string) => JSON.parse(/```widget\n(.*)\n```/.exec(out)![1]!).arguments;
   it('keeps the code of the first call and the state of the latest one', () => {
     const out = expandWidgetTokens('[[agentui:a3f9c1]]', [create], [create, update('t2', 1), update('t3', 2)]);
     expect(arg(out)).toEqual({ code, state: { n: 2 }, token: '[[agentui:a3f9c1]]' }); // the widget knows its token (its events say where they come from)
   });
-  it('conversations from before the rename (tool agentui_ui) still render', () => {
-    const legacy = { ...create, name: 'agentui_ui' };
-    const out = expandWidgetTokens('[[agentui:a3f9c1]]', [legacy], [legacy, { ...update('t2', 1), name: 'agentui_ui' }]);
-    expect(arg(out)).toEqual({ code, state: { n: 1 }, token: '[[agentui:a3f9c1]]' });
+  it('conversations from before the renames (agentui_ui, agentui_custom_widget) still render', () => {
+    for (const old of ['agentui_ui', 'agentui_custom_widget']) {
+      const legacy = { ...create, name: old };
+      const out = expandWidgetTokens('[[agentui:a3f9c1]]', [legacy], [legacy, { ...update('t2', 1), name: old }]);
+      expect(arg(out)).toEqual({ code, state: { n: 1 }, token: '[[agentui:a3f9c1]]' });
+    }
+  });
+  it('the display widgets keep rendering under their old tool names (agentui_chart…)', () => {
+    expect(expandWidgetTokens('[[agentui:a3f9c1]]', [tool('t1', 'a3f9c1', chart, 'agentui_chart')])).toContain('```widget');
+    expect(expandWidgetTokens('[[agentui:a3f9c1]]', [tool('t1', 'a3f9c1', chart, 'agentui_widget_chart')])).toContain('```widget');
+    expect(expandWidgetTokens('[[agentui:a3f9c1]]', [tool('t1', 'a3f9c1', chart, 'agentui_miniapp_list')])).toBe('');
   });
   it('an update call does not create a second widget in its own message', () => {
     expect(expandWidgetTokens('Ton coup.', [update('t2', 1)], [create, update('t2', 1)])).toBe('Ton coup.');
@@ -61,7 +68,7 @@ describe('expandWidgetTokens', () => {
 
 describe('progress widget (out of text)', () => {
   const steps = (...st: string[]) => ({ steps: st.map((status, i) => ({ label: `E${i + 1}`, status })) });
-  const prog = (id: string, args: unknown, token = 'c0ffee') => ({ id, name: 'agentui_progress', args, resultPreview: `{"widget": "[[agentui:${token}]]"}` });
+  const prog = (id: string, args: unknown, token = 'c0ffee') => ({ id, name: 'agentui_widget_progress', args, resultPreview: `{"widget": "[[agentui:${token}]]"}` });
   const states = (w: { arguments: Record<string, unknown> }) => (w.arguments.steps as Array<{ status: string }>).map((s) => s.status);
 
   it("shows from the tool call, without a token in the text, with the state of the latest call", () => {
@@ -89,7 +96,7 @@ describe('progress widget (out of text)', () => {
 });
 
 describe('stepTimes: step durations', () => {
-  const call = (at: number, ...status: string[]) => ({ name: 'agentui_progress', startedAt: at - 100, endedAt: at, args: { steps: status.map((s) => ({ label: 'x', status: s })) } });
+  const call = (at: number, ...status: string[]) => ({ name: 'agentui_widget_progress', startedAt: at - 100, endedAt: at, args: { steps: status.map((s) => ({ label: 'x', status: s })) } });
 
   it('a step lasts from when it becomes running to when it becomes done', () => {
     const t = stepTimes([call(1000, 'running', 'pending'), call(13000, 'done', 'running'), call(20000, 'done', 'done')]);
@@ -112,7 +119,7 @@ describe('stepTimes: step durations', () => {
 
 describe('image widget: mapping of copied files', () => {
   const args = { images: [{ src: '/opt/data/a.png' }, { src: 'https://x.org/b.jpg' }] };
-  const t = { id: 't1', name: 'agentui_image', args, resultPreview: '{"widget": "[[agentui:a1b2c3]]", "files": {"/opt/data/a.png": "agentui-img-1234abcd-a.png"}}' };
+  const t = { id: 't1', name: 'agentui_widget_image', args, resultPreview: '{"widget": "[[agentui:a1b2c3]]", "files": {"/opt/data/a.png": "agentui-img-1234abcd-a.png"}}' };
 
   it('adds `files` to the widget arguments', () => {
     const out = expandWidgetTokens('Voici [[agentui:a1b2c3]]', [t]);

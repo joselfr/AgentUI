@@ -304,8 +304,8 @@ export class AgentUIBridge implements RunHost {
     if (run.toolAsk) return Promise.resolve({ error: "A question is already awaiting an answer: wait for it before asking another one." });
     return new Promise<AskResult>((resolve) => {
       const id = `ui_${randomBytes(6).toString('hex')}`;
-      // `custom_widget_wait`: live session with a widget. No widget is displayed (it already is), and running out of time is a normal outcome, not an error.
-      const live = key === 'custom_widget_wait';
+      // `custom_wait`: live session with a widget. No widget is displayed (it already is), and running out of time is a normal outcome, not an error.
+      const live = key === 'custom_wait';
       const waitMs = live ? Math.min(Math.max(Number(args.timeout_s) || 600, 1), 1800) * 1000 : ASK_TIMEOUT_MS;
       const timer = setTimeout(() => settle(live ? { answer: JSON.stringify({ agentui: 'timeout' }) } : { error: "No answer from the user (timed out)." }), waitMs);
       timer.unref?.();
