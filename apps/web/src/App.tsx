@@ -63,6 +63,7 @@ export default function App() {
   const [newAgent, setNewAgent] = useState<string | undefined>(() => load<string | null>('newAgent', null) ?? undefined);
   const [convsLoaded, setConvsLoaded] = useState(false);
   const [dataTick, setDataTick] = useState<{ appId: string; n: number }>({ appId: '', n: 0 }); // data of a miniapp changed
+  const [appName, setAppName] = useState<string>(); // name of the open miniapp (reported by MiniappView)
   const [miniappsTick, setMiniappsTick] = useState(0); // bumped when a miniapp changes (refresh of the Miniapps pages)
   const currentRef = useRef<string>();
   currentRef.current = currentId;
@@ -149,6 +150,9 @@ export default function App() {
   useEffect(() => {
     if (agents.length && !agents.some((a) => a.id === newAgent)) setNewAgent(agents[0]!.id);
   }, [agents, newAgent]);
+  // Tab title: `AgentUI - {conversation or miniapp}` when one is open
+  const pageTitle = appId ? appName : view === 'chats' ? current?.title : undefined;
+  useEffect(() => { document.title = pageTitle ? `AgentUI - ${pageTitle}` : 'AgentUI'; }, [pageTitle]);
   // Restore state on reload: page, open chat, agent of the next conversation
   useEffect(() => { save('listOpen', listOpen); }, [listOpen]);
   useEffect(() => { save('currentId', currentId ?? null); }, [currentId]);
@@ -296,7 +300,7 @@ export default function App() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {view === 'agents' && <AgentsPage agents={agents} onStart={(id, s) => { setNewAgent(id); setSub(s); navigate('/'); }} />}
             {view === 'skills' && <SkillsPage agents={agents} />}
-            {view === 'miniapps' && (appId ? <MiniappView key={appId} id={appId} refreshKey={miniappsTick} dataKey={dataTick.appId === appId ? dataTick.n : 0} onBack={() => navigate('/miniapps')} /> : <MiniappsPage agents={agents} refreshKey={miniappsTick} onOpen={(id) => navigate(`/miniapps/${id}`)} />)}
+            {view === 'miniapps' && (appId ? <MiniappView key={appId} id={appId} refreshKey={miniappsTick} dataKey={dataTick.appId === appId ? dataTick.n : 0} onBack={() => navigate('/miniapps')} onName={setAppName} /> : <MiniappsPage agents={agents} refreshKey={miniappsTick} onOpen={(id) => navigate(`/miniapps/${id}`)} />)}
             {view === 'jobs' && <JobsPage agents={agents} onOpenConversation={(id) => navigate(`/c/${id}`)} />}
           </Box>)}
         <NewConversation open={newDlg} agents={agents} agentId={newAgent} sub={sub} onClose={() => setNewDlg(false)}

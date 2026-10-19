@@ -10,8 +10,9 @@ import { MiniappIcon } from './miniappIcons';
 import MiniappFrame from './MiniappFrame';
 
 /** One miniapp, full area: a thin native header, then the sandboxed iframe. */
-export default function MiniappView({ id, refreshKey, dataKey, onBack }: { id: string; refreshKey: number; dataKey: number; onBack: () => void }) {
+export default function MiniappView({ id, refreshKey, dataKey, onBack, onName }: { id: string; refreshKey: number; dataKey: number; onBack: () => void; onName?: (name?: string) => void }) {
   const app = useLoad(() => api.miniapp(id), [id]);
+  useEffect(() => { onName?.(app.data?.name); return () => onName?.(undefined); }, [app.data?.name]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (refreshKey) app.refresh().catch(() => onBack()); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const fs = useLoad(() => api.miniappFs(id), [id]);
   useEffect(() => { if (refreshKey) fs.refresh().catch(() => {}); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
