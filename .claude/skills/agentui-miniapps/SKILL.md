@@ -96,7 +96,7 @@ export default function App() {
 
 Icon names (`Icon`, `Button icon`, `IconButton icon`): add, close, check, delete, edit, search, refresh, back, forward, star, heart, info, warning, error, chevron-right, chevron-down, send, download, play, pause, more, home, person, apps, checklist.
 
-Helpers: `toast(message)`; `openUrl(url)` (opens an external link in a new tab); `useTheme()` → `{ mode: 'light'|'dark', lang }`; `useLang()` → `'fr'` / `'en'`… (translate your texts for the user's language); `chartColors()` → palette for custom chart.js charts.
+Helpers: `useWidth()` → width in px available to the component (for `agentui_custom_widget` it is the chat bubble, about 250-330 px on a phone: size canvases and boards with it, never a fixed width); `toast(message)`; `openUrl(url)` (opens an external link in a new tab); `useTheme()` → `{ mode: 'light'|'dark', lang }`; `useLang()` → `'fr'` / `'en'`… (translate your texts for the user's language); `chartColors()` → palette for custom chart.js charts.
 
 ### Calling the handlers
 

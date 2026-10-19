@@ -88,7 +88,7 @@ that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js` only). Plugins
 `export default`); the front end sends the code to `POST /api/widgets`, which compiles it (esbuild, cached by hash) and returns the
 URL of a token-protected sandboxed iframe (`/w/<hash>/<token>/`, same runtime and CSP as a miniapp, no backend, no `/api`).
 Nothing is stored apart from the tool call itself, so the widget survives a reload but not the component state.
-The widget can talk back through `reply(text)` (`@agentui/ui`): the front end sends `text` as the user's next `inbound` message. Because that text
+The widget gets the width of the chat bubble (about 250-330 px on a phone, anything wider is cut): `useWidth()` returns it, updated on resize, so a canvas or board can follow it. The widget can talk back through `reply(text)` (`@agentui/ui`): the front end sends `text` as the user's next `inbound` message. Because that text
 reaches the agent as if the user had typed it, the host only accepts it when the chat is idle (no run in progress, so it never answers a pending
 question), the iframe has the focus (the user clicked in it), at most once every 1.5 s, and for 1 to 2000 characters. `useCanReply()` tells the widget
 when it would be refused.

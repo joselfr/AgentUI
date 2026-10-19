@@ -93,6 +93,21 @@ export function useAgentState<T = unknown>(initial?: T): T | undefined {
   return (agentState === undefined ? initial : agentState) as T | undefined;
 }
 
+/**
+ * Width in px available to the widget (the width of its iframe, i.e. of the chat bubble: about 250-330 px on a phone, up to ~700 px on a desktop).
+ * Updates when it changes (rotation, window resize). Size canvases and boards with it instead of a fixed width, which would be cut on a phone.
+ */
+export function useWidth(): number {
+  const [w, setW] = useState(() => (typeof window === 'undefined' ? 0 : document.documentElement.clientWidth));
+  useEffect(() => {
+    const f = () => setW(document.documentElement.clientWidth);
+    f();
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+  }, []);
+  return w;
+}
+
 /** `false` while the agent is working (a `reply` would be refused): disable the buttons that call it. */
 export function useCanReply(): boolean {
   const [, force] = useState(0);
