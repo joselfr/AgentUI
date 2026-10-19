@@ -30,9 +30,12 @@ const safeUrl = (u: unknown): string | undefined => {
 /**
  * Dynamic widget written by the agent: its code is compiled by the server and runs in a sandboxed iframe (`allow-scripts` only,
  * opaque origin) with the miniapps runtime (`@agentui/ui`, themed by the host). It has no backend: the only messages it can
- * send are its size, errors and links to open.
+ * send are its size, errors, links to open and `reply` (a message sent in the chat as the user, see below).
  */
-export default function UiCard({ ui }: { ui: Ui }) {
+export const REPLY_MAX = 2000;
+const REPLY_COOLDOWN_MS = 1500;
+
+export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: string) => Promise<boolean> }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const muiTheme = useTheme();
   const lang = useLang() && getLang();
@@ -54,6 +57,14 @@ export default function UiCard({ ui }: { ui: Ui }) {
     return () => { live = false; };
   }, [ui.code]);
 
+  const lastReply = useRef(0);
+  const reply = useRef(onReply);
+  reply.current = onReply;
+  const postChat = useCallback(() => {
+    frame.current?.contentWindow?.postMessage({ type: 'agentui:chat', canReply: !!reply.current }, '*');
+  }, []);
+  useEffect(postChat, [postChat, !!onReply]);
+
   const postTheme = useCallback(() => {
     frame.current?.contentWindow?.postMessage({ type: 'agentui:theme', mode, lang, vars: themeCssVars(mode) }, '*');
   }, [mode, lang]);
@@ -63,16 +74,27 @@ export default function UiCard({ ui }: { ui: Ui }) {
     const onMsg = (e: MessageEvent) => {
       const w = frame.current?.contentWindow;
       if (!w || e.source !== w) return;
-      const m = e.data as { type?: string; id?: string; height?: unknown; message?: unknown; url?: unknown } | null;
-      if (m?.type === 'agentui:ready') { setReady(true); postTheme(); }
+      const m = e.data as { type?: string; id?: string; height?: unknown; message?: unknown; url?: unknown; text?: unknown } | null;
+      if (m?.type === 'agentui:ready') { setReady(true); postTheme(); postChat(); }
       else if (m?.type === 'agentui:resize' && typeof m.height === 'number') setHeight(Math.max(MIN_HEIGHT, Math.min(m.height, ui.maxHeight)));
       else if (m?.type === 'agentui:error') setRuntimeError(String(m.message ?? ''));
       else if (m?.type === 'agentui:open') { const url = safeUrl(m.url); if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
+      else if (m?.type === 'agentui:reply' && typeof m.id === 'string') {
+        // The text goes to the agent as if the user had typed it, so it is only accepted when the user is plausibly the one acting:
+        // the iframe has the focus (they clicked in it), the chat is idle, and not more than once every 1.5 s.
+        const text = typeof m.text === 'string' ? m.text.trim() : '';
+        const now = Date.now();
+        const allowed = !!reply.current && !!text && text.length <= REPLY_MAX && document.activeElement === frame.current && now - lastReply.current > REPLY_COOLDOWN_MS;
+        const done = (ok: boolean) => w.postMessage({ type: 'agentui:reply.result', id: m.id, ok }, '*');
+        if (!allowed) return done(false);
+        lastReply.current = now;
+        void reply.current!(text).then(done, () => done(false));
+      }
       else if (m?.type === 'agentui:fetch' && typeof m.id === 'string') w.postMessage({ type: 'agentui:fetch.result', id: m.id, status: 404, body: { error: 'This widget has no backend.' } }, '*');
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [postTheme, ui.maxHeight]);
+  }, [postTheme, postChat, ui.maxHeight]);
 
   if (errors.length) {
     return (
@@ -87,7 +109,7 @@ export default function UiCard({ ui }: { ui: Ui }) {
       {ui.title && <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{ui.title}</Typography>}
       <Box sx={{ position: 'relative', minHeight: ready ? 0 : 96 }}>
         {!ready && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}><CircularProgress size={20} /></Box>}
-        {base && <iframe ref={frame} title={ui.title ?? t('ui.title')} src={base} sandbox="allow-scripts" onLoad={postTheme}
+        {base && <iframe ref={frame} title={ui.title ?? t('ui.title')} src={base} sandbox="allow-scripts" onLoad={() => { postTheme(); postChat(); }}
           style={{ display: 'block', width: '100%', height, border: 0, background: 'transparent', colorScheme: mode, visibility: ready ? 'visible' : 'hidden' }} />}
       </Box>
       {runtimeError && <Alert severity="error" onClose={() => setRuntimeError('')} sx={{ mt: 0.5, whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{runtimeError}</Alert>}

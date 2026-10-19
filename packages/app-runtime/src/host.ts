@@ -7,6 +7,9 @@ export interface HostTheme { mode: Mode; lang: string; vars: Record<string, stri
 let theme: HostTheme = { mode: 'dark', lang: (typeof navigator !== 'undefined' && navigator.language?.slice(0, 2)) || 'en', vars: {} };
 const subs = new Set<() => void>();
 const dataSubs = new Set<() => void>();
+const chatSubs = new Set<() => void>();
+const replies = new Map<string, (ok: boolean) => void>();
+let canReplyNow = false;
 
 function applyTheme(t: HostTheme) {
   theme = t;
@@ -26,6 +29,8 @@ if (typeof window !== 'undefined') {
     const m = e.data as { type?: string; [k: string]: any } | null;
     if (m?.type === 'agentui:theme') applyTheme({ mode: m.mode, lang: m.lang, vars: m.vars ?? {} });
     else if (m?.type === 'agentui:data') dataSubs.forEach((f) => f());
+    else if (m?.type === 'agentui:chat') { canReplyNow = !!m.canReply; chatSubs.forEach((f) => f()); }
+    else if (m?.type === 'agentui:reply.result') { const done = replies.get(m.id); replies.delete(m.id); done?.(!!m.ok); }
     else if (m?.type === 'agentui:fetch.result') {
       const done = pending.get(m.id);
       pending.delete(m.id);
@@ -53,6 +58,31 @@ if (typeof window !== 'undefined') {
     e.preventDefault();
     openUrl(a.href);
   });
+}
+
+/**
+ * Sends `text` in the chat as the user's next message (chat widgets, `agentui_ui` only: miniapps have no chat). It answers `true`
+ * once sent, `false` when it was refused: the agent is busy, the click did not come from the user, the text is empty or over
+ * 2000 characters. Call it from a click handler, e.g. `<Button onClick={() => reply(`Tell me more about ${offer.name}`)}>Details</Button>`.
+ */
+export function reply(text: string): Promise<boolean> {
+  const id = `p${++seq}`;
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => { replies.delete(id); resolve(false); }, 5000);
+    replies.set(id, (ok) => { clearTimeout(timer); resolve(ok); });
+    toHost({ type: 'agentui:reply', id, text: String(text) });
+  });
+}
+
+/** `false` while the agent is working (a `reply` would be refused): disable the buttons that call it. */
+export function useCanReply(): boolean {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const f = () => force((n) => n + 1);
+    chatSubs.add(f);
+    return () => { chatSubs.delete(f); };
+  }, []);
+  return canReplyNow;
 }
 
 export class ApiError extends Error {

@@ -60,7 +60,7 @@ function Attachments({ m }: { m: Message }) {
 }
 
 /** Display widgets (no answer): ```widget block or `agentui_<type>` tool. `undefined` if the type or arguments are invalid. */
-function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message): ReactElement | undefined {
+function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message, onReply?: (text: string) => Promise<boolean>): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
   if (w?.type === 'table') { const table = parseTable(w.arguments); if (table) return <TableCard table={table} />; }
@@ -77,14 +77,16 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
       return <ImageCard gallery={gallery} resolve={resolve} />;
     }
   }
-  if (w?.type === 'ui') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} />; }
+  if (w?.type === 'ui') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }
 
 /** A message bubble: Markdown text (or "ask" question card), reasoning, tools, attachments. */
-export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, working, allTools }: {
+export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, onReply, working, allTools }: {
   m: Message; expandTools: boolean; agentName: string; answers?: string[]; onAnswer?: (t: string) => void; working?: boolean;
+  /** Sends a new user message from a dynamic widget (`reply`); absent while the agent is working. */
+  onReply?: (t: string) => Promise<boolean>;
   /** Tool calls of the whole chat: the agent may reuse the token of a widget from an earlier message. */
   allTools?: ToolCallLike[];
 }) {
@@ -95,11 +97,11 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
   const text = useMemo(() => (m.role === 'user' ? m.text : dropStrayFence(expandWidgetTokens(m.text, m.toolCalls ?? [], allTools, m.status !== 'streaming'))), [m.role, m.text, m.toolCalls, m.status, allTools]);
   // `pre` must keep the same identity from one render to the next: otherwise React unmounts and remounts it, and the widgets
   // (form input, map, checked boxes) lose their state and focus on every chat render.
-  const latest = useRef({ m, answers, onAnswer });
-  latest.current = { m, answers, onAnswer };
+  const latest = useRef({ m, answers, onAnswer, onReply });
+  latest.current = { m, answers, onAnswer, onReply };
   const components = useMemo<Components>(() => ({
     pre: ({ children }) => {
-      const { m, answers, onAnswer: canAnswer } = latest.current;
+      const { m, answers, onAnswer: canAnswer, onReply } = latest.current;
       const el = children as ReactElement<{ className?: string; children?: ReactNode }> | undefined;
       const lang = /language-(\w+)/.exec(el?.props?.className ?? '')?.[1];
       const raw = String(el?.props?.children ?? '').replace(/\n$/, '');
@@ -117,7 +119,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         const w = parseWidget(raw);
         if (w?.type === 'ask') { const ask = parseAsk(w.arguments); if (ask) return <AskCard ask={ask} answer={answer} onAnswer={onAnswer} />; }
         if (w?.type === 'confirm') { const confirm = parseConfirm(w.arguments); if (confirm) return <ConfirmCard confirm={confirm} answer={answer} onAnswer={onAnswer} />; }
-        const display = displayWidget(w, m);
+        const display = displayWidget(w, m, onReply);
         if (display) return display;
         if (w?.type === 'form') { const form = parseForm(w.arguments); if (form) return <FormCard form={form} answer={answer} onAnswer={onAnswer} />; }
       }

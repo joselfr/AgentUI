@@ -17,6 +17,43 @@ export const CRON_MESSAGES = [
 /** Scenarios: the first one whose keyword appears in the user's message is played. */
 export const SCENARIOS = [
   {
+    match: /sélection|selection/i,
+    intro: 'Voici trois offres. Utilisez les boutons pour m’en demander plus.',
+    tools: [
+      ['ui', { code: `import { Card, Stack, Row, Text, Button, Chip, useCanReply, reply, toast } from '@agentui/ui';
+
+const OFFERS = [
+  { name: 'Nimbus Start', price: '9 €/mois', tag: 'Le moins cher' },
+  { name: 'Nimbus Pro', price: '29 €/moisis', tag: 'Populaire' },
+  { name: 'Nimbus Max', price: '79 €/moisis', tag: 'Tout inclus' },
+];
+
+export default function Offers() {
+  const can = useCanReply();
+  return (
+    <Stack gap={8}>
+      {OFFERS.map((o) => (
+        <Card key={o.name} padding={12}>
+          <Row justify="space-between" wrap>
+            <Stack gap={2}>
+              <Text variant="subtitle">{o.name}</Text>
+              <Text muted>{o.price}</Text>
+            </Stack>
+            <Row>
+              <Chip label={o.tag} color="primary" />
+              <Button size="small" variant="outlined" disabled={!can} onClick={async () => { if (!(await reply(\`Donne-moi plus de détails sur l’offre : \${o.name}\`))) toast('…'); }}>Détails</Button>
+            </Row>
+          </Row>
+        </Card>
+      ))}
+    </Stack>
+  );
+}
+` }],
+    ],
+    outro: 'Cliquez sur « Détails » pour approfondir l’une d’elles.',
+  },
+  {
     match: /épargne|epargne|simul/i,
     intro: 'Voici un simulateur avec lequel jouer : modifiez le versement, le rendement ou la durée.',
     tools: [

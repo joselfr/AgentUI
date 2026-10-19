@@ -17,6 +17,43 @@ export const CRON_MESSAGES = [
 /** Scenarios: the first one whose keyword appears in the user's message is played. */
 export const SCENARIOS = [
   {
+    match: /shortlist/i,
+    intro: 'Here are three offers. Use the buttons to ask me for more.',
+    tools: [
+      ['ui', { code: `import { Card, Stack, Row, Text, Button, Chip, useCanReply, reply, toast } from '@agentui/ui';
+
+const OFFERS = [
+  { name: 'Nimbus Start', price: '9 €/mo', tag: 'Cheapest' },
+  { name: 'Nimbus Pro', price: '29 €/mo', tag: 'Popular' },
+  { name: 'Nimbus Max', price: '79 €/mo', tag: 'Everything' },
+];
+
+export default function Offers() {
+  const can = useCanReply();
+  return (
+    <Stack gap={8}>
+      {OFFERS.map((o) => (
+        <Card key={o.name} padding={12}>
+          <Row justify="space-between" wrap>
+            <Stack gap={2}>
+              <Text variant="subtitle">{o.name}</Text>
+              <Text muted>{o.price}</Text>
+            </Stack>
+            <Row>
+              <Chip label={o.tag} color="primary" />
+              <Button size="small" variant="outlined" disabled={!can} onClick={async () => { if (!(await reply(\`Tell me more about the offer: \${o.name}\`))) toast('…'); }}>Details</Button>
+            </Row>
+          </Row>
+        </Card>
+      ))}
+    </Stack>
+  );
+}
+` }],
+    ],
+    outro: 'Click “Details” on the one you want to dig into.',
+  },
+  {
     match: /saving|simulat/i,
     intro: 'Here is a simulator you can play with: change the deposit, the return or the duration.',
     tools: [

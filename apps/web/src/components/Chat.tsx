@@ -53,6 +53,7 @@ export default function Chat(props: {
                 {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
                 <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName} allTools={allTools}
                   answers={answers}
+                  onReply={!props.running ? (t) => props.onSend(t, []) : undefined}
                   onAnswer={current && (!props.running || props.awaiting) ? (t) => void props.onSend(t, []) : undefined}
                   working={props.running && m.role === 'assistant' && (last || m.status === 'streaming')} />
               </Fragment>);
