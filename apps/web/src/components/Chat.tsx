@@ -1,10 +1,12 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, Avatar, Box, Button, CircularProgress, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import type { Capabilities, Message } from '@agentui/shared';
 import Composer from './chat/Composer';
 import MessageBubble from './chat/MessageBubble';
 import UnreadDivider from './chat/UnreadDivider';
+import SelectionQuote from './chat/SelectionQuote';
+import { plainText, withQuote } from './chat/quote';
 import { useAttachments } from './chat/useAttachments';
 import { useStickToBottom } from './chat/useStickToBottom';
 import { t } from '../i18n';
@@ -20,6 +22,11 @@ export default function Chat(props: {
   canAbort: boolean; attach: Capabilities['attachments']; approval?: { id: string; description: string }; onApprove: (ok: boolean) => void; onSend: (t: string, files: File[]) => Promise<boolean>; onAbort: () => void; error?: string;
 }) {
   const [drag, setDrag] = useState(false);
+  // Text being replied to (a message or a selection). Not offered while the agent waits for an answer: that text is the answer itself.
+  const [quote, setQuote] = useState<string | null>(null);
+  const firstId = props.messages[0]?.id;
+  useEffect(() => setQuote(null), [firstId, props.awaiting]);
+  const onQuote = props.awaiting ? undefined : (text: string) => setQuote(plainText(text) || null);
   const attachments = useAttachments(props.attach);
   const scroll = useStickToBottom(props.messages);
   const lastAssistant = props.messages.findLastIndex((m) => m.role === 'assistant');
@@ -52,7 +59,7 @@ export default function Chat(props: {
               <Fragment key={m.id}>
                 {props.unreadMark?.id === m.id && <UnreadDivider count={props.unreadMark.count} />}
                 <MessageBubble m={m} expandTools={props.expandTools} agentName={props.agentName} allTools={allTools}
-                  answers={answers}
+                  answers={answers} onQuote={onQuote}
                   onReply={!props.running ? (t) => props.onSend(t, []) : undefined}
                   onAnswer={current && (!props.running || props.awaiting) ? (t) => void props.onSend(t, []) : undefined}
                   working={props.running && m.role === 'assistant' && (last || m.status === 'streaming')} />
@@ -69,7 +76,9 @@ export default function Chat(props: {
       {props.error && <Alert severity="error" variant="outlined" sx={alertSx}>{props.error}</Alert>}
       {attachments.error && <Alert severity="warning" variant="outlined" onClose={attachments.dismissError} sx={alertSx}>{attachments.error}</Alert>}
       <Composer agentName={props.agentName} running={props.running} awaiting={props.awaiting} canAbort={props.canAbort} attachments={attachments} onAbort={props.onAbort} modelPicker={props.modelPicker}
-        onSubmit={(t, f) => { scroll.pin(); return props.onSend(t, f); }} />
+        quote={quote} onClearQuote={() => setQuote(null)}
+        onSubmit={async (t, f) => { scroll.pin(); const ok = await props.onSend(withQuote(props.awaiting ? null : quote, t), f); if (ok) setQuote(null); return ok; }} />
+      <SelectionQuote onQuote={onQuote} />
     </Box>
   );
 }

@@ -1,7 +1,10 @@
-import { useMemo, useRef, type ReactElement, type ReactNode } from 'react';
-import { Avatar, Box, Chip, Paper, Typography } from '@mui/material';
+import { useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { Avatar, Box, Chip, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
+import FormatQuote from '@mui/icons-material/FormatQuote';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import Check from '@mui/icons-material/Check';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // a line break = a line (cron outputs, short messages)
@@ -21,6 +24,8 @@ import ImageCard, { isRemote, parseImage, type Resolved } from '../ImageCard';
 import CodeCard, { parseCode } from '../CodeCard';
 import UiCard, { parseUi } from '../UiCard';
 import FormCard, { parseForm } from '../FormCard';
+import { splitQuote, plainText } from './quote';
+import { copyText } from './copy';
 import { t } from '../../i18n';
 
 const bounce = keyframes`0%, 60%, 100% { transform: translateY(0); opacity: .35 } 30% { transform: translateY(-4px); opacity: 1 }`;
@@ -82,8 +87,39 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
   return undefined;
 }
 
+/** Text of a user message: the leading quote (reply to a message or to a selection) is shown as a quote, then the message. */
+function UserText({ text }: { text: string }) {
+  const { quote, body } = splitQuote(text);
+  return (
+    <>
+      {quote && (
+        <Box data-testid="bubble-quote" sx={{ mb: body ? 0.75 : 0, pl: 1, py: 0.25, borderLeft: 3, borderColor: 'primary.main', color: 'text.secondary', fontSize: 13,
+          display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', whiteSpace: 'pre-wrap' }}>{quote}</Box>)}
+      {body ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{body}</Typography> : null}
+    </>
+  );
+}
+
+/** Reply / copy actions of a bubble (hover on desktop, always shown on touch screens). */
+function BubbleActions({ text, onQuote }: { text: string; onQuote?: (t: string) => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Box className="bubble-actions" sx={{ position: 'absolute', top: -14, right: 10, display: 'flex', bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 2, opacity: 0, transition: 'opacity .12s',
+      '@media (hover: none)': { opacity: 0.8 } }}>
+      {onQuote && <Tooltip title={t('chat.reply')}><IconButton size="small" aria-label={t('chat.reply')} onClick={() => onQuote(text)}><FormatQuote fontSize="small" /></IconButton></Tooltip>}
+      <Tooltip title={copied ? t('chat.copied') : t('chat.copy')}>
+        <IconButton size="small" aria-label={t('chat.copy')} onClick={() => void copyText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}>
+          {copied ? <Check fontSize="small" /> : <ContentCopy fontSize="small" />}
+        </IconButton>
+      </Tooltip>
+    </Box>
+  );
+}
+
 /** A message bubble: Markdown text (or "ask" question card), reasoning, tools, attachments. */
-export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, onReply, working, allTools }: {
+export default function MessageBubble({ m, expandTools, agentName, answers = [], onAnswer, onReply, onQuote, working, allTools }: {
+  /** Quotes a text (a whole message or a selection) in the next reply; absent while the agent waits for an answer. */
+  onQuote?: (t: string) => void;
   m: Message; expandTools: boolean; agentName: string; answers?: string[]; onAnswer?: (t: string) => void; working?: boolean;
   /** Sends a new user message from a dynamic widget (`reply`); absent while the agent is working. */
   onReply?: (t: string) => Promise<boolean>;
@@ -130,7 +166,8 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
       {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
         '--halo': (t) => alpha(t.palette.primary.main, 0.5), animation: working ? `${halo} 1.6s infinite` : 'none' }}>{agentName[0]}</Avatar>}
-      <Paper data-role={m.role} sx={{
+      <Paper data-role={m.role} data-bubble="" sx={{
+        position: 'relative', '&:hover .bubble-actions, &:focus-within .bubble-actions': { opacity: 1 },
         maxWidth: mine ? 'min(640px, 88%)' : 'min(760px, calc(100% - 44px))', px: 2, py: 1.25, borderRadius: mine ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
         bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
         '& pre': { overflow: 'auto', p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: 1, borderColor: 'divider', fontSize: 13 },
@@ -151,9 +188,10 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         {!mine && <ActivityBlock reasoning={m.reasoning} tools={m.toolCalls ?? []} subRuns={m.subAgentRuns ?? []} expandAll={expandTools} />}
         {live.map((w) => { const progress = parseProgress(w.arguments); return progress ? <ProgressCard key={w.token} progress={progress} ended={m.status !== 'streaming'} times={w.times} /> : null; })}
         {mine && <Attachments m={m} />}
-        {mine ? (m.text ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{m.text}</Typography> : null)
+        {mine ? (m.text ? <UserText text={m.text} /> : null)
           : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{text}</ReactMarkdown>}
         {!mine && <Attachments m={m} />}
+        {m.status !== 'streaming' && plainText(m.text) && <BubbleActions text={plainText(m.text)} onQuote={onQuote} />}
         {working && <Working m={m} />}
         {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">{t('chat.aborted')}</Typography>}
       </Paper>
