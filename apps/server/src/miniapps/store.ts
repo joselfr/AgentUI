@@ -3,6 +3,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import type { MiniApp } from '@agentui/shared';
 import type { DB } from '../db.js';
 import { buildApp, type BuildError } from './build.js';
+import { AppFs, checkGrantRequest, FS_LIMITS, type FsGrant, type FsMode } from './fs.js';
 
 export const APP_LIMITS = {
   maxFiles: 80,
@@ -54,7 +55,7 @@ export class MiniAppStore {
   /** Notified after each change (create / write / remove) so that the web clients refresh. */
   onChange?: (id: string, kind: 'changed' | 'removed') => void;
 
-  constructor(private db: DB, dataDir: string) {
+  constructor(private db: DB, private dataDir: string, private fsRoots: string[] = []) {
     this.root = resolve(dataDir, 'miniapps');
     mkdirSync(this.root, { recursive: true });
   }
@@ -112,6 +113,54 @@ export class MiniAppStore {
     }
     this.onChange?.(input.id, 'changed');
     return this.get(input.id)!;
+  }
+
+  /** File grants of a miniapp (declared by the agent at registration; inactive until `approved`). */
+  fsGrants(id: string): FsGrant[] {
+    return (this.db.prepare('SELECT path, mode, approved FROM miniapp_fs WHERE app_id = ? ORDER BY path').all(id) as unknown as { path: string; mode: FsMode; approved: number }[])
+      .map((r) => ({ path: r.path, mode: r.mode, approved: !!r.approved }));
+  }
+
+  /** `ctx.fs` of the handlers: approved grants only. */
+  fsFor(id: string): AppFs | undefined {
+    const grants = this.fsGrants(id).filter((g) => g.approved);
+    return grants.length ? new AppFs(grants, this.fsRoots, this.dataDir) : undefined;
+  }
+
+  /** Replaces the declared grants. A grant that is unchanged keeps its approval; a new or widened one (ro → rw) waits for the user. */
+  declareFs(id: string, agentId: string, entries: { path: string; mode?: string }[]): FsGrant[] {
+    this.owned(id, agentId);
+    if (entries.length > FS_LIMITS.maxEntries) throw new AppError(`Too many file grants (maximum ${FS_LIMITS.maxEntries}).`);
+    const before = new Map(this.fsGrants(id).map((g) => [g.path, g]));
+    const next = new Map<string, { path: string; mode: FsMode; approved: boolean }>();
+    for (const e of entries) {
+      if (e.mode !== undefined && e.mode !== 'ro' && e.mode !== 'rw') throw new AppError(`Invalid mode "${e.mode}" for "${e.path}" (ro or rw).`);
+      const path = checkGrantRequest(e.path, this.fsRoots, this.dataDir);
+      const mode: FsMode = e.mode === 'rw' ? 'rw' : 'ro';
+      const old = before.get(path);
+      next.set(path, { path, mode, approved: !!old?.approved && (old.mode === mode || mode === 'ro') });
+    }
+    this.db.exec('BEGIN');
+    try {
+      this.db.prepare('DELETE FROM miniapp_fs WHERE app_id = ?').run(id);
+      const ins = this.db.prepare('INSERT INTO miniapp_fs (app_id, path, mode, approved) VALUES (?,?,?,?)');
+      for (const g of next.values()) ins.run(id, g.path, g.mode, g.approved ? 1 : 0);
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+    this.onChange?.(id, 'changed');
+    return this.fsGrants(id);
+  }
+
+  /** User decision on one declared grant. */
+  setFsApproval(id: string, path: string, approved: boolean): FsGrant[] {
+    if (!this.get(id)) throw new AppError('Unknown miniapp', 404);
+    const r = this.db.prepare('UPDATE miniapp_fs SET approved = ? WHERE app_id = ? AND path = ?').run(approved ? 1 : 0, id, path);
+    if (!r.changes) throw new AppError('Unknown file grant', 404);
+    this.onChange?.(id, 'changed');
+    return this.fsGrants(id);
   }
 
   remove(id: string, agentId?: string): void {

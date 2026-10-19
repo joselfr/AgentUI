@@ -1,12 +1,13 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AuthUser } from '../auth.js';
 import type { AppData } from './data.js';
-import { runHandler } from './sandbox.js';
+import { runHandler, type SandboxResult } from './sandbox.js';
 import { AppError, type MiniAppStore } from './store.js';
 
+const PUBLIC_RATE_PER_MIN = 120;
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
 const MIME: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
@@ -30,6 +31,19 @@ export function verifyAppToken(secret: string, appId: string, token: string, now
   const good = createHmac('sha256', secret).update(`${uid}.${appId}.${exp}`).digest('base64url');
   const a = Buffer.from(sig), b = Buffer.from(good);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Sends a handler's result. Headers were validated by the sandbox. A handler that serves a document (HTML, XML, SVG) is
+ * confined: this runs on the app's own origin, so it gets an opaque origin without scripts (CSP sandbox) and cannot use the session.
+ */
+function sendResult(reply: FastifyReply, res: SandboxResult) {
+  reply.code(res.status);
+  for (const [k, v] of Object.entries(res.headers ?? {})) reply.header(k, v);
+  if (/html|xml|svg/i.test(res.headers?.['content-type'] ?? '')) {
+    reply.header('Content-Security-Policy', "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:").header('X-Content-Type-Options', 'nosniff');
+  }
+  return reply.send(res.body);
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -83,6 +97,14 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     return { base: `/m/${a.id}/${signAppToken(secret, user.id, a.id)}/`, version: a.version, name: a.name };
   });
 
+  /** File grants declared by the agent; the user approves or revokes each one (nothing is accessible before). */
+  app.get<{ Params: { id: string } }>('/api/miniapps/:id/fs', async (req) => store.fsGrants(must(req.params.id).id));
+  app.put<{ Params: { id: string }; Body: { path?: unknown; approved?: unknown } }>('/api/miniapps/:id/fs', async (req) => {
+    const b = req.body ?? {};
+    if (typeof b.path !== 'string' || typeof b.approved !== 'boolean') throw new AppError('path and approved are required');
+    return store.setFsApproval(must(req.params.id).id, b.path, b.approved);
+  });
+
   /** Handlers of a miniapp: `/api/miniapps/<id>/x/<route>/…` → `server/<route>.js`, else `server/index.js`. */
   app.route<{ Params: { id: string; '*': string } }>({
     method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -107,11 +129,65 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         req: { method: req.method, path, query: (req.query ?? {}) as Record<string, string>, body: req.body ?? null },
         user: { id: user.id, username: user.username },
         data,
+        fs: store.fsFor(a.id),
         log: (l) => store.log(a.id, `[${name}] ${l}`),
         onData: () => store.dataChanged(a.id),
       });
-      return reply.code(res.status).send(res.body);
+      return sendResult(reply, res);
     },
+  });
+
+  // ---------- Public handlers (webhooks…): NO authentication, opt-in with `server/public.js` ----------
+  /** `/public/<id>/<path>` → `server/public.js` with `req.path = /<path>`; `ctx.user` is null. The handler must authenticate the caller itself (secret in the URL, signature header…). */
+  const hits = new Map<string, number[]>();
+  const limited = (key: string) => {
+    const now = Date.now();
+    const arr = (hits.get(key) ?? []).filter((t) => now - t < 60_000);
+    arr.push(now);
+    hits.set(key, arr);
+    if (hits.size > 5000) for (const [k, v] of hits) if (!v.some((t) => now - t < 60_000)) hits.delete(k);
+    return arr.length > PUBLIC_RATE_PER_MIN;
+  };
+  app.register(async (pub) => {
+    // Webhooks send any content type: keep the raw text, parse JSON / forms ourselves.
+    pub.removeAllContentTypeParsers();
+    pub.addContentTypeParser('*', { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_req, body, done) => done(null, body));
+    pub.route<{ Params: { id: string; '*': string } }>({
+      method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      url: '/public/:id/*',
+      handler: async (req, reply) => publicCall(req, reply),
+    });
+    pub.route<{ Params: { id: string } }>({
+      method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      url: '/public/:id',
+      handler: async (req, reply) => publicCall(req, reply),
+    });
+    async function publicCall(req: FastifyRequest<{ Params: { id: string; '*'?: string } }>, reply: FastifyReply) {
+      const a = store.get(req.params.id);
+      const code = a && store.serverCode(a.id, 'public');
+      if (!a || !code) return reply.code(404).send({ error: 'Not found' });
+      if (limited(`${a.id}|${req.ip}`)) return reply.code(429).send({ error: 'Too many requests' });
+      const rawBody = typeof req.body === 'string' ? req.body : '';
+      const type = String(req.headers['content-type'] ?? '').toLowerCase();
+      let body: unknown = rawBody || null;
+      try {
+        if (type.includes('json') && rawBody) body = JSON.parse(rawBody);
+        else if (type.includes('x-www-form-urlencoded')) body = Object.fromEntries(new URLSearchParams(rawBody));
+      } catch { /* keep the raw text */ }
+      const headers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) if (k !== 'cookie' && typeof v === 'string') headers[k] = v.slice(0, 2000);
+      const res = await runHandler({
+        code,
+        appId: a.id,
+        req: { method: req.method, path: '/' + (req.params['*'] ?? '').replace(/^\/+/, ''), query: (req.query ?? {}) as Record<string, string>, body, headers, rawBody },
+        user: null,
+        data,
+        fs: store.fsFor(a.id),
+        log: (l) => store.log(a.id, `[public] ${l}`),
+        onData: () => store.dataChanged(a.id),
+      });
+      return sendResult(reply, res);
+    }
   });
 
   // ---------- Static files of the iframe (token in the path) ----------

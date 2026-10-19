@@ -1,7 +1,7 @@
 {
   "id": "agentui",
   "channels": ["agentui"],
-  "contracts": { "tools": ["agentui_chart", "agentui_map", "agentui_code", "agentui_table", "agentui_progress", "agentui_image", "agentui_ask", "agentui_confirm", "agentui_form", "agentui_miniapp_guide", "agentui_miniapp_create", "agentui_miniapp_write", "agentui_miniapp_read", "agentui_miniapp_list", "agentui_miniapp_delete_file", "agentui_miniapp_remove", "agentui_miniapp_logs", "agentui_miniapp_data"] },
+  "contracts": { "tools": ["agentui_chart", "agentui_map", "agentui_code", "agentui_table", "agentui_progress", "agentui_image", "agentui_ask", "agentui_confirm", "agentui_form", "agentui_miniapp_guide", "agentui_miniapp_create", "agentui_miniapp_write", "agentui_miniapp_read", "agentui_miniapp_list", "agentui_miniapp_delete_file", "agentui_miniapp_remove", "agentui_miniapp_logs", "agentui_miniapp_data", "agentui_notify"] },
   "name": "AgentUI",
   "description": "AgentUI channel: OpenClaw connects to AgentUI (outgoing WebSocket) using the AgentUI Channel Protocol v1.",
   "configSchema": {

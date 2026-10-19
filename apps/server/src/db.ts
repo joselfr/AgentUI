@@ -109,6 +109,13 @@ export function openDb(dataDir: string): DB {
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (app_id, collection, id)
     );
+    CREATE TABLE IF NOT EXISTS miniapp_fs (
+      app_id TEXT NOT NULL REFERENCES miniapps(id) ON DELETE CASCADE,
+      path TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      approved INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (app_id, path)
+    );
     CREATE TABLE IF NOT EXISTS miniapp_kv (
       app_id TEXT NOT NULL REFERENCES miniapps(id) ON DELETE CASCADE,
       key TEXT NOT NULL,

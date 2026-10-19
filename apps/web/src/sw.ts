@@ -6,7 +6,9 @@ declare const self: any;
 
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
-registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//, /^\/ws/, /^\/m\//] }));
+// `/public/…` is the public entry point (OAuth return, webhooks) of the miniapps: the browser must reach the
+// server directly, never the app shell, otherwise it shows an empty conversation instead of the handler's response. `/close.html` is the static page that closes the tab after such a redirect.
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//, /^\/ws/, /^\/m\//, /^\/public\//, /^\/close(\.html)?(\?|$)/] }));
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e: any) => e.waitUntil(self.clients.claim()));
@@ -46,6 +48,7 @@ self.addEventListener('notificationclick', (event: any) => {
   const url = new URL(event.notification.data?.url ?? '/', self.location.origin).href;
   event.waitUntil(
     (async () => {
+      if (new URL(url).origin !== self.location.origin) return void (await self.clients.openWindow(url));
       const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const existing = wins[0];
       if (existing) {

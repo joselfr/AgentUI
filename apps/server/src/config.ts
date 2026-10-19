@@ -36,5 +36,7 @@ export const env = {
   cookieSecret: process.env.COOKIE_SECRET ?? '',
   adminUser: process.env.ADMIN_USER,
   adminPassword: process.env.ADMIN_PASSWORD,
+  /** Folders miniapps may ask file access to (`MINIAPP_FS_ROOTS`, separated by `:`). Empty = file access disabled. */
+  miniappFsRoots: (process.env.MINIAPP_FS_ROOTS ?? '').split(':').map((x) => x.trim()).filter((x) => x.startsWith('/')).map((x) => resolve(x)),
   secureCookies: process.env.INSECURE_COOKIES !== '1',
 };

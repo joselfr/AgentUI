@@ -473,6 +473,30 @@
           "description": {
             "type": "string",
             "description": "One short sentence."
+          },
+          "fs": {
+            "type": "array",
+            "description": "Files/folders the miniapp's handlers (ctx.fs) may access, declared once here. Absolute paths, under the folders the administrator allows. Each grant stays inactive until the user approves it in the miniapp header. Re-sending replaces the list.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Absolute path of a folder (covers its content) or of one file."
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "ro",
+                    "rw"
+                  ],
+                  "description": "ro (read only, default) or rw."
+                }
+              },
+              "required": [
+                "path"
+              ]
+            }
           }
         },
         "required": [
@@ -654,6 +678,34 @@
         "required": [
           "id",
           "action"
+        ]
+      }
+    }
+  },
+  "notifyTool": {
+    "notify": {
+      "description": "Sends a push notification to the user's devices (AgentUI installed as a PWA). Use it sparingly, to get their attention when it matters: a long task is finished, something needs their decision, an alert fired. Never for routine chat replies (AgentUI already notifies those). Returns how many devices were notified.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Short headline."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "One or two sentences of detail."
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Link opened when the user taps the notification: an AgentUI path (\"/miniapps/<id>\", \"/c/<conversationId>\") or an https:// URL. Default: the AgentUI home."
+          }
+        },
+        "required": [
+          "title"
         ]
       }
     }

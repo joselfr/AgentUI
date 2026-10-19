@@ -6,7 +6,9 @@ const id = z.string().min(1).max(60);
 const path = z.string().min(1).max(200);
 
 const SCHEMAS = {
-  create: z.object({ id, name: z.string().min(1).max(60), icon: z.string().max(40).optional(), description: z.string().max(300).optional() }),
+  create: z.object({ id, name: z.string().min(1).max(60), icon: z.string().max(40).optional(), description: z.string().max(300).optional(),
+    fs: z.array(z.object({ path: z.string().min(1).max(500), mode: z.enum(['ro', 'rw']).optional() })).max(20).optional(),
+  }),
   write: z.object({ id, files: z.array(z.object({ path, content: z.string() })).min(1).max(40) }),
   read: z.object({ id, path }),
   list: z.object({}).passthrough(),
@@ -37,7 +39,9 @@ export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: s
   switch (op) {
     case 'create': {
       const app = store.create(agentId, a);
-      return { app, next: 'Write src/main.tsx (default-export a React component) with agentui_miniapp_write, and optionally handlers in server/<route>.js.' };
+      const fs = a.fs ? store.declareFs(a.id, agentId, a.fs) : undefined;
+      const pending = fs?.filter((g: { approved: boolean }) => !g.approved).length;
+      return { app, ...(fs ? { fs, fsNote: pending ? `${pending} file grant(s) wait for the user's approval in the miniapp header; ctx.fs fails on them until then. Tell the user.` : 'All file grants are approved.' } : {}), next: 'Write src/main.tsx (default-export a React component) with agentui_miniapp_write, and optionally handlers in server/<route>.js.' };
     }
     case 'write': {
       const r = await store.writeFiles(a.id, agentId, a.files);
@@ -46,7 +50,7 @@ export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: s
     case 'read':
       return { path: a.path, content: store.readFile(a.id, agentId, a.path) };
     case 'list':
-      return store.list().filter((x) => x.agentId === agentId).map((x) => ({ ...x, files: store.files(x.id) }));
+      return store.list().filter((x) => x.agentId === agentId).map((x) => ({ ...x, files: store.files(x.id), fs: store.fsGrants(x.id) }));
     case 'delete_file': {
       const r = await store.deleteFile(a.id, agentId, a.path);
       return r.ok ? { ok: true } : { ok: false, errors: r.errors };

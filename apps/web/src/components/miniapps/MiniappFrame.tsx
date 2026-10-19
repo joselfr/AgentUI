@@ -9,6 +9,12 @@ import { getLang, t, useLang } from '../../i18n';
 const safePath = (p: unknown): string | undefined =>
   typeof p === 'string' && !p.split('?')[0]!.split('/').some((s) => s === '..' || s === '.') && !/^[a-z]+:/i.test(p) && !p.startsWith('//') ? p.replace(/^\/+/, '') : undefined;
 
+/** Only web links, mail and phone links may be opened on behalf of a miniapp (no `javascript:`, `data:`, `file:`…). */
+const safeUrl = (u: unknown): string | undefined => {
+  if (typeof u !== 'string' || u.length > 4096) return undefined;
+  try { const p = new URL(u); return ['http:', 'https:', 'mailto:', 'tel:'].includes(p.protocol) ? p.href : undefined; } catch { return undefined; }
+};
+
 /**
  * Runs a miniapp in a sandboxed iframe (`allow-scripts` only: opaque origin, no access to the session cookie nor to /api).
  * The only way out is this postMessage bridge: the host replays the app's requests on its own backend namespace
@@ -45,6 +51,10 @@ export default function MiniappFrame({ app, dataKey = 0 }: { app: MiniApp; dataK
       const m = e.data as { type?: string; id?: string; method?: string; path?: unknown; body?: unknown } | null;
       if (m?.type === 'agentui:ready') { setReady(true); postTheme(); }
       else if (m?.type === 'agentui:error') setAppError(String((m as { message?: string }).message ?? ''));
+      else if (m?.type === 'agentui:open') {
+        const url = safeUrl((m as { url?: unknown }).url);
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      }
       else if (m?.type === 'agentui:fetch' && typeof m.id === 'string') {
         const path = safePath(m.path);
         const method = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(m.method ?? '') ? m.method! : 'GET';

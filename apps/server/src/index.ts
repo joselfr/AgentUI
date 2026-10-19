@@ -291,7 +291,7 @@ async function main() {
   });
 
   // ---------- Miniapps (created by the agents, shown in the Miniapps tab) ----------
-  const apps = new MiniAppStore(db, env.dataDir);
+  const apps = new MiniAppStore(db, env.dataDir, env.miniappFsRoots);
   apps.onChange = (id, kind) => runs.broadcast({ type: 'miniapp.changed', appId: id, removed: kind === 'removed' });
   const appData = new AppData(db);
   const dataTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -348,6 +348,10 @@ async function main() {
       return handleAppOp(apps, appData, g.id, op, args);
     };
     g.onMiniappOpError = opError;
+    g.onNotify = async (a) => {
+      const r = await push.notify({ title: a.title, body: a.body ?? '', url: a.url ?? '/', tag: `notify-${Date.now()}` });
+      return { sent: r.sent, ...(r.sent === 0 ? { note: 'No device is subscribed to notifications.' } : {}) };
+    };
     g.onOutbound = (m) => {
       const conv = runs.deliver(g.id, m.conversationId, m.text, m.media, g.name, m.title);
       app.log.info({ agent: g.id, conversation: conv.id }, 'proactive message received');
@@ -389,7 +393,7 @@ async function main() {
   if (existsSync(webDist)) {
     await app.register(fastifyStatic, { root: webDist });
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') || req.url.startsWith('/m/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
+      req.url.startsWith('/api/') || req.url.startsWith('/m/') || req.url.startsWith('/public/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
     );
   }
 

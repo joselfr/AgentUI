@@ -1,11 +1,14 @@
+import { createHmac, createVerify, generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDb, type DB } from '../db.js';
+import { mkdirSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { AppData } from './data.js';
-import { signAppToken, verifyAppToken } from './routes.js';
-import { runHandler } from './sandbox.js';
+import Fastify from 'fastify';
+import { registerMiniApps, signAppToken, verifyAppToken } from './routes.js';
+import { runHandler, sanitizeHeaders } from './sandbox.js';
 import { AppError, MiniAppStore } from './store.js';
 
 let dir: string;
@@ -166,5 +169,186 @@ describe('network', () => {
     store.create('a1', { id: 'net2', name: 'net2' });
     await store.writeFiles('net2', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/index.js', content: `export function GET(req, ctx) { return typeof ctx.fetch; }` }]);
     expect((await call('net2', 'index', 'GET')).body).toBe('function');
+  });
+});
+
+describe('public handlers', () => {
+  const server = async () => {
+    const app = Fastify();
+    registerMiniApps(app, { store, data, secret: 's', userOf: () => null, runtimeDir: dir });
+    await app.ready();
+    return app;
+  };
+  const JS = `export function POST(req, ctx) { return { user: ctx.user, path: req.path, body: req.body, raw: req.rawBody, sig: req.headers['x-sig'] }; }`;
+
+  it('serves only server/public.js, without authentication', async () => {
+    store.create('a1', { id: 'hook', name: 'hook' });
+    await store.writeFiles('hook', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/index.js', content: JS }]);
+    const app = await server();
+    expect((await app.inject({ method: 'POST', url: '/public/hook/x' })).statusCode).toBe(404); // private handlers are never exposed
+    await store.writeFiles('hook', 'a1', [{ path: 'server/public.js', content: JS }]);
+    const res = await app.inject({ method: 'POST', url: '/public/hook/github/push', headers: { 'content-type': 'application/json', 'x-sig': 'abc' }, payload: '{"a":1}' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ user: null, path: '/github/push', body: { a: 1 }, raw: '{"a":1}', sig: 'abc' });
+    const form = await app.inject({ method: 'POST', url: '/public/hook', headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: 'a=1&b=2' });
+    expect(form.json().body).toEqual({ a: '1', b: '2' });
+    expect((await app.inject({ method: 'POST', url: '/public/nope/x' })).statusCode).toBe(404);
+    await app.close();
+  });
+});
+
+describe('file grants', () => {
+  let shared: string;
+  let secret: string;
+  let fsStore: MiniAppStore;
+  beforeEach(() => {
+    shared = join(dir, 'shared');
+    secret = join(dir, 'secret');
+    mkdirSync(join(shared, 'docs'), { recursive: true });
+    mkdirSync(secret);
+    writeFileSync(join(shared, 'docs', 'a.txt'), 'hello');
+    writeFileSync(join(secret, 'key.txt'), 'nope');
+    symlinkSync(secret, join(shared, 'docs', 'escape'));
+    fsStore = new MiniAppStore(db, join(dir, 'data'), [shared]);
+    fsStore.create('a1', { id: 'files', name: 'files' });
+  });
+  const run = (js: string) => {
+    const code = `module.exports.GET = (req, ctx) => { ${js} };`;
+    return runHandler({ code, appId: 'files', req: { method: 'GET', path: '/', query: {}, body: null }, user: null, data, fs: fsStore.fsFor('files'), log: () => {} });
+  };
+
+  it('refuses paths outside the allowed roots and the data dir', () => {
+    expect(() => fsStore.declareFs('files', 'a1', [{ path: secret }])).toThrow(/outside/);
+    expect(() => fsStore.declareFs('files', 'a1', [{ path: 'docs' }])).toThrow(/absolute/);
+    expect(() => fsStore.declareFs('files', 'a1', [{ path: join(shared, '..', 'secret') }])).toThrow(/outside/);
+  });
+
+  it('is inactive until approved, then read-only unless rw', async () => {
+    const g = fsStore.declareFs('files', 'a1', [{ path: join(shared, 'docs') }]);
+    expect(g[0]).toMatchObject({ mode: 'ro', approved: false });
+    const read = `return ctx.fs.readFile(${JSON.stringify(join(shared, 'docs', 'a.txt'))});`;
+    expect((await run(read)).status).toBe(500); // not approved
+    fsStore.setFsApproval('files', join(shared, 'docs'), true);
+    expect((await run(read)).body).toBe('hello');
+    expect((await run(`return ctx.fs.writeFile(${JSON.stringify(join(shared, 'docs', 'b.txt'))}, 'x');`)).status).toBe(500); // read-only
+    expect((await run(`return ctx.fs.readFile(${JSON.stringify(join(shared, 'other.txt'))});`)).status).toBe(500); // outside the grant
+    expect((await run(`return ctx.fs.readFile(${JSON.stringify(join(shared, 'docs', 'escape', 'key.txt'))});`)).status).toBe(500); // symlink escape
+  });
+
+  it('writes with rw and resets approval when a grant is widened', async () => {
+    const d = join(shared, 'docs');
+    fsStore.declareFs('files', 'a1', [{ path: d }]);
+    fsStore.setFsApproval('files', d, true);
+    expect(fsStore.declareFs('files', 'a1', [{ path: d }])[0]!.approved).toBe(true); // unchanged
+    expect(fsStore.declareFs('files', 'a1', [{ path: d, mode: 'rw' }])[0]!.approved).toBe(false); // widened
+    fsStore.setFsApproval('files', d, true);
+    expect((await run(`ctx.fs.writeFile(${JSON.stringify(join(d, 'new.txt'))}, 'ok'); return ctx.fs.readdir(${JSON.stringify(d)}).map((e) => e.name).sort();`)).body).toEqual(['a.txt', 'escape', 'new.txt']);
+    expect(readFileSync(join(d, 'new.txt'), 'utf8')).toBe('ok');
+  });
+});
+
+describe('handler response headers', () => {
+  const server = async () => {
+    const app = Fastify();
+    registerMiniApps(app, { store, data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as any, runtimeDir: dir });
+    await app.ready();
+    return app;
+  };
+  const publicJs = `export function GET(req, ctx) {
+  if (req.path === '/go') return ctx.status(302, null, { Location: '/x', 'Set-Cookie': 'a=b', 'Content-Length': '1', 'X-Evil': '1' });
+  if (req.path === '/page') return ctx.status(200, '<!doctype html><p>ok</p>', { 'Content-Type': 'text/html; charset=utf-8' });
+  if (req.path === '/crlf') return ctx.status(200, { ok: true }, { 'Cache-Control': 'a\\r\\nSet-Cookie: x=1' });
+  return { plain: true };
+}`;
+
+  it('applies allowed headers on public and authenticated routes, ignores the others', async () => {
+    store.create('a1', { id: 'hdr', name: 'hdr' });
+    await store.writeFiles('hdr', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/public.js', content: publicJs }, { path: 'server/index.js', content: publicJs }]);
+    const app = await server();
+    const go = await app.inject({ method: 'GET', url: '/public/hdr/go' });
+    expect(go.statusCode).toBe(302);
+    expect(go.headers.location).toBe('/x');
+    expect(go.headers['set-cookie']).toBeUndefined();
+    expect(go.headers['x-evil']).toBeUndefined();
+    expect((await app.inject({ method: 'GET', url: '/api/miniapps/hdr/x/go' })).headers.location).toBe('/x'); // authenticated route too
+
+    const page = await app.inject({ method: 'GET', url: '/public/hdr/page' });
+    expect(page.headers['content-type']).toBe('text/html; charset=utf-8');
+    expect(page.body).toBe('<!doctype html><p>ok</p>');
+    expect(page.headers['content-security-policy']).toMatch(/^sandbox/);
+
+    const bad = await app.inject({ method: 'GET', url: '/public/hdr/crlf' });
+    expect(bad.statusCode).toBe(200);
+    expect(bad.headers['cache-control']).toBeUndefined();
+    expect(bad.headers['set-cookie']).toBeUndefined();
+
+    const plain = await app.inject({ method: 'GET', url: '/public/hdr/other' });
+    expect(plain.json()).toEqual({ plain: true });
+    expect(plain.headers.location).toBeUndefined();
+    await app.close();
+  });
+
+  it('validates headers on the host', () => {
+    const logs: string[] = [];
+    expect(sanitizeHeaders({ Location: '/a', 'Retry-After': '5', 'set-cookie': 'x', 'content-length': '1', 'transfer-encoding': 'chunked' }, (l) => logs.push(l))).toEqual({ location: '/a', 'retry-after': '5' });
+    expect(logs.length).toBe(3);
+    expect(sanitizeHeaders(['location'])).toBeUndefined();
+    expect(sanitizeHeaders({ location: 'a\nb' })).toBeUndefined();
+    expect(sanitizeHeaders({ location: 'x'.repeat(1025) })).toBeUndefined();
+    expect(sanitizeHeaders({ location: 1 })).toBeUndefined();
+    expect(sanitizeHeaders(undefined)).toBeUndefined();
+  });
+});
+
+describe('ctx.crypto', () => {
+  it('hashes, signs, compares and generates randomness', async () => {
+    store.create('a1', { id: 'cry', name: 'cry' });
+    const js = `export function GET(req, ctx) { return {
+      sha: ctx.crypto.hash('sha256', 'abc'),
+      b64: ctx.crypto.hmac('sha256', 'k', 'msg', 'base64url'),
+      global: crypto === ctx.crypto,
+      eq: [ctx.crypto.timingSafeEqual('a', 'a'), ctx.crypto.timingSafeEqual('a', 'b'), ctx.crypto.timingSafeEqual('a', 'ab')],
+      rnd: ctx.crypto.randomBytes(8).length,
+      uuid: ctx.crypto.randomUUID().length,
+      bad: (() => { try { ctx.crypto.hash('whirlpool', 'x'); return 'no error'; } catch (e) { return e.message; } })(),
+    }; }`;
+    await store.writeFiles('cry', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/index.js', content: js }]);
+    const r = await call('cry', 'index', 'GET');
+    const b = r.body as any;
+    expect(b.sha).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(b.b64).toBe(createHmac('sha256', 'k').update('msg').digest('base64url'));
+    expect(b.global).toBe(true);
+    expect(b.eq).toEqual([true, false, false]);
+    expect(b.rnd).toBe(16);
+    expect(b.uuid).toBe(36);
+    expect(b.bad).toMatch(/algorithm must be one of/);
+  });
+});
+
+describe('ctx.crypto signatures', () => {
+  it('signs RS256 / ES256 and verifies', async () => {
+    const rsa = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+    const ec = generateKeyPairSync('ec', { namedCurve: 'P-256', privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+    store.create('a1', { id: 'sig', name: 'sig' });
+    const js = `export function POST(req, ctx) {
+      const { rsa, ec } = req.body;
+      const s = ctx.crypto.sign('RS256', rsa.priv, 'a.b');
+      const e = ctx.crypto.sign('ES256', ec.priv, 'a.b');
+      const ps = ctx.crypto.sign('PS256', rsa.priv, 'a.b');
+      return { s, e, ok: [ctx.crypto.verify('RS256', rsa.pub, 'a.b', s), ctx.crypto.verify('ES256', ec.pub, 'a.b', e), ctx.crypto.verify('PS256', rsa.pub, 'a.b', ps), ctx.crypto.verify('RS256', rsa.pub, 'a.c', s)],
+        b64: ctx.crypto.base64url('{"a":"é"}'), back: ctx.crypto.fromBase64url(ctx.crypto.base64url('{"a":"é"}')),
+        badKey: (() => { try { ctx.crypto.sign('RS256', 'nope', 'x'); return 'no error'; } catch (err) { return err.message; } })(),
+        badAlg: (() => { try { ctx.crypto.sign('none', rsa.priv, 'x'); return 'no error'; } catch (err) { return err.message; } })() };
+    }`;
+    await store.writeFiles('sig', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/index.js', content: js }]);
+    const r = await call('sig', 'index', 'POST', { rsa: { priv: rsa.privateKey, pub: rsa.publicKey }, ec: { priv: ec.privateKey, pub: ec.publicKey } });
+    const b = r.body as any;
+    expect(r.status).toBe(200);
+    expect(createVerify('RSA-SHA256').update('a.b').verify(rsa.publicKey, Buffer.from(b.s, 'base64url'))).toBe(true); // a standard verifier accepts it
+    expect(b.ok).toEqual([true, true, true, false]);
+    expect(b.b64).toBe(Buffer.from('{"a":"é"}').toString('base64url'));
+    expect(b.back).toBe('{"a":"é"}');
+    expect(b.badKey).toMatch(/PEM/);
+    expect(b.badAlg).toMatch(/must be one of/);
   });
 });

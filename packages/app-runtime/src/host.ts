@@ -36,6 +36,25 @@ if (typeof window !== 'undefined') {
 
 export const toHost = (msg: Record<string, unknown>) => window.parent.postMessage({ ...msg }, '*');
 
+/**
+ * Opens a link in a new browser tab. The iframe is sandboxed (no `allow-popups`), so `window.open` and `target="_blank"`
+ * are blocked: the host opens the URL for us. Only `http(s):`, `mailto:` and `tel:` are accepted. Call it from a click handler.
+ */
+export const openUrl = (url: string) => toHost({ type: 'agentui:open', url: String(url) });
+
+if (typeof window !== 'undefined') {
+  // Make `window.open(url)` and `<a target="_blank">` work transparently through the host.
+  window.open = ((url?: string | URL) => { if (url) openUrl(String(new URL(String(url), document.baseURI))); return null; }) as typeof window.open;
+  document.addEventListener('click', (e) => {
+    const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!a || e.defaultPrevented || e.button !== 0) return;
+    const external = a.target === '_blank' || /^(https?:|mailto:|tel:)/i.test(a.getAttribute('href') ?? '');
+    if (!external) return;
+    e.preventDefault();
+    openUrl(a.href);
+  });
+}
+
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly body: unknown) {
     super(message);

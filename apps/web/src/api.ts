@@ -75,6 +75,8 @@ export const api = {
   miniapps: () => call<MiniApp[]>('GET', '/miniapps'),
   miniapp: (id: string) => call<MiniApp>('GET', `/miniapps/${id}`),
   removeMiniapp: (id: string) => call<{ ok: true }>('DELETE', `/miniapps/${id}`),
+  miniappFs: (id: string) => call<{ path: string; mode: 'ro' | 'rw'; approved: boolean }[]>('GET', `/miniapps/${id}/fs`),
+  setMiniappFs: (id: string, path: string, approved: boolean) => call<{ path: string; mode: 'ro' | 'rw'; approved: boolean }[]>('PUT', `/miniapps/${id}/fs`, { path, approved }),
   miniappSession: (id: string) => call<{ base: string; version: number; name: string }>('GET', `/miniapps/${id}/session`),
   approval: (id: string, approvalId: string, approve: boolean) => call('POST', `/conversations/${id}/approval`, { approvalId, approve }),
 };
