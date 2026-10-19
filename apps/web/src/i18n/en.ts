@@ -220,6 +220,7 @@ export const en: Record<FullKey, string> = {
   'miniapps.error': "The miniapp reported an error",
   'ui.error': "The widget could not be built",
   'ui.title': "Dynamic widget",
+  'ui.exitFullscreen': "Exit full screen",
   'chat.reply': "Reply",
   'chat.copy': "Copy",
   'chat.copied': "Copied ✓",

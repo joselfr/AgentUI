@@ -30,10 +30,11 @@ async function main() {
 /** `agentui_custom_widget` widget shown in the chat: no full-height page, the iframe is sized to its content and transparent. */
 function inlineWidget() {
   const style = document.createElement('style');
-  style.textContent = 'html, body, #root { height: auto; } body { background: transparent; overflow-x: hidden; overflow-y: auto; }';
+  style.textContent = 'html, body, #root { height: auto; } body { background: transparent; overflow-x: hidden; overflow-y: auto; } html.au-fullscreen, html.au-fullscreen body, html.au-fullscreen #root { height: 100%; }';
   document.head.appendChild(style);
   let last = 0;
   const report = () => {
+    if (document.documentElement.classList.contains('au-fullscreen')) return; // the host gives the whole screen: nothing to size
     const h = Math.ceil(document.body.getBoundingClientRect().height);
     if (h !== last) { last = h; toHost({ type: 'agentui:resize', height: h }); }
   };

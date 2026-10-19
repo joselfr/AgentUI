@@ -218,6 +218,7 @@ export const fr = {
   'miniapps.error': "La miniapp a signalé une erreur",
   'ui.error': "Le widget n'a pas pu être compilé",
   'ui.title': "Widget dynamique",
+  'ui.exitFullscreen': "Quitter le plein écran",
   'chat.reply': "Répondre",
   'chat.copy': "Copier",
   'chat.copied': "Copié ✓",

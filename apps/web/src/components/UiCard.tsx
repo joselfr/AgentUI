@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Box, CircularProgress, Typography } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { Alert, Box, CircularProgress, IconButton, Typography } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
+import Close from '@mui/icons-material/Close';
 import { themeCssVars, type WidgetEvent } from '@agentui/shared';
 import { api } from '../api';
 import { getLang, t, useLang } from '../i18n';
@@ -47,6 +48,27 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
   const [runtimeError, setRuntimeError] = useState('');
   const [ready, setReady] = useState(false);
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
+  // Full screen (`requestFullscreen()` in the widget): the SAME iframe is stretched over the viewport, never moved or remounted, so the widget keeps
+  // running with its state. The browser's own full screen is requested on top of it when available (not on iPhone: the overlay alone is used).
+  const [fs, setFs] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const enterFs = useCallback(() => {
+    setFs(true);
+    try { void wrap.current?.requestFullscreen?.().catch(() => {}); } catch { /* overlay only */ }
+  }, []);
+  const leaveFs = useCallback(() => {
+    setFs(false);
+    try { if (document.fullscreenElement) void document.exitFullscreen().catch(() => {}); } catch { /* already out */ }
+  }, []);
+  useEffect(() => {
+    if (!fs) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') leaveFs(); };
+    const onChange = () => { if (!document.fullscreenElement) setFs(false); }; // Escape in the browser's full screen
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('fullscreenchange', onChange); };
+  }, [fs, leaveFs]);
+  useEffect(() => () => { try { if (document.fullscreenElement) void document.exitFullscreen().catch(() => {}); } catch { /* unmounted while open */ } }, []);
 
   useEffect(() => {
     let live = true;
@@ -77,6 +99,8 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
   }, []);
   const stateJson = JSON.stringify(ui.state) ?? '';
   useEffect(postState, [postState, stateJson]);
+  const postFs = useCallback(() => { frame.current?.contentWindow?.postMessage({ type: 'agentui:fullscreen.state', on: fs }, '*'); }, [fs]);
+  useEffect(postFs, [postFs]);
 
   const postTheme = useCallback(() => {
     frame.current?.contentWindow?.postMessage({ type: 'agentui:theme', mode, lang, vars: themeCssVars(mode) }, '*');
@@ -87,8 +111,16 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
     const onMsg = (e: MessageEvent) => {
       const w = frame.current?.contentWindow;
       if (!w || e.source !== w) return;
-      const m = e.data as { type?: string; id?: string; height?: unknown; message?: unknown; url?: unknown; text?: unknown; silent?: unknown } | null;
-      if (m?.type === 'agentui:ready') { setReady(true); postTheme(); postChat(); postState(); }
+      const m = e.data as { type?: string; id?: string; height?: unknown; message?: unknown; url?: unknown; text?: unknown; silent?: unknown; on?: unknown } | null;
+      if (m?.type === 'agentui:ready') { setReady(true); postTheme(); postChat(); postState(); postFs(); }
+      else if (m?.type === 'agentui:fullscreen') {
+        if (m.on === true) {
+          // Takes over the whole screen, so like `reply` it only follows a click in the widget (the iframe has the focus).
+          const allowed = document.activeElement === frame.current;
+          if (typeof m.id === 'string') w.postMessage({ type: 'agentui:fullscreen.result', id: m.id, ok: allowed }, '*');
+          if (allowed) enterFs();
+        } else leaveFs();
+      }
       else if (m?.type === 'agentui:resize' && typeof m.height === 'number') setHeight(Math.max(MIN_HEIGHT, Math.min(m.height, ui.maxHeight)));
       else if (m?.type === 'agentui:error') setRuntimeError(String(m.message ?? ''));
       else if (m?.type === 'agentui:open') { const url = safeUrl(m.url); if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
@@ -107,7 +139,7 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [postTheme, postChat, postState, ui.maxHeight]);
+  }, [postTheme, postChat, postState, postFs, enterFs, leaveFs, ui.maxHeight]);
 
   if (errors.length) {
     return (
@@ -120,10 +152,18 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
   return (
     <Box sx={{ my: 1 }}>
       {ui.title && <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{ui.title}</Typography>}
-      <Box sx={{ position: 'relative', minHeight: ready ? 0 : 96 }}>
+      <Box sx={{ height: fs ? height : undefined }}>
+      <Box ref={wrap} role={fs ? 'dialog' : undefined} aria-modal={fs || undefined} aria-label={fs ? (ui.title ?? t('ui.title')) : undefined}
+        sx={fs ? { position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'background.default' } : { position: 'relative', minHeight: ready ? 0 : 96 }}>
         {!ready && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}><CircularProgress size={20} /></Box>}
         {base && <iframe ref={frame} title={ui.title ?? t('ui.title')} src={base} sandbox="allow-scripts" onLoad={() => { postTheme(); postChat(); postState(); }}
-          style={{ display: 'block', width: '100%', height, border: 0, background: 'transparent', colorScheme: mode, visibility: ready ? 'visible' : 'hidden' }} />}
+          style={{ display: 'block', width: '100%', height: fs ? '100%' : height, border: 0, background: 'transparent', colorScheme: mode, visibility: ready ? 'visible' : 'hidden' }} />}
+        {fs && (
+          <IconButton onClick={leaveFs} aria-label={t('ui.exitFullscreen')} title={t('ui.exitFullscreen')}
+            sx={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 8px)', right: 'calc(env(safe-area-inset-right, 0px) + 8px)', zIndex: 1, bgcolor: (th) => alpha(th.palette.background.paper, 0.75), '&:hover': { bgcolor: 'background.paper' } }}>
+            <Close />
+          </IconButton>)}
+      </Box>
       </Box>
       {runtimeError && <Alert severity="error" onClose={() => setRuntimeError('')} sx={{ mt: 0.5, whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{runtimeError}</Alert>}
     </Box>

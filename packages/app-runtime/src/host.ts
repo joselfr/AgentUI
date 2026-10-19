@@ -11,6 +11,8 @@ const chatSubs = new Set<() => void>();
 const replies = new Map<string, (ok: boolean) => void>();
 let canReplyNow = false;
 let agentState: unknown;
+let fullscreenOn = false;
+const fullscreenSubs = new Set<() => void>();
 const stateSubs = new Set<() => void>();
 
 function applyTheme(t: HostTheme) {
@@ -32,6 +34,12 @@ if (typeof window !== 'undefined') {
     if (m?.type === 'agentui:theme') applyTheme({ mode: m.mode, lang: m.lang, vars: m.vars ?? {} });
     else if (m?.type === 'agentui:data') dataSubs.forEach((f) => f());
     else if (m?.type === 'agentui:chat') { canReplyNow = !!m.canReply; chatSubs.forEach((f) => f()); }
+    else if (m?.type === 'agentui:fullscreen.state') {
+      fullscreenOn = !!m.on;
+      document.documentElement.classList.toggle('au-fullscreen', fullscreenOn);
+      fullscreenSubs.forEach((f) => f());
+    }
+    else if (m?.type === 'agentui:fullscreen.result') { const done = replies.get(m.id); replies.delete(m.id); done?.(!!m.ok); }
     else if (m?.type === 'agentui:state') { agentState = m.state; stateSubs.forEach((f) => f()); }
     else if (m?.type === 'agentui:reply.result') { const done = replies.get(m.id); replies.delete(m.id); done?.(!!m.ok); }
     else if (m?.type === 'agentui:fetch.result') {
@@ -41,6 +49,9 @@ if (typeof window !== 'undefined') {
     }
   });
 }
+
+// Escape leaves the full screen even though the keyboard focus is inside the widget (the host only sees keys typed outside the iframe).
+if (typeof window !== 'undefined') window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fullscreenOn) toHost({ type: 'agentui:fullscreen', on: false }); });
 
 export const toHost = (msg: Record<string, unknown>) => window.parent.postMessage({ ...msg }, '*');
 
@@ -106,6 +117,48 @@ export function useWidth(): number {
     return () => window.removeEventListener('resize', f);
   }, []);
   return w;
+}
+
+/**
+ * Opens this widget over the whole screen (chat widgets, `agentui_custom_widget` only: miniapps already have their own page). The same component
+ * keeps running, nothing is reloaded: its state, timers and canvas stay as they are, only its size changes (see `useWidth` / `useHeight`).
+ * It answers `true` once open, `false` when refused: the user did not just click in the widget (call it from a click handler), or the widget is
+ * not displayed in a chat. The host draws a close button above the widget, and Escape closes it too.
+ */
+export function requestFullscreen(): Promise<boolean> {
+  const id = `f${++seq}`;
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => { replies.delete(id); resolve(false); }, 5000);
+    replies.set(id, (ok) => { clearTimeout(timer); resolve(ok); });
+    toHost({ type: 'agentui:fullscreen', id, on: true });
+  });
+}
+
+/** Back to the chat (no-op when the widget is not in full screen). */
+export function exitFullscreen(): void { toHost({ type: 'agentui:fullscreen', on: false }); }
+
+/** `true` while the widget is over the whole screen: switch to a layout that uses all the room (`useWidth()` and `useHeight()` give it). */
+export function useFullscreen(): boolean {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const f = () => force((n) => n + 1);
+    fullscreenSubs.add(f);
+    return () => { fullscreenSubs.delete(f); };
+  }, []);
+  return fullscreenOn;
+}
+
+/** Height in px of the screen area given to the widget while it is in full screen, `undefined` otherwise (in the chat it is sized to its content). */
+export function useHeight(): number | undefined {
+  const full = useFullscreen();
+  const [h, setH] = useState(() => (typeof window === 'undefined' ? 0 : window.innerHeight));
+  useEffect(() => {
+    const f = () => setH(window.innerHeight);
+    f();
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+  }, []);
+  return full ? h : undefined;
 }
 
 /** `false` while the agent is working (a `reply` would be refused): disable the buttons that call it. */

@@ -1,12 +1,14 @@
 // Two-way widget used by e2e/ui-twoway.mjs: a tic-tac-toe board that stays in the same component while the agent plays.
 // The user's clicks go to the agent with reply(…, { silent: true }); the agent answers by pushing a new `state` (agentui_custom_widget `update`).
 export const GAME_CODE = `import { useState } from 'react';
-import { Button, Card, Row, Stack, Text, reply, useAgentState, useCanReply, useWidth } from '@agentui/ui';
+import { Button, Card, Row, Stack, Text, reply, useAgentState, useCanReply, useWidth, useHeight, useFullscreen, requestFullscreen, exitFullscreen } from '@agentui/ui';
 
 export default function Game() {
   const state = useAgentState({ cells: Array(9).fill(''), note: 'Your turn (X)' });
   const canReply = useCanReply();
   const width = useWidth();
+  const full = useFullscreen();
+  const height = useHeight();
   const [clicks, setClicks] = useState(0); // local state: kept when the agent pushes a new state
   return (
     <Card>
@@ -22,6 +24,8 @@ export default function Game() {
         ))}
         <Text variant="caption" muted>Clicks: {clicks}</Text>
         <Text variant="caption" muted>Width: {width}</Text>
+        <Text variant="caption" muted>{full ? 'Fullscreen: on ' + width + 'x' + height : 'Fullscreen: off'}</Text>
+        <Button size="small" onClick={() => (full ? exitFullscreen() : requestFullscreen())}>{full ? 'Close it' : 'Fullscreen'}</Button>
       </Stack>
     </Card>
   );
