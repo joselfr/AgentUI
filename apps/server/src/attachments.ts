@@ -89,12 +89,20 @@ export function prepareAttachments(text: string, incoming: OutgoingAttachment[],
   return out;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export class AttachmentStore {
   constructor(private db: DB, private dir: string) {}
 
+  /** Folder of a conversation's files. The id is always a UUID made by the server; anything else never becomes a path. */
+  private folder(convId: string): string {
+    if (!UUID_RE.test(convId)) throw new Error('Invalid conversation id');
+    return join(this.dir, 'uploads', convId);
+  }
+
   save(messageId: string, convId: string, files: Prepared['stored']): AttachmentMeta[] {
     const metas: AttachmentMeta[] = [];
-    const folder = join(this.dir, 'uploads', convId);
+    const folder = this.folder(convId);
     mkdirSync(folder, { recursive: true });
     for (const f of files) {
       const id = randomUUID();
@@ -116,6 +124,6 @@ export class AttachmentStore {
   }
 
   removeConversation(convId: string): void {
-    rmSync(join(this.dir, 'uploads', convId), { recursive: true, force: true });
+    rmSync(this.folder(convId), { recursive: true, force: true });
   }
 }

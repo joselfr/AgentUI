@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, rmdirSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, rmdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, normalize, resolve, sep } from 'node:path';
 import { AppError } from './store.js';
 
@@ -38,7 +38,8 @@ export function checkGrantRequest(p: unknown, roots: string[], dataDir: string):
 export class AppFs {
   constructor(private grants: FsGrant[], private roots: string[], private dataDir: string) {}
 
-  private resolveFor(p: unknown, write: boolean): string {
+  /** Validates a path against the grants. `real` is what was checked (symlinks resolved): read and write operate on it, not on `path`. */
+  private check(p: unknown, write: boolean): { path: string; real: string; grantReal: string } {
     if (typeof p !== 'string' || !isAbsolute(p) || p.includes('\0')) throw new AppError('fs: the path must be absolute.');
     const path = normalize(p);
     if (path.split(/[\\/]/).includes('..')) throw new AppError('fs: ".." is not allowed.');
@@ -47,20 +48,47 @@ export class AppFs {
     if (!g) throw new AppError(`fs: "${p}" is not an approved path of this miniapp.`);
     if (write && g.mode !== 'rw') throw new AppError(`fs: "${g.path}" is read-only.`);
     // The real target (symlinks resolved) must stay inside the real granted path, and out of AgentUI's data.
-    if (!inside(real, realish(g.path)) || inside(real, realish(this.dataDir))) throw new AppError(`fs: "${p}" leaves its granted folder.`);
-    return path;
+    const grantReal = realish(g.path);
+    if (!inside(real, grantReal) || inside(real, realish(this.dataDir))) throw new AppError(`fs: "${p}" leaves its granted folder.`);
+    return { path, real, grantReal };
+  }
+
+  private resolveFor(p: unknown, write: boolean): string {
+    return this.check(p, write).path;
+  }
+
+  /**
+   * Opens the checked target without following a symlink as the last component, then checks again what the descriptor really points to
+   * (Linux): a path swapped for a link between the check and the open cannot lead out of the grant. Size checks and I/O use the descriptor.
+   */
+  private open(p: unknown, write: boolean): number {
+    const { real, grantReal } = this.check(p, write);
+    const flags = write ? constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW : constants.O_RDONLY | constants.O_NOFOLLOW;
+    let fd: number;
+    try { fd = openSync(real, flags, 0o666); } catch (e) { throw new AppError(`fs: cannot open "${String(p)}" (${(e as NodeJS.ErrnoException).code ?? 'error'}).`); }
+    try {
+      if (existsSync('/proc/self/fd')) {
+        const actual = realpathSync(`/proc/self/fd/${fd}`);
+        if (!inside(actual, grantReal) || inside(actual, realish(this.dataDir))) throw new AppError(`fs: "${String(p)}" leaves its granted folder.`);
+      }
+    } catch (e) { closeSync(fd); throw e; }
+    return fd;
   }
 
   readFile(p: unknown, encoding?: unknown): string {
-    const f = this.resolveFor(p, false);
-    if (statSync(f).size > FS_LIMITS.maxFileBytes) throw new AppError(`fs: file larger than ${FS_LIMITS.maxFileBytes} bytes.`);
-    return readFileSync(f).toString(encoding === 'base64' ? 'base64' : 'utf8');
+    const fd = this.open(p, false);
+    try {
+      const st = fstatSync(fd);
+      if (!st.isFile()) throw new AppError('fs: not a regular file.');
+      if (st.size > FS_LIMITS.maxFileBytes) throw new AppError(`fs: file larger than ${FS_LIMITS.maxFileBytes} bytes.`);
+      return readFileSync(fd).toString(encoding === 'base64' ? 'base64' : 'utf8');
+    } finally { closeSync(fd); }
   }
   writeFile(p: unknown, content: unknown, encoding?: unknown): true {
-    const f = this.resolveFor(p, true);
     const buf = Buffer.from(String(content), encoding === 'base64' ? 'base64' : 'utf8');
     if (buf.length > FS_LIMITS.maxFileBytes) throw new AppError(`fs: content larger than ${FS_LIMITS.maxFileBytes} bytes.`);
-    writeFileSync(f, buf);
+    const fd = this.open(p, true);
+    try { writeFileSync(fd, buf); } finally { closeSync(fd); }
     return true;
   }
   readdir(p: unknown): { name: string; type: 'file' | 'dir' | 'other'; size: number }[] {

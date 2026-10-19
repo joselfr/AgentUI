@@ -5,6 +5,7 @@ import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import fastifyWebsocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import type { AgentInfo, ServerPush, Usage } from '@agentui/shared';
 import { env, loadConfig } from './config.js';
@@ -18,7 +19,7 @@ import { PushService } from './push.js';
 import { AttachmentError, AttachmentStore } from './attachments.js';
 import { createReadStream } from 'node:fs';
 import { AppData } from './miniapps/data.js';
-import { registerMiniApps } from './miniapps/routes.js';
+import { FILE_RATE_LIMIT, registerMiniApps } from './miniapps/routes.js';
 import { AppError, MiniAppStore } from './miniapps/store.js';
 import { WidgetStore } from './miniapps/widgets.js';
 import { handleAppOp, isAppOp, opError } from './miniapps/ops.js';
@@ -53,6 +54,7 @@ async function main() {
   if (!env.cookieSecret) app.log.warn('COOKIE_SECRET missing: ephemeral secret (sessions invalidated on restart)');
   await app.register(fastifyCookie, { secret });
   await app.register(fastifyWebsocket);
+  await app.register(fastifyRateLimit, { global: false }); // opt-in per route (`config: { rateLimit }`), the login has its own limiter
 
   const limiter = new RateLimiter();
   const userOf = (cookies: Record<string, string | undefined>): AuthUser | null => {
@@ -293,7 +295,7 @@ async function main() {
       return reply.code(e instanceof AttachmentError ? 400 : 409).send({ error: (e as Error).message });
     }
   });
-  app.get<{ Params: { id: string } }>('/api/attachments/:id', async (req, reply) => {
+  app.get<{ Params: { id: string } }>('/api/attachments/:id', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
     const f = files.get(req.params.id);
     if (!f) return reply.code(404).send({ error: 'not found' });
     // Only verified images are displayed inline; everything else is downloaded, never interpreted by the browser.

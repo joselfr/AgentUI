@@ -1,7 +1,11 @@
 import { deflateSync } from 'node:zlib';
 import { expect, test } from 'vitest';
 import type { Capabilities } from '@agentui/shared';
-import { AttachmentError, prepareAttachments, sanitizeName, sniffImage } from './attachments.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { AttachmentError, AttachmentStore, prepareAttachments, sanitizeName, sniffImage } from './attachments.js';
+import { openDb } from './db.js';
 
 const caps = (images: boolean, files: boolean, maxBytes = 20 * 1048576): Capabilities =>
   ({ attachments: { images, files, maxBytes } }) as unknown as Capabilities;
@@ -45,4 +49,18 @@ test('sanitized file names', () => {
   expect(sanitizeName('../../etc/passwd')).toBe('passwd');
   expect(sanitizeName('C:\\x\\rapport "final".pdf')).toBe('rapport _final_.pdf');
   expect(sanitizeName('')).toBe('file');
+});
+
+test('the files folder of a conversation only comes from a UUID, never from another string', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentui-att-'));
+  try {
+    const store = new AttachmentStore(openDb(dir), dir);
+    for (const bad of ['../../etc', 'home', '', 'a/b', '..', '00000000-0000-0000-0000-00000000000/../x']) {
+      expect(() => store.save('m1', bad, [])).toThrow(/Invalid conversation id/);
+      expect(() => store.removeConversation(bad)).toThrow(/Invalid conversation id/);
+    }
+    const id = '123e4567-e89b-42d3-a456-426614174000';
+    expect(() => store.save('m1', id, [])).not.toThrow();
+    expect(() => store.removeConversation(id)).not.toThrow();
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

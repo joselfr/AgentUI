@@ -20,6 +20,12 @@ const MIME: Record<string, string> = {
 };
 
 /** Token of the iframe: static files cannot rely on the cookie (opaque origin + SameSite=strict). */
+/**
+ * Limit per client address for the routes that serve files (widget and miniapp iframes, attachments), applied by `@fastify/rate-limit`
+ * (registered with `global: false` in index.ts: routes opt in with `config: { rateLimit }`). A page load makes a few dozen requests.
+ */
+export const FILE_RATE_LIMIT = { max: 600, timeWindow: '1 minute' } as const;
+
 export function signAppToken(secret: string, userId: number, appId: string, now = Date.now()): string {
   const exp = now + TOKEN_TTL_MS;
   const sig = createHmac('sha256', secret).update(`${userId}.${appId}.${exp}`).digest('base64url');
@@ -219,7 +225,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     return { ok: true, base: `/w/${r.hash}/${signAppToken(secret, o.userOf(req.cookies)!.id, `widget-${r.hash}`)}/` };
   });
 
-  app.get<{ Params: { hash: string; token: string; '*': string } }>('/w/:hash/:token/*', async (req, reply) => {
+  app.get<{ Params: { hash: string; token: string; '*': string } }>('/w/:hash/:token/*', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
     const { hash, token } = req.params;
     if (!WidgetStore.validHash(hash) || !verifyAppToken(secret, `widget-${hash}`, token)) return reply.code(403).send({ error: 'forbidden' });
     const rest = req.params['*'];
@@ -241,7 +247,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     return reply.code(404).send({ error: 'not found' });
   });
 
-  app.get<{ Params: { id: string; token: string; '*': string } }>('/m/:id/:token/*', async (req, reply) => {
+  app.get<{ Params: { id: string; token: string; '*': string } }>('/m/:id/:token/*', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
     const { id, token } = req.params;
     if (!verifyAppToken(secret, id, token)) return reply.code(403).send({ error: 'forbidden' });
     const a = store.get(id);

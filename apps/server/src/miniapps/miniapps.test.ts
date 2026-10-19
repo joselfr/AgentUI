@@ -7,7 +7,8 @@ import { openDb, type DB } from '../db.js';
 import { mkdirSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { AppData } from './data.js';
 import Fastify from 'fastify';
-import { registerMiniApps, signAppToken, verifyAppToken } from './routes.js';
+import fastifyRateLimit from '@fastify/rate-limit';
+import { FILE_RATE_LIMIT, registerMiniApps, signAppToken, verifyAppToken } from './routes.js';
 import { runHandler, sanitizeHeaders } from './sandbox.js';
 import { AppError, MiniAppStore } from './store.js';
 import { WidgetStore } from './widgets.js';
@@ -398,5 +399,28 @@ describe('widgets (agentui_widget_custom)', () => {
     expect((await app.inject(base)).statusCode).toBe(200);
     expect((await app.inject(`${base}app.js`)).statusCode).toBe(200);
     expect((await app.inject(`/w/${r.hash}/bad.token.x/app.js`)).statusCode).toBe(403);
+  });
+});
+
+describe('hardening of the file routes', () => {
+  it('distFile refuses "..", hidden names and anything with a separator', () => {
+    store.create('a1', { id: 'dist', name: 'dist' });
+    mkdirSync(join(dir, 'miniapps', 'dist', 'dist'), { recursive: true });
+    writeFileSync(join(dir, 'miniapps', 'dist', 'dist', 'app.js'), 'x');
+    writeFileSync(join(dir, 'miniapps', 'dist', 'dist', '.hidden'), 'x');
+    expect(store.distFile('dist', 'app.js')).toBeTruthy();
+    for (const bad of ['..', '.', '.hidden', '../app.js', 'a/b', '']) expect(store.distFile('dist', bad)).toBeUndefined();
+  });
+
+  it('the widget and miniapp file routes are rate limited per client', async () => {
+    const app = Fastify();
+    await app.register(fastifyRateLimit, { global: false });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
+    await app.ready();
+    const statuses = new Set<number>();
+    for (let i = 0; i < FILE_RATE_LIMIT.max + 5; i++) statuses.add((await app.inject({ url: '/w/0123456789abcdef01234567/bad/app.js' })).statusCode);
+    expect(statuses.has(403)).toBe(true); // refused by the token check while under the limit
+    expect(statuses.has(429)).toBe(true); // then by the limiter
+    await app.close();
   });
 });

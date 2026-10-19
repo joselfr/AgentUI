@@ -285,7 +285,7 @@ export class MiniAppStore {
 
   /** Built file served to the iframe (`dist/…`), or undefined. */
   distFile(id: string, name: string): string | undefined {
-    if (!/^[A-Za-z0-9_.-]+$/.test(name)) return undefined;
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(name)) return undefined; // no leading dot: neither ".." nor hidden files
     const p = join(this.dir(id), 'dist', name);
     return existsSync(p) ? p : undefined;
   }
