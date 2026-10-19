@@ -1,9 +1,14 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/app-runtime/package.json packages/app-runtime/
+COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+RUN npm ci
 COPY packages ./packages
 COPY apps ./apps
-RUN npm ci && npm run build
+RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /app
