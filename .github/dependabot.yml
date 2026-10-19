@@ -1,0 +1,56 @@
+# Dependabot opens pull requests when a dependency has a new version or a known vulnerability.
+# Minor and patch updates are grouped (one PR per week and kind); major updates come one by one.
+version: 2
+updates:
+  # Server, web app, shared packages and the runtime: npm workspaces sharing one lockfile at the root.
+  # The workspace folders are listed on purpose, so that their own package.json files are updated too.
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /apps/*
+      - /packages/*
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # OpenClaw channel plugin: its own package, outside the workspaces and without a lockfile
+  # (the Hermes plugin is Python and relies on what Hermes provides: nothing to track).
+  - package-ecosystem: npm
+    directory: /plugins/openclaw-agentui
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      plugin:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # Base images of the Dockerfile (node:22-alpine)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "build(docker)"
+
+  # The actions used by the workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci"

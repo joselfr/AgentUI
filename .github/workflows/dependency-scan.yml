@@ -1,0 +1,51 @@
+name: Dependency scan
+
+# Looks for known vulnerabilities in the dependencies:
+#  - on every pull request, a dependency review blocks the ones that add a vulnerable dependency;
+#  - every Monday (and on demand), `npm audit` checks what is already in the lockfile.
+on:
+  pull_request:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+
+      # What ships to users: fails on a high or critical vulnerability.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Build and test tools (vite, vitest…): reported in the job summary, never blocking.
+      - name: Audit development dependencies (report only)
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo "### npm audit, all dependencies"
+            echo '```'
+            npm audit || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
