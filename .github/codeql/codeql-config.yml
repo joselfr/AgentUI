@@ -1,0 +1,11 @@
+# What CodeQL does not need to read: generated or vendored code, tests and demo scripts, the static site.
+name: AgentUI CodeQL configuration
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - e2e
+  - docs
+  - mockups
+  - "**/*.test.ts"
+  - "**/*.test.mjs"
+  - plugins/hermes-agentui/tests
