@@ -13,14 +13,14 @@ const TEXT = {
     locale: 'fr-FR', username: 'Utilisateur', password: 'Mot de passe', signIn: 'Se connecter', newChat: 'Nouvelle conversation', start: 'Démarrer',
     composer: (a) => `Message à ${a}`, stop: 'Arrêter', cronSection: /^Tâches cron/, jobsNav: /^Tâches/, chats: /discussions|menu/i,
     morning: '⏰ Résumé du matin', backup: 'Sauvegarde nocturne', expenses: 'Dépenses', byCategory: 'Par catégorie',
-    prompts: { chart: 'Montre-moi l’évolution des ventes de cette année', table: 'Fais-moi un comparatif des offres', map: 'Prépare l’itinéraire de ma visite de jeudi', progress: 'Lance la migration vers la nouvelle base', code: 'Corrige le bug de date dans le script', confirm: 'Supprime les anciennes sauvegardes', form: 'Organise mon voyage à Lyon' },
+    prompts: { ui: 'Fais-moi un simulateur d’épargne', chart: 'Montre-moi l’évolution des ventes de cette année', table: 'Fais-moi un comparatif des offres', map: 'Prépare l’itinéraire de ma visite de jeudi', progress: 'Lance la migration vers la nouvelle base', code: 'Corrige le bug de date dans le script', confirm: 'Supprime les anciennes sauvegardes', form: 'Organise mon voyage à Lyon' },
     ready: { confirm: 'text=Garder', form: 'text=Lancer la recherche' },
   },
   en: {
     locale: 'en-US', username: 'Username', password: 'Password', signIn: 'Sign in', newChat: 'New conversation', start: 'Start',
     composer: (a) => `Message ${a}`, stop: 'Stop', cronSection: /^Cron tasks/, jobsNav: /^Tasks/, chats: /chats|menu/i,
     morning: '⏰ Morning briefing', backup: 'Nightly backup', expenses: 'Expenses', byCategory: 'By category',
-    prompts: { chart: 'Show me this year’s sales trend', table: 'Make me a comparison of the plans', map: 'Plan the route for my Thursday visit', progress: 'Start the migration to the new database', code: 'Fix the date bug in the script', confirm: 'Delete the old backups', form: 'Organize my trip to Lyon' },
+    prompts: { ui: 'Make me a savings simulator', chart: 'Show me this year’s sales trend', table: 'Make me a comparison of the plans', map: 'Plan the route for my Thursday visit', progress: 'Start the migration to the new database', code: 'Fix the date bug in the script', confirm: 'Delete the old backups', form: 'Organize my trip to Lyon' },
     ready: { confirm: 'text=Keep', form: 'text=Start the search' },
   },
 }[lang];
@@ -34,6 +34,7 @@ const SCENARIOS = [
   { id: 'code', prompt: TEXT.prompts.code, ready: 'text=src/booking.ts', blocking: false },
   { id: 'confirm', prompt: TEXT.prompts.confirm, ready: TEXT.ready.confirm, blocking: true },
   { id: 'form', prompt: TEXT.prompts.form, ready: TEXT.ready.form, blocking: true },
+  { id: 'ui', prompt: TEXT.prompts.ui, ready: 'iframe[src*="/w/"]', blocking: false, settle: 4000 },
 ];
 
 // Outside the played scenarios: chat of a cron task (created by the proactive message) and the "Tasks" page.
@@ -109,8 +110,8 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
 
 // 2. Other variants: reopen the existing chats
 for (const [name, theme, only] of [
-  ['desktop-light', 'light', ['chart', 'table', 'map', 'code', 'confirm', 'form', 'progress', 'cron', 'jobs', 'miniapps', 'miniapp']],
-  ['mobile-dark', 'dark', ['chart', 'table', 'map', 'progress', 'code', 'confirm', 'form', 'cron', 'jobs', 'miniapps', 'miniapp']],
+  ['desktop-light', 'light', ['chart', 'table', 'map', 'code', 'confirm', 'form', 'ui', 'progress', 'cron', 'jobs', 'miniapps', 'miniapp']],
+  ['mobile-dark', 'dark', ['chart', 'table', 'map', 'progress', 'code', 'confirm', 'form', 'ui', 'cron', 'jobs', 'miniapps', 'miniapp']],
   ['mobile-light', 'light', ['chart', 'table', 'progress']],
 ]) {
   const ctx = await themed(await browser.newContext(ctxOpts(name)), theme);
