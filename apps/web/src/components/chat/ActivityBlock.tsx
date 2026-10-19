@@ -70,7 +70,7 @@ function ToolRow({ tool }: { tool: ToolCall }) {
 /** A sub-agent: its line expands to show its reasoning, summary and tools. */
 function SubRunRow({ run, tools, expandAll }: { run: SubAgentRun; tools: ToolCall[]; expandAll: boolean }) {
   const [manual, setManual] = useState<boolean>();
-  const open = manual ?? (expandAll || run.status === 'running');
+  const open = manual ?? expandAll;
   return (
     <Box>
       <ButtonBase onClick={() => setManual(!open)} aria-expanded={open} sx={rowSx}>
@@ -93,8 +93,8 @@ const sep: ReactNode = <Box component="span" aria-hidden sx={{ opacity: 0.5 }}>�
 
 /**
    * Agent activity on a message: a discreet line "✦ Reasoning · 🔧 2 tools 0.1 s ⌄" that expands into
-   * a plain list (reasoning, sub-agents, tools with their arguments and results). A running tool stays
-   * visible even when the line is collapsed; "Expand tools by default" (Settings) opens everything.
+   * a plain list (reasoning, sub-agents, tools with their arguments and results). Running tools are folded like finished ones:
+   * the line only shows the spinner and the name of the tool in progress; "Expand tools by default" (Settings) opens everything.
  */
 export default function ActivityBlock({ reasoning, tools, subRuns, expandAll }: { reasoning?: string; tools: ToolCall[]; subRuns: SubAgentRun[]; expandAll: boolean }) {
   const [open, setOpen] = useState(false);
@@ -102,9 +102,8 @@ export default function ActivityBlock({ reasoning, tools, subRuns, expandAll }: 
   const runningTool = tools.find((t) => t.status === 'running');
   const running = !!runningTool || subRuns.some((s) => s.status === 'running');
   const showAll = open || expandAll;
-  // Unless expanded, only what is currently running is shown
-  const visible = showAll ? tools : tools.filter((t) => t.status === 'running');
-  const runs = showAll ? subRuns : subRuns.filter((s) => s.status === 'running' || visible.some((t) => t.parentSubAgentRunId === s.id));
+  const visible = showAll ? tools : [];
+  const runs = showAll ? subRuns : [];
   const top = visible.filter((t) => !t.parentSubAgentRunId);
 
   const hasWork = tools.length > 0 || subRuns.length > 0;
@@ -127,7 +126,7 @@ export default function ActivityBlock({ reasoning, tools, subRuns, expandAll }: 
         </>)}
         <Chevron open={showAll} />
       </ButtonBase>
-      <Collapse in={showAll || running} unmountOnExit>
+      <Collapse in={showAll} unmountOnExit>
         <Box sx={{ mt: 0.5, mb: 1, pl: 1.5, borderLeft: 2, borderColor: 'divider' }}>
           {showAll && reasoning && <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap', mb: hasWork ? 1 : 0 }}>{reasoning}</Typography>}
           {runs.map((s) => <SubRunRow key={s.id} run={s} expandAll={expandAll} tools={visible.filter((t) => t.parentSubAgentRunId === s.id)} />)}
