@@ -55,7 +55,7 @@ The plugin also gives the agent its **tools**: `agentui_widget_*` to display com
 
 ## Quick start
 
-You need Docker (or Node.js ≥ 22.5 for development).
+You need Docker (or Node.js ≥ 22.13 to run it without Docker). The full guide — with and without Docker, HTTPS, the Hermes and OpenClaw plugins, updates and troubleshooting — is in [**INSTALLATION.md**](INSTALLATION.md).
 
 ```bash
 git clone https://github.com/joselfr/AgentUI.git && cd AgentUI
