@@ -53,9 +53,42 @@ flowchart LR
 
 The plugin also gives the agent its **tools**: `agentui_widget_*` to display components, `agentui_ask` / `agentui_confirm` / `agentui_form` to talk to you, `agentui_miniapp_*` to build apps and `agentui_notify` to send a push notification. The tool descriptions teach the agent when to use each one, so there is nothing to configure on the model side.
 
-## Quick start
+## Installation
 
-You need Docker (or Node.js ≥ 22.13 to run it without Docker). The full guide — with and without Docker, HTTPS, the Hermes and OpenClaw plugins, updates and troubleshooting — is in [**INSTALLATION.md**](INSTALLATION.md).
+Two ways to install AgentUI: [ask your agent to do it](#ask-your-agent-to-install-it), or [follow the quick start](#or-install-it-yourself) yourself. The full guide — with and without Docker, HTTPS, the Hermes and OpenClaw plugins, updates and troubleshooting — is in [**INSTALLATION.md**](INSTALLATION.md).
+
+### Ask your agent to install it
+
+If your agent can run commands on a machine (Hermes and OpenClaw can), the easiest way is to hand it the job. Send it a message like this one and answer its questions:
+
+```text
+Install AgentUI for me by following
+https://github.com/joselfr/AgentUI/blob/main/INSTALLATION.md
+
+- Clone https://github.com/joselfr/AgentUI.git on this machine and read INSTALLATION.md first.
+- Before changing anything, tell me which option you choose (Docker if it is available,
+  otherwise Node.js) and ask me what you do not know: the address I will use to open
+  AgentUI (domain name, HTTPS), whether a reverse proxy already runs here, and the
+  login and password I want for the AgentUI admin account.
+- Generate the secrets yourself (COOKIE_SECRET and the token for your own connection),
+  write them in .env and agents.config.yaml, and never repeat them in this chat.
+- Start AgentUI and check that it answers. Set up HTTPS only after I confirm how.
+- Install the AgentUI channel plugin for your own platform last, with the same token and
+  the URL your machine can reach. If it means restarting your gateway, warn me first:
+  this conversation will be cut.
+- At the end, give me the URL and tell me how to check that you appear as connected.
+```
+
+What to expect, and a few tips:
+
+- **Where it installs.** AgentUI is installed on the machine the agent has a shell on. If you want it on another server, give the agent SSH access to that one and say so.
+- **Restart of the agent.** Hermes only loads a plugin when its gateway starts, so the last step ends the current conversation: that is normal. Reopen the chat afterwards, or start AgentUI and talk to the agent there. OpenClaw applies the plugin without restarting.
+- **Secrets.** The agent writes the token in two files and in its own configuration. A token pasted in a chat stays in that conversation's history, which is why the prompt asks it not to repeat them.
+- **Check its work.** Open AgentUI, sign in, and look for the green dot next to the agent name; then ask for a chart (see [Check that it works](INSTALLATION.md#5-check-that-it-works)). If something fails, tell the agent to read the troubleshooting table at the end of `INSTALLATION.md`.
+
+### Or install it yourself
+
+You need Docker (or Node.js ≥ 22.13 to run it without Docker).
 
 ```bash
 git clone https://github.com/joselfr/AgentUI.git && cd AgentUI
