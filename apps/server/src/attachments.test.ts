@@ -64,3 +64,11 @@ test('the files folder of a conversation only comes from a UUID, never from anot
     expect(() => store.removeConversation(id)).not.toThrow();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('safeJoin stays inside its base', async () => {
+  const { safeJoin } = await import('./safe-path.js');
+  expect(safeJoin('/data', 'uploads', 'abc')).toBe('/data/uploads/abc');
+  expect(safeJoin('/data', '.')).toBe('/data');
+  for (const bad of [['..'], ['a', '..', '..', 'etc'], ['/etc/passwd'], ['../data2']]) expect(() => safeJoin('/data', ...bad)).toThrow(/leaves its folder/);
+  expect(() => safeJoin('/data', '../data-other')).toThrow(); // a sibling sharing the prefix is outside too
+});

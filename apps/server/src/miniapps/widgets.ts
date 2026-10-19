@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { build, type Message } from 'esbuild';
 import { RUNTIME_EXTERNALS, type BuildError } from './build.js';
 import { AppError } from './store.js';
+import { safeJoin } from '../safe-path.js';
 
 export const WIDGET_LIMITS = { maxCodeBytes: 64 * 1024, maxCached: 300 };
 const HASH_RE = /^[0-9a-f]{24}$/;
@@ -30,8 +31,9 @@ export class WidgetStore {
 
   /** Compiled bundle of a widget, if built. */
   file(hash: string): string | undefined {
-    const f = join(this.root, hash, 'app.js');
-    return HASH_RE.test(hash) && existsSync(f) ? f : undefined;
+    if (!HASH_RE.test(hash)) return undefined;
+    const f = safeJoin(this.root, hash, 'app.js');
+    return existsSync(f) ? f : undefined;
   }
 
   /** Compiles `code` (cached). Returns the hash, or the compilation errors for the agent/user to read. */

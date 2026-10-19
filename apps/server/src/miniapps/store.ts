@@ -4,6 +4,7 @@ import type { MiniApp } from '@agentui/shared';
 import type { DB } from '../db.js';
 import { buildApp, type BuildError } from './build.js';
 import { AppFs, checkGrantRequest, FS_LIMITS, type FsGrant, type FsMode } from './fs.js';
+import { safeJoin } from '../safe-path.js';
 
 export const APP_LIMITS = {
   maxFiles: 80,
@@ -62,7 +63,7 @@ export class MiniAppStore {
 
   dir(id: string): string {
     if (!APP_ID_RE.test(id)) throw new AppError(`Invalid miniapp id "${id}" (lowercase letters, digits and dashes, 2-40 chars, starts with a letter).`);
-    return join(this.root, id);
+    return safeJoin(this.root, id);
   }
 
   list(): MiniApp[] {
@@ -286,14 +287,14 @@ export class MiniAppStore {
   /** Built file served to the iframe (`dist/…`), or undefined. */
   distFile(id: string, name: string): string | undefined {
     if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(name)) return undefined; // no leading dot: neither ".." nor hidden files
-    const p = join(this.dir(id), 'dist', name);
+    const p = safeJoin(this.dir(id), 'dist', name);
     return existsSync(p) ? p : undefined;
   }
 
   /** Compiled handler (`dist/server/<name>.cjs`). */
   serverCode(id: string, name: string): string | undefined {
     if (!/^[A-Za-z0-9_-]+$/.test(name)) return undefined;
-    const p = join(this.dir(id), 'dist', 'server', `${name}.cjs`);
+    const p = safeJoin(this.dir(id), 'dist', 'server', `${name}.cjs`);
     return existsSync(p) ? readFileSync(p, 'utf8') : undefined;
   }
 

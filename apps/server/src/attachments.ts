@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { AdapterAttachment, AttachmentMeta, Capabilities, OutgoingAttachment } from '@agentui/shared';
 import type { DB } from './db.js';
+import { safeJoin } from './safe-path.js';
 
 export const LIMITS = {
   maxFiles: 8,
@@ -97,7 +97,7 @@ export class AttachmentStore {
   /** Folder of a conversation's files. The id is always a UUID made by the server; anything else never becomes a path. */
   private folder(convId: string): string {
     if (!UUID_RE.test(convId)) throw new Error('Invalid conversation id');
-    return join(this.dir, 'uploads', convId);
+    return safeJoin(this.dir, 'uploads', convId);
   }
 
   save(messageId: string, convId: string, files: Prepared['stored']): AttachmentMeta[] {
@@ -106,7 +106,7 @@ export class AttachmentStore {
     mkdirSync(folder, { recursive: true });
     for (const f of files) {
       const id = randomUUID();
-      const path = join(folder, id);
+      const path = safeJoin(folder, id);
       writeFileSync(path, f.data, { mode: 0o600 });
       this.db
         .prepare('INSERT INTO attachments (id, message_id, name, mime_type, size, path) VALUES (?,?,?,?,?,?)')

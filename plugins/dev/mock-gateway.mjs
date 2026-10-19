@@ -14,7 +14,8 @@
 //   /rpc <method> [json]   RPC call (without parameters, deleteSession targets the current chat)
 //   /quit
 import { createInterface } from 'node:readline';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
@@ -22,7 +23,7 @@ import { WebSocketServer } from 'ws';
 const portArg = process.argv.indexOf('--port');
 const port = Number((portArg > 0 && process.argv[portArg + 1]) || process.env.PORT || 8790);
 const token = process.env.AGENTUI_TOKEN ?? 'dev';
-const mediaDir = process.env.MEDIA_DIR ?? '/tmp/agentui-mock-media';
+const mediaDir = process.env.MEDIA_DIR ?? mkdtempSync(join(tmpdir(), 'agentui-mock-media-')); // private folder, not a predictable /tmp path
 mkdirSync(mediaDir, { recursive: true });
 
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
@@ -57,7 +58,7 @@ function onEvent({ conversationId, runId, event: e }) {
     case 'tool.completed': return console.log(`${tag} ${color(e.failed ? 31 : 32, '✓ ' + (e.name ?? e.id))} ${dim(String(e.result ?? '').slice(0, 200))}`);
     case 'message.media': {
       const file = join(mediaDir, `${Date.now()}-${basename(e.name)}`);
-      writeFileSync(file, Buffer.from(e.data, 'base64'));
+      writeFileSync(file, Buffer.from(e.data, 'base64'), { mode: 0o600 });
       return console.log(`${tag} 📎 ${e.name} (${e.mimeType}) → ${file}`);
     }
     case 'approval.request':

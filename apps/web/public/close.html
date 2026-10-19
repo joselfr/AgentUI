@@ -23,7 +23,10 @@
   // Only a same-origin path is accepted for the fallback link (no "//host", no scheme).
   var to = new URLSearchParams(location.search).get('to') || '/';
   if (to.charAt(0) !== '/' || to.charAt(1) === '/' || to.indexOf('\\') !== -1 || /[\u0000-\u001f]/.test(to)) to = '/';
-  document.getElementById('link').href = to;
+  // Rebuilt from the parsed URL: only a path of this same origin can end up in the link.
+  var u;
+  try { u = new URL(to, location.origin); } catch (e) { u = null; }
+  document.getElementById('link').href = u && u.origin === location.origin ? u.pathname + u.search + u.hash : '/';
   setTimeout(function () {
     window.close();
     // Still here: the tab was not opened by a script, so the browser refuses to close it.
