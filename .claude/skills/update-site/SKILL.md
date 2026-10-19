@@ -1,17 +1,17 @@
 ---
 name: update-site
-description: Update AgentUI's presentation page (docs/index.html, GitHub Pages) — redo the desktop/mobile screenshots, add a widget or a feature to the page, publish. Use when the user wants to edit the site, the landing page or the presentation page, refresh its screenshots, or present a new widget on it.
+description: Update AgentUI's presentation page (docs/index.html, GitHub Pages: https://joselfr.github.io/AgentUI/) — redo the desktop/mobile screenshots, add a widget or a feature to the page, publish. Use when the user wants to edit the site, the landing page or the presentation page, refresh its screenshots, or present a new widget on it.
 ---
 
 # Update the presentation site
 
-Static pages: `docs/index.html` (French), `docs/en/index.html` (English) — HTML + CSS + a bit of inline JS, no dependency — and `docs/img/*.webp`, shared by both (the English page references them as `../img/`). Served by GitHub Pages (`main` branch, `/docs` folder); `docs/.nojekyll` disables Jekyll. No build: what is in `docs/` is published as is.
+Static pages: `docs/index.html` (**English, the default**), `docs/fr/index.html` (French) — HTML + CSS + a bit of inline JS, no dependency — and `docs/img/*.webp` (English captures; the French ones are in `docs/img/fr/`, `icon.svg` is shared). Served by GitHub Pages (`main` branch, `/docs` folder); `docs/.nojekyll` disables Jekyll. No build: what is in `docs/` is published as is.
 
 The screenshots do **not** come from a real platform: a fake agent (`e2e/demo/fake-agent.mjs`) connects to a throwaway AgentUI instance and plays scenarios (chart, table, map, progress, code, confirmation, form) with real `agentui_<widget>` tool calls. The photographed UI is therefore always that of the current code, with fictional and reproducible data.
 
 ## 1. Change the text or the layout
 
-Edit `docs/index.html`, **then carry the same change over to `docs/en/index.html`**: both pages have the same structure and must stay in sync (same sections, same images, same order). The English page uses its own captures in `docs/img/en/` (English interface and demo content, see section 2), referenced as `../img/en/…`; only `icon.svg` stays shared (`../img/icon.svg`). In the English page, also translate the `alt` attributes and the visible comments. A language switcher (`a.lang`) is in the navigation of both pages. Things to know:
+Edit `docs/index.html`, **then carry the same change over to `docs/fr/index.html`**: both pages have the same structure and must stay in sync (same sections, same images, same order). The French page uses its own captures in `docs/img/fr/` (French interface and demo content, see section 2), referenced as `../img/fr/…`; only `icon.svg` stays shared (`../img/icon.svg`). In the French page, also translate the `alt` attributes and the visible comments. A language switcher (`a.lang`) is in the navigation of both pages. Things to know:
 - Colors as `:root` variables (`--bg #0e1015`, `--accent #ff5c5c`, those of the app); dark page only.
 - A widget row = `<div class="row">` (copy on the left, capture on the right) or `row flip` (reversed). It contains `.copy` (kicker, `h3`, `p`, list, `<span class="tag">agentui_xxx</span>`) and `.shot` (one desktop `.frame` + one mobile `.phone`).
 - `.reveal` blocks appear on scroll (without JS or with reduced motion, everything is visible).
@@ -24,15 +24,15 @@ Edit `docs/index.html`, **then carry the same change over to `docs/en/index.html
 DEMO_DIR=<scratchpad>/demo e2e/demo/demo.sh up     # front build + server :8181 + fake agent (demo / demo-pass-123)
 node e2e/demo/capture.mjs http://localhost:8181 demo demo-pass-123 <scratchpad>/shots   # ~3 min: 25 PNGs
 DEMO_DIR=<scratchpad>/demo e2e/demo/demo.sh down
-e2e/demo/demo.sh webp <scratchpad>/shots docs/img   # WebP: desktop 1600 px, mobile 600 px (+ hero-desktop / hero-mobile)
+e2e/demo/demo.sh webp <scratchpad>/shots docs/img/fr   # WebP: desktop 1600 px, mobile 600 px (+ hero-desktop / hero-mobile)
 ```
 
-**English captures** (`docs/img/en/`, used by `docs/en/`): same steps with `DEMO_LANG=en` for the fake agent (it then plays `e2e/demo/content.en.mjs` instead of `content.fr.mjs`) and the `en` argument for the capture script (English interface, English prompts):
+**English captures** (`docs/img/`, used by `docs/index.html`): same steps with `DEMO_LANG=en` for the fake agent (it then plays `e2e/demo/content.en.mjs` instead of `content.fr.mjs`) and the `en` argument for the capture script (English interface, English prompts):
 ```sh
 DEMO_LANG=en DEMO_DIR=<scratchpad>/demo e2e/demo/demo.sh up
 node e2e/demo/capture.mjs http://localhost:8181 demo demo-pass-123 <scratchpad>/shots-en en
 DEMO_DIR=<scratchpad>/demo e2e/demo/demo.sh down
-e2e/demo/demo.sh webp <scratchpad>/shots-en docs/img/en
+e2e/demo/demo.sh webp <scratchpad>/shots-en docs/img
 ```
 When the demo content changes (scenarios, jobs, cron messages), edit **both** `content.fr.mjs` and `content.en.mjs`, and the prompts / UI labels of `TEXT` in `capture.mjs` if needed.
 

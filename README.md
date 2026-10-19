@@ -37,7 +37,7 @@ kept in the database (`data/agentui.db`): do not delete it, otherwise devices wi
 Tests: `npm run e2e` (interface) and `npm run e2e:push` (see the header of `e2e/push.mjs`).
 
 ## Presentation site
-Bilingual static page in [`docs/`](docs/index.html) (French) and [`docs/en/`](docs/en/index.html) (English), published by GitHub Pages (`main` branch, `/docs` folder). To edit it or redo its screenshots: `update-site` skill (`.claude/skills/update-site/SKILL.md`).
+Bilingual static page in [`docs/`](docs/index.html) (English, the default) and [`docs/fr/`](docs/fr/index.html) (French), published by GitHub Pages at https://joselfr.github.io/AgentUI/ (`main` branch, `/docs` folder). To edit it or redo its screenshots: `update-site` skill (`.claude/skills/update-site/SKILL.md`).
 
 ## License
 MIT, see [`LICENSE`](LICENSE).

@@ -20,7 +20,7 @@ import * as fr from './content.fr.mjs';
 import * as en from './content.en.mjs';
 import { GAME_CODE, newGame } from './game.mjs';
 
-// DEMO_LANG=en plays the English content (captures for docs/en/); French by default.
+// DEMO_LANG=en plays the English content (captures for docs/img/, the default English site); French by default (docs/img/fr/).
 const { JOBS, CRON_MESSAGES, SCENARIOS, FALLBACK, REASONING, ACK } = process.env.DEMO_LANG === 'en' ? en : fr;
 
 // Miniapps: created like a real plugin does, with `miniapp.op` frames (the server answers with `miniapp.result`).

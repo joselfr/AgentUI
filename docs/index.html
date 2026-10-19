@@ -1,16 +1,18 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AgentUI — Le chat qui affiche vraiment ce que font vos agents</title>
-<meta name="description" content="AgentUI est une PWA de chat pour agents IA : graphiques, tableaux, cartes, formulaires et suivis de tâches interactifs, sur mobile comme sur desktop. Auto-hébergée.">
+<title>AgentUI — The chat that actually shows what your agents do</title>
+<meta name="description" content="AgentUI is a chat PWA for AI agents: interactive charts, tables, maps, forms and task trackers, on mobile and desktop. Self-hosted.">
 <meta name="theme-color" content="#0e1015">
-<meta property="og:title" content="AgentUI — Le chat qui affiche vraiment ce que font vos agents">
-<meta property="og:description" content="Graphiques, tableaux, cartes, formulaires et suivis de tâches interactifs dans le chat de vos agents IA.">
-<meta property="og:image" content="img/hero-desktop.webp">
-<link rel="alternate" hreflang="fr" href="./">
-<link rel="alternate" hreflang="en" href="en/">
+<meta property="og:title" content="AgentUI — The chat that actually shows what your agents do">
+<meta property="og:description" content="Interactive charts, tables, maps, forms and task trackers inside your AI agents’ chat.">
+<meta property="og:image" content="https://joselfr.github.io/AgentUI/img/hero-desktop.webp">
+<link rel="canonical" href="https://joselfr.github.io/AgentUI/">
+<link rel="alternate" hreflang="fr" href="fr/">
+<link rel="alternate" hreflang="en" href="./">
+<link rel="alternate" hreflang="x-default" href="./">
 <link rel="icon" href="img/icon.svg" type="image/svg+xml">
 <style>
   :root {
@@ -38,7 +40,7 @@
   .nav nav a.lang { border: 1px solid var(--line); border-radius: 8px; padding: 2px 9px; font-weight: 700; font-size: 13px; color: var(--text); }
   .nav nav a:hover { color: var(--text); }
 
-  /* Boutons */
+  /* Buttons */
   .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 999px; font-weight: 600; font-size: 16px; text-decoration: none; border: 1px solid var(--line); transition: transform .15s, background .15s, border-color .15s; }
   .btn:hover { transform: translateY(-1px); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 8px 30px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
@@ -76,7 +78,7 @@
   .strip p { text-align: center; color: var(--muted); margin: 0 0 18px; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; }
   .strip ul { list-style: none; display: flex; flex-wrap: wrap; gap: 14px 38px; justify-content: center; margin: 0; padding: 0; font-weight: 700; font-size: 20px; color: #c2c9d8; }
 
-  /* Lignes de widgets */
+  /* Widget rows */
   .row { display: grid; grid-template-columns: 1fr 1.45fr; gap: 56px; align-items: center; margin-top: 110px; }
   .row.flip { grid-template-columns: 1.45fr 1fr; }
   .row.flip .copy { order: 2; }
@@ -91,14 +93,14 @@
   .copy code, .card code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: 1px 6px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line); color: #c8cfdd; }
   .tag { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 3px 9px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); color: #c8cfdd; margin: 0 6px 6px 0; }
 
-  /* Thèmes */
+  /* Themes */
   .themes { background: linear-gradient(180deg, transparent, var(--bg-2) 20%, var(--bg-2) 80%, transparent); }
   .themes-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; margin-top: 56px; align-items: end; }
   .stack { display: grid; gap: 24px; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   .cap { color: var(--muted); font-size: 14px; margin-top: 10px; text-align: center; }
 
-  /* Cartes de fonctionnalités */
+  /* Feature cards */
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; transition: border-color .2s, transform .2s; }
   .card:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); transform: translateY(-2px); }
@@ -107,14 +109,14 @@
   .card p { margin: 8px 0 0; color: var(--muted); font-size: 15.5px; }
 
 
-  /* Tâches planifiées */
+  /* Scheduled tasks */
   .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; counter-reset: f; }
   .flow .card { position: relative; padding-top: 30px; }
   .flow .card::before { counter-increment: f; content: counter(f); position: absolute; top: -16px; left: 22px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 15px; background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px var(--accent); }
   .crop { aspect-ratio: 1600 / 600; object-fit: cover; object-position: top; width: 100%; }
   .note { margin-top: 22px; padding: 16px 18px; border-left: 3px solid var(--accent); background: var(--bg-2); border-radius: 0 12px 12px 0; color: #c8cfdd; font-size: 15.5px; }
 
-  /* Fonctionnement */
+  /* How it works */
   .how { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; margin-top: 56px; }
   .steps { display: grid; gap: 26px; counter-reset: s; }
   .step { display: grid; grid-template-columns: 44px 1fr; gap: 16px; }
@@ -124,14 +126,14 @@
   pre { margin: 0; padding: 22px; overflow: auto; background: #0a0c11; border: 1px solid var(--line); border-radius: var(--radius); font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; color: #d6dbe8; box-shadow: 0 30px 70px -30px rgba(0,0,0,.7); }
   pre .c { color: #6b7488; } pre .k { color: var(--accent); } pre .s { color: #8fd9a8; } pre .n { color: #8bb4ff; }
 
-  /* Appel final */
+  /* Final call to action */
   .final { text-align: center; }
   .final .box { padding: 72px 24px; border-radius: 28px; border: 1px solid var(--line); background:
     radial-gradient(60% 90% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%), var(--card); }
   footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
   footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
 
-  /* Apparition au défilement */
+  /* Reveal on scroll */
   .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
   .reveal.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
@@ -178,13 +180,13 @@
     <nav>
       <a href="#widgets">Widgets</a>
       <a href="#miniapps">Miniapps</a>
-      <a href="#taches">Tâches cron</a>
+      <a href="#taches">Scheduled tasks</a>
       <a href="#themes">Interface</a>
-      <a href="#fonctions">Fonctions</a>
-      <a href="#fonctionnement">Fonctionnement</a>
-      <a href="#comparatif">Comparatif</a>
+      <a href="#fonctions">Features</a>
+      <a href="#fonctionnement">How it works</a>
+      <a href="#comparatif">Comparison</a>
       <a href="#" data-repo-link hidden>GitHub</a>
-      <a class="lang" href="en/" hreflang="en" lang="en" title="English version">EN</a>
+      <a class="lang" href="fr/" hreflang="fr" lang="fr" title="Version française">FR</a>
     </nav>
   </div>
 </header>
@@ -193,27 +195,27 @@
   <!-- HERO -->
   <div class="hero">
     <div class="wrap">
-      <span class="pill"><i></i>PWA open source · auto-hébergée</span>
-      <h1>Vos agents IA méritent mieux qu’<em>un mur de texte</em>.</h1>
-      <p class="lead">AgentUI transforme les réponses de vos agents en graphiques, tableaux, cartes, formulaires et suivis de tâches <strong>interactifs</strong> — sur desktop comme sur mobile.</p>
+      <span class="pill"><i></i>Open-source PWA · self-hosted</span>
+      <h1>Your AI agents deserve better than <em>a wall of text</em>.</h1>
+      <p class="lead">AgentUI turns your agents’ answers into <strong>interactive</strong> charts, tables, maps, forms and task trackers — on desktop and on mobile.</p>
       <div class="cta">
-        <a class="btn primary" href="#widgets">Découvrir les widgets</a>
-        <a class="btn ghost" href="#" data-repo-link hidden>Voir sur GitHub</a>
+        <a class="btn primary" href="#widgets">Explore the widgets</a>
+        <a class="btn ghost" href="#" data-repo-link hidden>View on GitHub</a>
       </div>
       <div class="hero-shot reveal">
         <div class="frame">
           <div class="bar"><span></span><span></span><span></span></div>
-          <img src="img/hero-desktop.webp" alt="AgentUI sur desktop : un agent répond avec un graphique interactif" width="1600" height="1067" fetchpriority="high">
+          <img src="img/hero-desktop.webp" alt="AgentUI on desktop: an agent answers with an interactive chart" width="1600" height="1067" fetchpriority="high">
         </div>
-        <div class="phone"><img src="img/hero-mobile.webp" alt="AgentUI sur mobile : suivi de migration étape par étape" width="600" height="1300" loading="lazy"></div>
+        <div class="phone"><img src="img/hero-mobile.webp" alt="AgentUI on mobile: step-by-step migration tracker" width="600" height="1300" loading="lazy"></div>
       </div>
     </div>
   </div>
 
   <div class="strip">
     <div class="wrap">
-      <p>Se branche sur vos plateformes d’agents</p>
-      <ul><li>Hermes</li><li>OpenClaw</li><li>Votre agent, via le protocole canal</li></ul>
+      <p>Plugs into your agent platforms</p>
+      <ul><li>Hermes</li><li>OpenClaw</li><li>Your own agent, via the channel protocol</li></ul>
     </div>
   </div>
 
@@ -221,106 +223,106 @@
   <section id="widgets">
     <div class="wrap">
       <div class="center reveal">
-        <span class="kicker">Les widgets</span>
-        <h2>Le bon composant, au bon moment.</h2>
-        <p class="sub">Chaque widget est un <strong>outil</strong> que l’agent appelle : il valide ses arguments, et l’interface affiche un vrai composant — pas du Markdown bricolé.</p>
+        <span class="kicker">Widgets</span>
+        <h2>The right component, at the right time.</h2>
+        <p class="sub">Every widget is a <strong>tool</strong> the agent calls: it validates its arguments, and the interface renders a real component — not hacked-together Markdown.</p>
       </div>
 
       <div class="row reveal">
         <div class="copy">
-          <span class="kicker">Graphiques</span>
-          <h3>Des courbes, barres et camemberts qui répondent au doigt.</h3>
-          <p>L’agent passe ses séries, AgentUI trace. Info-bulles au survol, graduations lisibles, donut interactif, copie des données en un clic.</p>
-          <ul><li>Courbes, barres, camemberts</li><li>Unités et légendes automatiques</li><li>Clair et sombre</li></ul>
+          <span class="kicker">Charts</span>
+          <h3>Lines, bars and pies that respond to your touch.</h3>
+          <p>The agent passes its series, AgentUI draws. Hover tooltips, readable ticks, interactive donut, one-click data copy.</p>
+          <ul><li>Lines, bars, pies</li><li>Automatic units and legends</li><li>Light and dark</li></ul>
           <p><span class="tag">agentui_widget_chart</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-chart.webp" alt="Widget graphique : chiffre d’affaires mensuel" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-chart.webp" alt="Widget graphique sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-chart.webp" alt="Chart widget: monthly revenue" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-chart.webp" alt="Chart widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="row flip reveal">
         <div class="copy">
-          <span class="kicker">Tableaux</span>
-          <h3>Des données triables, prêtes à être copiées.</h3>
-          <p>Colonnes typées, nombres alignés, unités affichées et export CSV. Jusqu’à 200 lignes sans quitter la conversation.</p>
-          <ul><li>Tri numérique et alphabétique</li><li>Unités par colonne</li><li>Copie au format CSV</li></ul>
+          <span class="kicker">Tables</span>
+          <h3>Sortable data, ready to copy.</h3>
+          <p>Typed columns, aligned numbers, units and CSV export. Up to 200 rows without leaving the conversation.</p>
+          <ul><li>Numeric and alphabetical sorting</li><li>Per-column units</li><li>Copy as CSV</li></ul>
           <p><span class="tag">agentui_widget_table</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-table.webp" alt="Widget tableau : comparatif d’offres" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-table.webp" alt="Widget tableau sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-table.webp" alt="Table widget: plan comparison" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-table.webp" alt="Table widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="row reveal">
         <div class="copy">
-          <span class="kicker">Cartes</span>
-          <h3>Un itinéraire, des lieux, un bouton « Ouvrir dans Maps ».</h3>
-          <p>Jusqu’à dix points avec leur popup en Markdown, et un lien direct vers votre application de cartes pour la navigation.</p>
-          <ul><li>Fond de carte adapté au thème</li><li>Popups détaillées par point</li><li>Ouverture dans Maps</li></ul>
+          <span class="kicker">Maps</span>
+          <h3>A route, places, and an “Open in Maps” button.</h3>
+          <p>Up to ten points with Markdown popups, and a direct link to your maps app for navigation.</p>
+          <ul><li>Map style that follows the theme</li><li>Detailed popup for each point</li><li>Opens in Maps</li></ul>
           <p><span class="tag">agentui_widget_map</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-map.webp" alt="Widget carte : tournée du jeudi à Toulouse" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-map.webp" alt="Widget carte sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-map.webp" alt="Map widget: Thursday’s round in Toulouse" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-map.webp" alt="Map widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="row flip reveal">
         <div class="copy">
-          <span class="kicker">Suivi de tâches</span>
-          <h3>Voyez l’agent travailler, étape par étape.</h3>
-          <p>Une checklist vivante : l’agent met à jour le même composant au fil de l’eau, avec la durée de chaque étape et un compteur en direct pour celle en cours.</p>
-          <ul><li>Statuts : en attente, en cours, terminé, échec, ignoré</li><li>Détail et durée par étape</li><li>Un seul composant, mis à jour sur place</li></ul>
+          <span class="kicker">Task tracking</span>
+          <h3>Watch the agent work, step by step.</h3>
+          <p>A living checklist: the agent updates the same component as it goes, with the duration of each step and a live counter for the current one.</p>
+          <ul><li>Statuses: pending, running, done, failed, skipped</li><li>Detail and duration per step</li><li>A single component, updated in place</li></ul>
           <p><span class="tag">agentui_widget_progress</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-progress.webp" alt="Widget progression : migration de base de données" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-progress.webp" alt="Widget progression sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-progress.webp" alt="Progress widget: database migration" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-progress.webp" alt="Progress widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="row reveal">
         <div class="copy">
-          <span class="kicker">Code & diff</span>
-          <h3>Du code lisible, avec les changements en couleur.</h3>
-          <p>Coloration syntaxique, numéros de ligne, lignes mises en évidence et rendu diff pour montrer exactement ce qui change.</p>
-          <ul><li>Coloration par langage</li><li>Diff ajouté / supprimé</li><li>Bouton Copier</li></ul>
+          <span class="kicker">Code &amp; diff</span>
+          <h3>Readable code, with changes in color.</h3>
+          <p>Syntax highlighting, line numbers, highlighted lines and a diff view to show exactly what changes.</p>
+          <ul><li>Per-language highlighting</li><li>Added / removed diff lines</li><li>Copy button</li></ul>
           <p><span class="tag">agentui_widget_code</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-code.webp" alt="Widget code : correctif au format diff" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-code.webp" alt="Widget code sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-code.webp" alt="Code widget: a fix shown as a diff" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-code.webp" alt="Code widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="row flip reveal">
         <div class="copy">
-          <span class="kicker">Interactif</span>
-          <h3>L’agent pose la question, vous répondez d’un geste.</h3>
-          <p>Confirmations (y compris en mode « danger »), questions à choix et formulaires complets : l’agent <strong>attend votre réponse</strong>, puis reprend son travail là où il s’était arrêté.</p>
-          <ul><li>Confirmer / annuler avant une action sensible</li><li>Formulaires : texte, date, liste, case à cocher…</li><li>Validation avant envoi</li></ul>
+          <span class="kicker">Interactive</span>
+          <h3>The agent asks, you answer with a tap.</h3>
+          <p>Confirmations (including a “danger” mode), multiple-choice questions and full forms: the agent <strong>waits for your answer</strong>, then picks its work back up where it stopped.</p>
+          <ul><li>Confirm / cancel before a sensitive action</li><li>Forms: text, date, list, checkbox…</li><li>Validation before submit</li></ul>
           <p><span class="tag">agentui_confirm</span><span class="tag">agentui_form</span><span class="tag">agentui_ask</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-form.webp" alt="Widget formulaire : préparer un déplacement" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-confirm.webp" alt="Widget de confirmation sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-form.webp" alt="Form widget: planning a trip" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-confirm.webp" alt="Confirmation widget on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="row reveal">
         <div class="copy">
-          <span class="kicker">Sur mesure</span>
-          <h3>Quand rien ne convient, l’agent code le widget.</h3>
-          <p>Simulateur, convertisseur, liste filtrable, mini-quiz : l’agent écrit un composant React avec <strong>la même bibliothèque que les miniapps</strong>. Il s’affiche dans la conversation, suit le thème et réagit à vos saisies en direct.</p>
-          <ul><li>Exécuté dans un iframe isolé, sans accès à votre session</li><li>Mêmes composants et mêmes couleurs que les miniapps</li><li>Ses boutons peuvent écrire dans la conversation : « Détails », « Réserver »… l’agent reçoit la réponse comme un message</li><li>Pour garder l’outil, l’agent en fait une miniapp</li></ul>
+          <span class="kicker">Custom</span>
+          <h3>When nothing fits, the agent codes the widget.</h3>
+          <p>Simulator, converter, filterable list, mini quiz: the agent writes a React component with <strong>the same library as the miniapps</strong>. It shows up in the conversation, follows the theme and reacts to your input live.</p>
+          <ul><li>Runs in an isolated iframe, with no access to your session</li><li>Same components and colors as the miniapps</li><li>Its buttons can write in the conversation: “Details”, “Book”… the agent receives the answer as a message</li><li>To keep the tool, the agent turns it into a miniapp</li></ul>
           <p><span class="tag">agentui_widget_custom</span></p>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-ui.webp" alt="Widget dynamique : simulateur d’épargne" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-offers.webp" alt="Widget sur mesure sur mobile : offres avec boutons « Détails »" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-ui.webp" alt="Dynamic widget: savings simulator" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-offers.webp" alt="Custom widget on mobile: plans with “Details” buttons" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
     </div>
@@ -331,41 +333,41 @@
     <div class="wrap">
       <div class="center reveal">
         <span class="kicker">Miniapps</span>
-        <h2>Vos agents ne se contentent plus de répondre. Ils construisent vos outils.</h2>
-        <p class="sub">Un suivi de dépenses, un tableau de bord, une liste partagée : demandez-le à l’agent, il écrit une <strong>miniapp</strong> — un front React et ses handlers côté serveur — qui apparaît dans l’onglet Miniapps, aux couleurs d’AgentUI.</p>
+        <h2>Your agents no longer just answer. They build your tools.</h2>
+        <p class="sub">An expense tracker, a dashboard, a shared list: ask the agent and it writes a <strong>miniapp</strong> — a React front and its server-side handlers — that shows up in the Miniapps tab, in AgentUI’s own look.</p>
       </div>
 
       <div class="row reveal">
         <div class="copy">
-          <span class="kicker">Aux couleurs d’AgentUI</span>
-          <h3>Une vraie application, pas une page web collée à côté.</h3>
-          <p>L’agent dispose d’un kit de composants React et des variables CSS du thème : la miniapp suit le <strong>mode clair ou sombre</strong>, la langue et le format mobile de l’application, sans une ligne de style en dur.</p>
-          <ul><li>Composants prêts à l’emploi : formulaires, listes, tableaux, graphiques</li><li>Pensées d’abord pour le téléphone</li><li>Mise à jour en direct quand l’agent modifie la miniapp</li></ul>
+          <span class="kicker">In AgentUI’s look</span>
+          <h3>A real app, not a web page glued next to it.</h3>
+          <p>The agent gets a kit of React components and the theme’s CSS variables: the miniapp follows the app’s <strong>light or dark mode</strong>, language and mobile layout, without a single hardcoded style.</p>
+          <ul><li>Ready-made components: forms, lists, tables, charts</li><li>Designed phone-first</li><li>Live update when the agent changes the miniapp</li></ul>
           <span class="tag">agentui_miniapp_write</span>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-miniapp.webp" alt="Miniapp de suivi des dépenses : totaux, graphique par catégorie et liste" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-miniapp.webp" alt="La même miniapp sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-miniapp.webp" alt="Expense tracker miniapp: totals, chart by category and list" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-miniapp.webp" alt="The same miniapp on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="flow">
-        <div class="card reveal"><h3>L’agent écrit</h3><p>Il lit le guide fourni par le plugin, puis envoie ses fichiers avec des outils <code>agentui_miniapp_*</code>. Les erreurs de compilation lui reviennent avec le fichier et la ligne : il corrige tout seul.</p></div>
-        <div class="card reveal"><h3>AgentUI compile et isole</h3><p>Le front tourne dans une iframe sandbox, sans accès à votre session. Les handlers s’exécutent dans un worker isolé, avec leurs propres données, protégés par l’authentification d’AgentUI.</p></div>
-        <div class="card reveal"><h3>La miniapp apparaît</h3><p>Elle est dans l’onglet Miniapps, tout de suite. Un cron ou l’agent peut y pousser de nouvelles données : la miniapp ouverte se rafraîchit seule.</p></div>
+        <div class="card reveal"><h3>The agent writes</h3><p>It reads the guide shipped with the plugin, then sends its files with <code>agentui_miniapp_*</code> tools. Build errors come back with the file and line: it fixes them on its own.</p></div>
+        <div class="card reveal"><h3>AgentUI builds and isolates</h3><p>The front runs in a sandboxed iframe with no access to your session. Handlers run in an isolated worker, with their own data, behind AgentUI’s authentication.</p></div>
+        <div class="card reveal"><h3>The miniapp appears</h3><p>It is in the Miniapps tab right away. A cron or the agent can push new data: the open miniapp refreshes by itself.</p></div>
       </div>
 
       <div class="row flip reveal">
         <div class="copy">
-          <span class="kicker">Données et API</span>
-          <h3>Un backend par miniapp, sans rien à héberger.</h3>
-          <p>Chaque miniapp a ses collections de documents et son stockage clé/valeur, isolés des autres. Ses handlers peuvent appeler des <strong>API publiques</strong> pour afficher des données en direct ; les adresses internes de votre serveur restent inaccessibles.</p>
-          <ul><li>Routes protégées par la session AgentUI, un espace de noms par miniapp</li><li>Appels HTTP sortants bornés (durée, taille, adresses publiques uniquement)</li><li>L’agent lit et écrit les données avec <code>agentui_miniapp_data</code></li></ul>
-          <div class="note">Une miniapp n’accède qu’à ses propres routes et données : ni à vos conversations, ni aux autres miniapps.</div>
+          <span class="kicker">Data and API</span>
+          <h3>A backend per miniapp, nothing to host.</h3>
+          <p>Each miniapp has its own document collections and key/value store, isolated from the others. Its handlers can call <strong>public APIs</strong> to show live data; your server’s internal addresses stay unreachable.</p>
+          <ul><li>Routes behind the AgentUI session, one namespace per miniapp</li><li>Outgoing HTTP calls are bounded (time, size, public addresses only)</li><li>The agent reads and writes data with <code>agentui_miniapp_data</code></li></ul>
+          <div class="note">A miniapp only reaches its own routes and data: not your conversations, not other miniapps.</div>
         </div>
         <div class="shot">
-          <div class="frame"><img class="crop" src="img/desktop-dark-miniapps.webp" alt="Onglet Miniapps : deux miniapps créées par l’agent" width="1600" height="600" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-miniapps.webp" alt="Liste des miniapps sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img class="crop" src="img/desktop-dark-miniapps.webp" alt="Miniapps tab: two miniapps created by the agent" width="1600" height="600" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-miniapps.webp" alt="Miniapps list on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
     </div>
@@ -375,41 +377,41 @@
   <section id="taches">
     <div class="wrap">
       <div class="center reveal">
-        <span class="kicker">Tâches planifiées</span>
-        <h2>Vos agents travaillent la nuit. Vous retrouvez tout au réveil.</h2>
-        <p class="sub">Résumés du matin, veilles, sauvegardes… Chaque tâche cron de vos agents a sa <strong>propre discussion</strong> : le résultat arrive comme un vrai message, widgets compris.</p>
+        <span class="kicker">Scheduled tasks</span>
+        <h2>Your agents work through the night. You find everything when you wake up.</h2>
+        <p class="sub">Morning briefings, watchers, backups… Every cron task of your agents has its <strong>own conversation</strong>: the result arrives as a real message, widgets included.</p>
       </div>
 
       <div class="row reveal">
         <div class="copy">
-          <span class="kicker">Messages de cron</span>
-          <h3>Le résultat arrive dans la discussion de la tâche.</h3>
-          <p>L’agent n’attend pas que vous lui parliez : à chaque exécution, il poste un <strong>message proactif</strong> dans la discussion « ⏰ nom de la tâche ». Vous pouvez y répondre et continuer la conversation à partir de ce résultat.</p>
-          <ul><li>Une discussion par tâche, rangée dans la section « Tâches cron »</li><li>Pastille « non lu » et repère « Nouveau message »</li><li>Tableaux, listes et autres widgets dans le message</li></ul>
+          <span class="kicker">Cron messages</span>
+          <h3>The result lands in the task’s conversation.</h3>
+          <p>The agent doesn’t wait for you to talk to it: on every run, it posts a <strong>proactive message</strong> in the “⏰ task name” conversation. You can reply and carry on from that result.</p>
+          <ul><li>One conversation per task, filed under “Cron tasks”</li><li>“Unread” dot and a “New message” marker</li><li>Tables, lists and other widgets inside the message</li></ul>
         </div>
         <div class="shot">
-          <div class="frame"><img src="img/desktop-dark-cron.webp" alt="Discussion d’une tâche cron : résumé du matin avec un tableau d’agenda" width="1600" height="1067" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-cron.webp" alt="Message de cron sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img src="img/desktop-dark-cron.webp" alt="A cron task conversation: morning briefing with an agenda table" width="1600" height="1067" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-cron.webp" alt="Cron message on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
 
       <div class="flow">
-        <div class="card reveal"><h3>La tâche s’exécute</h3><p>Le planificateur de la plateforme (Hermes, OpenClaw…) lance la tâche à l’heure prévue — prompt confié à l’agent, ou simple script.</p></div>
-        <div class="card reveal"><h3>Le message arrive</h3><p>Le plugin le transmet à AgentUI, qui le range dans la discussion dédiée. Elle est créée automatiquement à la première exécution.</p></div>
-        <div class="card reveal"><h3>Vous êtes prévenu</h3><p>Une notification push s’affiche ; un clic ouvre directement la bonne discussion, même si l’application était fermée.</p></div>
+        <div class="card reveal"><h3>The task runs</h3><p>The platform’s scheduler (Hermes, OpenClaw…) starts the task on time — a prompt handed to the agent, or a plain script.</p></div>
+        <div class="card reveal"><h3>The message arrives</h3><p>The plugin forwards it to AgentUI, which files it in the dedicated conversation. It is created automatically on the first run.</p></div>
+        <div class="card reveal"><h3>You get notified</h3><p>A push notification appears; one tap opens the right conversation, even if the app was closed.</p></div>
       </div>
 
       <div class="row flip reveal">
         <div class="copy">
-          <span class="kicker">Page « Tâches »</span>
-          <h3>Ce qui a marché, ce qui a échoué — et pourquoi.</h3>
-          <p>Planification, prochaine exécution, dernier statut : tout est sur une page. En cas d’échec, le message d’erreur complet est à un clic, sans aller fouiller les journaux du serveur.</p>
-          <ul><li>Statut et erreur de la dernière exécution</li><li>Accès direct à la discussion de la tâche</li><li>Pause, reprise, « Exécuter maintenant », suppression</li></ul>
-          <div class="note">Une tâche poste dans AgentUI quand elle est configurée pour y livrer ses résultats ; ses échecs peuvent suivre le même chemin.</div>
+          <span class="kicker">“Tasks” page</span>
+          <h3>What worked, what failed — and why.</h3>
+          <p>Schedule, next run, last status: all on one page. When a task fails, the full error message is one click away — no digging through server logs.</p>
+          <ul><li>Status and error of the last run</li><li>Direct access to the task’s conversation</li><li>Pause, resume, “Run now”, delete</li></ul>
+          <div class="note">A task posts to AgentUI when it is configured to deliver its results there; its failures can follow the same path.</div>
         </div>
         <div class="shot">
-          <div class="frame"><img class="crop" src="img/desktop-dark-jobs.webp" alt="Page Tâches : trois tâches planifiées dont une en erreur" width="1600" height="600" loading="lazy"></div>
-          <div class="phone"><img src="img/mobile-dark-jobs.webp" alt="Page Tâches sur mobile" width="600" height="1300" loading="lazy"></div>
+          <div class="frame"><img class="crop" src="img/desktop-dark-jobs.webp" alt="Tasks page: three scheduled tasks, one of them failing" width="1600" height="600" loading="lazy"></div>
+          <div class="phone"><img src="img/mobile-dark-jobs.webp" alt="Tasks page on mobile" width="600" height="1300" loading="lazy"></div>
         </div>
       </div>
     </div>
@@ -419,23 +421,23 @@
   <section id="themes" class="themes">
     <div class="wrap">
       <div class="center reveal">
-        <span class="kicker">L’interface</span>
-        <h2>Pensée pour le mobile. À l’aise partout.</h2>
-        <p class="sub">Une PWA installable sur l’écran d’accueil, avec un thème clair, un thème sombre et un tiroir de discussions qui s’efface devant la conversation.</p>
+        <span class="kicker">The interface</span>
+        <h2>Designed for mobile. At home everywhere.</h2>
+        <p class="sub">A PWA you can install on your home screen, with a light theme, a dark theme and a conversation drawer that gets out of the way.</p>
       </div>
       <div class="themes-grid">
         <div class="stack reveal">
-          <div class="frame"><img src="img/desktop-light-chart.webp" alt="AgentUI en thème clair" width="1600" height="1067" loading="lazy"></div>
-          <p class="cap">Thème clair · desktop</p>
+          <div class="frame"><img src="img/desktop-light-chart.webp" alt="AgentUI in light theme" width="1600" height="1067" loading="lazy"></div>
+          <p class="cap">Light theme · desktop</p>
         </div>
         <div class="pair reveal">
           <div>
-            <div class="frame"><img src="img/mobile-light-progress.webp" alt="AgentUI mobile en thème clair" width="600" height="1300" loading="lazy"></div>
-            <p class="cap">Clair · mobile</p>
+            <div class="frame"><img src="img/mobile-light-progress.webp" alt="AgentUI mobile in light theme" width="600" height="1300" loading="lazy"></div>
+            <p class="cap">Light · mobile</p>
           </div>
           <div>
-            <div class="frame"><img src="img/mobile-dark-liste.webp" alt="Liste des discussions sur mobile" width="600" height="1300" loading="lazy"></div>
-            <p class="cap">Liste des discussions</p>
+            <div class="frame"><img src="img/mobile-dark-liste.webp" alt="Conversation list on mobile" width="600" height="1300" loading="lazy"></div>
+            <p class="cap">Conversation list</p>
           </div>
         </div>
       </div>
@@ -446,17 +448,17 @@
   <section id="fonctions">
     <div class="wrap">
       <div class="center reveal">
-        <span class="kicker">Et aussi</span>
-        <h2>Tout ce qu’il faut pour vivre avec vos agents.</h2>
+        <span class="kicker">And also</span>
+        <h2>Everything you need to live with your agents.</h2>
       </div>
       <div class="features">
-        <div class="card reveal"><div class="ico">🔔</div><h3>Notifications push</h3><p>Soyez prévenu quand un agent répond ou qu’une tâche planifiée se termine — un clic ouvre la bonne discussion.</p></div>
-        <div class="card reveal"><div class="ico">🧩</div><h3>Miniapps créées par l’agent</h3><p>Suivi, tableau de bord, liste : l’agent écrit une petite application qui apparaît dans AgentUI, aux couleurs de l’interface.</p></div>
-        <div class="card reveal"><div class="ico">⏰</div><h3>Tâches planifiées</h3><p>Visualisez les crons de vos agents, leur dernier statut et leurs erreurs. Mettez en pause, lancez ou supprimez.</p></div>
-        <div class="card reveal"><div class="ico">🧠</div><h3>Skills lisibles</h3><p>Parcourez les skills de chaque agent et lisez leur contenu directement dans l’application.</p></div>
-        <div class="card reveal"><div class="ico">🤖</div><h3>Plusieurs agents</h3><p>Hermes, OpenClaw ou les vôtres, côte à côte. Filtrez la liste par agent et reprenez n’importe quelle discussion.</p></div>
-        <div class="card reveal"><div class="ico">📎</div><h3>Pièces jointes & images</h3><p>Envoyez fichiers et images à l’agent ; il vous renvoie des visuels affichés dans la conversation.</p></div>
-        <div class="card reveal"><div class="ico">🔒</div><h3>Chez vous, sous votre contrôle</h3><p>Auto-hébergé via Docker. Chaque plateforme s’authentifie par son propre jeton ; vos données restent sur votre serveur.</p></div>
+        <div class="card reveal"><div class="ico">🔔</div><h3>Push notifications</h3><p>Get notified when an agent replies or a scheduled task finishes — one tap opens the right conversation.</p></div>
+        <div class="card reveal"><div class="ico">🧩</div><h3>Agent-built miniapps</h3><p>Tracker, dashboard, list: the agent writes a small app that shows up in AgentUI, in the interface’s own look.</p></div>
+        <div class="card reveal"><div class="ico">⏰</div><h3>Scheduled tasks</h3><p>See your agents’ cron jobs, their last status and their errors. Pause, run or delete them.</p></div>
+        <div class="card reveal"><div class="ico">🧠</div><h3>Readable skills</h3><p>Browse each agent’s skills and read their content right in the app.</p></div>
+        <div class="card reveal"><div class="ico">🤖</div><h3>Multiple agents</h3><p>Hermes, OpenClaw or your own, side by side. Filter the list by agent and pick up any conversation.</p></div>
+        <div class="card reveal"><div class="ico">📎</div><h3>Attachments &amp; images</h3><p>Send files and images to the agent; it sends visuals back, displayed in the conversation.</p></div>
+        <div class="card reveal"><div class="ico">🔒</div><h3>Yours, under your control</h3><p>Self-hosted with Docker. Each platform authenticates with its own token; your data stays on your server.</p></div>
       </div>
     </div>
   </section>
@@ -465,62 +467,62 @@
   <section id="fonctionnement">
     <div class="wrap">
       <div class="reveal">
-        <span class="kicker">Comment ça marche</span>
-        <h2>Un plugin, un protocole, zéro bricolage.</h2>
-        <p class="sub">AgentUI se connecte à votre plateforme comme Telegram à un bot : par un plugin canal qui parle un protocole WebSocket simple.</p>
+        <span class="kicker">How it works</span>
+        <h2>One plugin, one protocol, zero hacks.</h2>
+        <p class="sub">AgentUI connects to your platform the way Telegram connects to a bot: through a channel plugin that speaks a simple WebSocket protocol.</p>
       </div>
       <div class="how">
         <div class="steps reveal">
-          <div class="step"><div><h3>Installez le plugin</h3><p>Plugins fournis pour Hermes et OpenClaw. La plateforme ouvre la connexion vers AgentUI — rien à exposer de son côté.</p></div></div>
-          <div class="step"><div><h3>L’agent reçoit de nouveaux outils</h3><p>Graphique, tableau, carte, progression, code, formulaire… décrits comme de vrais outils, avec leurs schémas.</p></div></div>
-          <div class="step"><div><h3>L’interface fait le reste</h3><p>L’agent appelle l’outil et place le jeton dans sa réponse. AgentUI le remplace par le composant, en direct pendant le streaming.</p></div></div>
+          <div class="step"><div><h3>Install the plugin</h3><p>Plugins are provided for Hermes and OpenClaw. The platform opens the connection to AgentUI — nothing to expose on its side.</p></div></div>
+          <div class="step"><div><h3>The agent gets new tools</h3><p>Chart, table, map, progress, code, form… described as real tools, with their schemas.</p></div></div>
+          <div class="step"><div><h3>The interface does the rest</h3><p>The agent calls the tool and places the token in its answer. AgentUI swaps it for the component, live while streaming.</p></div></div>
         </div>
-        <pre class="reveal"><span class="c">// L’agent appelle un outil…</span>
+        <pre class="reveal"><span class="c">// The agent calls a tool…</span>
 <span class="n">agentui_widget_chart</span>({
   <span class="k">kind</span>: <span class="s">"line"</span>,
-  <span class="k">title</span>: <span class="s">"Chiffre d’affaires mensuel"</span>,
+  <span class="k">title</span>: <span class="s">"Monthly revenue"</span>,
   <span class="k">unit</span>: <span class="s">" k€"</span>,
-  <span class="k">x</span>: [<span class="s">"Jan"</span>, <span class="s">"Fév"</span>, <span class="s">"Mar"</span>],
+  <span class="k">x</span>: [<span class="s">"Jan"</span>, <span class="s">"Feb"</span>, <span class="s">"Mar"</span>],
   <span class="k">series</span>: [{ <span class="k">name</span>: <span class="s">"2026"</span>, <span class="k">y</span>: [96, 103, 112] }]
 })
 
-<span class="c">// …et place le jeton dans sa réponse :</span>
-<span class="s">"Voici l’évolution : [[agentui:a3f9c1]]"</span>
+<span class="c">// …and places the token in its answer:</span>
+<span class="s">"Here is the trend: [[agentui:a3f9c1]]"</span>
 
-<span class="c">// AgentUI affiche le graphique à cet endroit.</span></pre>
+<span class="c">// AgentUI renders the chart right there.</span></pre>
       </div>
     </div>
   </section>
 
-  <!-- COMPARATIF -->
+  <!-- COMPARISON -->
   <section id="comparatif">
     <div class="wrap">
       <div class="center reveal">
-        <span class="kicker">Comparatif</span>
-        <h2>Où AgentUI se place, honnêtement.</h2>
-        <p class="sub">Face aux messageries (Telegram, Discord…) et aux interfaces web qui passent par l’API (Open WebUI, Hermes WebUI…). Chaque approche a ses forces.</p>
+        <span class="kicker">Comparison</span>
+        <h2>Where AgentUI stands, honestly.</h2>
+        <p class="sub">Against messengers (Telegram, Discord…) and web interfaces that go through the API (Open WebUI, Hermes WebUI…). Each approach has its strengths.</p>
       </div>
       <div class="cmp-wrap reveal">
         <table class="cmp">
-          <thead><tr><th></th><th>Messageries<small>Telegram, Discord, WhatsApp…</small></th><th>UI web via API<small>Open WebUI, Hermes WebUI…</small></th><th class="us">AgentUI<small>Plugin canal + PWA</small></th></tr></thead>
+          <thead><tr><th></th><th>Messengers<small>Telegram, Discord, WhatsApp…</small></th><th>Web UI via API<small>Open WebUI, Hermes WebUI…</small></th><th class="us">AgentUI<small>Channel plugin + PWA</small></th></tr></thead>
           <tbody>
-            <tr><th>Plusieurs discussions</th><td class="p"><b>~</b>Topics ou threads, selon la messagerie</td><td class="y"><b>✓</b>Oui</td><td class="y us"><b>✓</b>Une session distincte par discussion</td></tr>
-            <tr><th>Rendu riche (graphiques, tableaux, cartes, formulaires)</th><td class="n"><b>✗</b>Texte et boutons</td><td class="p"><b>~</b>Markdown, selon l’outil</td><td class="y us"><b>✓</b>Widgets appelés comme des outils</td></tr>
-            <tr><th>Outils, raisonnement, sous-agents, coût</th><td class="n"><b>✗</b>Non affichés</td><td class="p"><b>~</b>Partiel, dépend de l’API</td><td class="y us"><b>✓</b>Événements natifs du protocole</td></tr>
-            <tr><th>Approbations et questions en cours d’exécution</th><td class="p"><b>~</b>Boutons inline à bricoler</td><td class="n"><b>✗</b>Pas dans une API de chat</td><td class="y us"><b>✓</b>Natifs, la discussion continue</td></tr>
-            <tr><th>Messages proactifs (crons, rappels)</th><td class="y"><b>✓</b>Oui</td><td class="n"><b>✗</b>Pas de canal pour l’agent</td><td class="y us"><b>✓</b>Chat dédié « Messages de l’agent »</td></tr>
-            <tr><th>Pilotage des tâches planifiées et des skills</th><td class="n"><b>✗</b>Non</td><td class="p"><b>~</b>Selon l’UI : certaines le permettent</td><td class="y us"><b>✓</b>Pause, lancement, erreurs, lecture</td></tr>
-            <tr><th>Notifications push sur mobile</th><td class="y"><b>✓</b>Excellentes, rien à configurer</td><td class="p"><b>~</b>Variable selon l’outil</td><td class="p us"><b>~</b>Oui, mais HTTPS requis (iPhone : écran d’accueil)</td></tr>
-            <tr><th>Agent derrière un NAT</th><td class="y"><b>✓</b>Oui</td><td class="n"><b>✗</b>L’API doit être joignable</td><td class="y us"><b>✓</b>Connexion sortante du plugin</td></tr>
-            <tr><th>Données sous votre contrôle</th><td class="n"><b>✗</b>Passent par un tiers</td><td class="y"><b>✓</b>Auto-hébergé</td><td class="y us"><b>✓</b>Auto-hébergé</td></tr>
-            <tr><th>Mise en place</th><td class="y"><b>✓</b>Presque rien</td><td class="p"><b>~</b>Une UI à installer et à brancher</td><td class="p us"><b>~</b>Un service + un plugin par plateforme</td></tr>
-            <tr><th>Maturité et communauté</th><td class="y"><b>✓</b>Très mûr</td><td class="y"><b>✓</b>Grosses communautés</td><td class="n us"><b>✗</b>Jeune, un seul mainteneur</td></tr>
-            <tr><th>Indépendance vis-à-vis de la plateforme</th><td class="y"><b>✓</b>Bonne</td><td class="y"><b>✓</b>Très bonne (API standard)</td><td class="p us"><b>~</b>Un plugin à maintenir pour Hermes, OpenClaw…</td></tr>
+            <tr><th>Several conversations</th><td class="p"><b>~</b>Topics or threads, depending on the messenger</td><td class="y"><b>✓</b>Yes</td><td class="y us"><b>✓</b>One distinct session per conversation</td></tr>
+            <tr><th>Rich rendering (charts, tables, maps, forms)</th><td class="n"><b>✗</b>Text and buttons</td><td class="p"><b>~</b>Markdown, depends on the tool</td><td class="y us"><b>✓</b>Widgets called like tools</td></tr>
+            <tr><th>Tools, reasoning, sub-agents, cost</th><td class="n"><b>✗</b>Not shown</td><td class="p"><b>~</b>Partial, depends on the API</td><td class="y us"><b>✓</b>Native protocol events</td></tr>
+            <tr><th>Approvals and questions mid-run</th><td class="p"><b>~</b>Inline buttons, DIY</td><td class="n"><b>✗</b>Not in a chat API</td><td class="y us"><b>✓</b>Native, the run carries on</td></tr>
+            <tr><th>Proactive messages (crons, reminders)</th><td class="y"><b>✓</b>Yes</td><td class="n"><b>✗</b>No channel for the agent</td><td class="y us"><b>✓</b>Dedicated “Messages from the agent” chat</td></tr>
+            <tr><th>Managing scheduled tasks and skills</th><td class="n"><b>✗</b>No</td><td class="p"><b>~</b>Depends on the UI: some allow it</td><td class="y us"><b>✓</b>Pause, run, errors, reading</td></tr>
+            <tr><th>Mobile push notifications</th><td class="y"><b>✓</b>Excellent, nothing to set up</td><td class="p"><b>~</b>Varies by tool</td><td class="p us"><b>~</b>Yes, but HTTPS required (iPhone: home screen)</td></tr>
+            <tr><th>Agent behind a NAT</th><td class="y"><b>✓</b>Yes</td><td class="n"><b>✗</b>The API must be reachable</td><td class="y us"><b>✓</b>Outgoing connection from the plugin</td></tr>
+            <tr><th>Data under your control</th><td class="n"><b>✗</b>Goes through a third party</td><td class="y"><b>✓</b>Self-hosted</td><td class="y us"><b>✓</b>Self-hosted</td></tr>
+            <tr><th>Setup</th><td class="y"><b>✓</b>Almost nothing</td><td class="p"><b>~</b>A UI to install and wire up</td><td class="p us"><b>~</b>A service + one plugin per platform</td></tr>
+            <tr><th>Maturity and community</th><td class="y"><b>✓</b>Very mature</td><td class="y"><b>✓</b>Large communities</td><td class="n us"><b>✗</b>Young, a single maintainer</td></tr>
+            <tr><th>Independence from the platform</th><td class="y"><b>✓</b>Good</td><td class="y"><b>✓</b>Very good (standard API)</td><td class="p us"><b>~</b>A plugin to maintain for Hermes, OpenClaw…</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="cmp-legend">✓ bien couvert · ~ partiel ou avec réserves · ✗ absent ou peu adapté. Appréciations générales, qui varient selon l’outil et sa version.</p>
-      <div class="note reveal"><strong>En résumé.</strong> Pour simplement parler à un agent depuis le téléphone, une messagerie suffit et demande moins d’efforts. Pour une interface de chat généraliste ou multi-utilisateur, une UI via API est plus complète. AgentUI vise les vrais agents : outils, sous-agents, crons, approbations, widgets. Sa contrepartie : un service de plus à héberger et des plugins à maintenir.</div>
+      <p class="cmp-legend">✓ well covered · ~ partial or with caveats · ✗ missing or poorly suited. General assessments, which vary by tool and version.</p>
+      <div class="note reveal"><strong>In short.</strong> To simply talk to an agent from your phone, a messenger is enough and takes less effort. For a general-purpose or multi-user chat interface, a UI via API is more complete. AgentUI targets real agents: tools, sub-agents, crons, approvals, widgets. The trade-off: one more service to host and plugins to maintain.</div>
     </div>
   </section>
 
@@ -528,11 +530,11 @@
   <section class="final">
     <div class="wrap">
       <div class="box reveal">
-        <h2>Donnez un vrai visage à vos agents.</h2>
-        <p class="sub">Déployez AgentUI en quelques minutes avec Docker, branchez vos agents, et regardez vos conversations prendre vie.</p>
+        <h2>Give your agents a real face.</h2>
+        <p class="sub">Deploy AgentUI in minutes with Docker, plug in your agents, and watch your conversations come to life.</p>
         <div class="cta">
-          <a class="btn primary" href="#" data-repo-link hidden>Démarrer sur GitHub</a>
-          <a class="btn ghost" href="#widgets">Revoir les widgets</a>
+          <a class="btn primary" href="#" data-repo-link hidden>Get started on GitHub</a>
+          <a class="btn ghost" href="#widgets">Back to the widgets</a>
         </div>
       </div>
     </div>
@@ -542,16 +544,16 @@
 <footer>
   <div class="wrap">
     <span class="brand"><img src="img/icon.svg" alt="" width="26" height="26">AgentUI</span>
-    <span>Les captures de cette page ont été générées avec un agent de démonstration.</span>
+    <span>Screenshots were generated with a demo agent, using the English interface.</span>
   </div>
 </footer>
 
 <script>
-  // URL du dépôt : à renseigner pour afficher les boutons GitHub.
+  // Repository URL: set it to show the GitHub buttons.
   const REPO_URL = '';
   if (REPO_URL) document.querySelectorAll('[data-repo-link]').forEach((a) => { a.href = REPO_URL; a.hidden = false; });
 
-  // Apparition douce des blocs au défilement (sans JS ou avec mouvement réduit : tout est visible)
+  // Soft reveal on scroll (without JS or with reduced motion: everything is visible)
   const items = document.querySelectorAll('.reveal');
   if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });

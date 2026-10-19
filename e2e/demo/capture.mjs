@@ -1,4 +1,4 @@
-// Captures for the presentation site (docs/img) from an AgentUI instance wired to e2e/demo/fake-agent.mjs.
+// Captures for the presentation site (docs/img for English, docs/img/fr for French) from an AgentUI instance wired to e2e/demo/fake-agent.mjs.
 //   node e2e/demo/capture.mjs <baseUrl> <user> <password> <output-folder> [fr|en]
 //   (en: English interface and content; the fake agent must be started with DEMO_LANG=en)
 import { chromium } from 'playwright-core';
