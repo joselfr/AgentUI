@@ -24,8 +24,8 @@ export const SCENARIOS = [
 
 const OFFERS = [
   { name: 'Nimbus Start', price: '9 €/mois', tag: 'Le moins cher' },
-  { name: 'Nimbus Pro', price: '29 €/moisis', tag: 'Populaire' },
-  { name: 'Nimbus Max', price: '79 €/moisis', tag: 'Tout inclus' },
+  { name: 'Nimbus Pro', price: '29 €/mois', tag: 'Populaire' },
+  { name: 'Nimbus Max', price: '79 €/mois', tag: 'Tout inclus' },
 ];
 
 export default function Offers() {
