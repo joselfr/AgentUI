@@ -135,7 +135,7 @@ networks:
 
 Requirements:
 
-- **Node.js 22.13 or later** (the project declares `>=22.5`; AgentUI uses the built-in `node:sqlite`, which needs no flag from 22.13 on) and npm,
+- **Node.js 22.13 or later** (the project declares `>=22.13`; AgentUI uses the built-in `node:sqlite`, which needs no flag from 22.13 on) and npm,
 - a build toolchain is **not** required: there are no native dependencies.
 
 ```bash

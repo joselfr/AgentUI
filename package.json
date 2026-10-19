@@ -17,9 +17,12 @@
     "e2e:push": "node e2e/push.mjs"
   },
   "engines": {
-    "node": ">=22.5"
+    "node": ">=22.13"
   },
   "devDependencies": {
     "playwright-core": "^1.64.0"
+  },
+  "overrides": {
+    "vite": "^7.3.7"
   }
 }
