@@ -208,7 +208,7 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         // Small screen: a table with 3 or more columns becomes a series of cards, one line per attribute
         '@media (max-width: 599.95px)': {
           '& table.stackable, & table.stackable tbody, & table.stackable tr, & table.stackable td': { display: 'block', overflowX: 'visible' },
-          '& table.stackable thead': { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' },
+          '& table.stackable thead': { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' },
           '& table.stackable tr': { border: 1, borderColor: 'divider', borderRadius: 1.5, mb: 1, p: 0.5 },
           '& table.stackable td': { border: 0, display: 'flex', gap: 1, px: 1, py: 0.25 },
           '& table.stackable td::before': { content: 'attr(data-label)', flex: '0 0 34%', color: 'text.secondary', fontWeight: 600 },
