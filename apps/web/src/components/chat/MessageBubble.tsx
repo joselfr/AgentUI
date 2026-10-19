@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { Avatar, Box, Chip, IconButton, Paper, Tooltip, Typography } from '@mui/material';
+import { useMemo, useRef, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
+import { Avatar, Box, Chip, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Paper, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
 import FormatQuote from '@mui/icons-material/FormatQuote';
 import ContentCopy from '@mui/icons-material/ContentCopy';
-import Check from '@mui/icons-material/Check';
+import MoreHoriz from '@mui/icons-material/MoreHoriz';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // a line break = a line (cron outputs, short messages)
@@ -100,19 +100,13 @@ function UserText({ text }: { text: string }) {
   );
 }
 
-/** Reply / copy actions of a bubble (hover on desktop, always shown on touch screens). */
-function BubbleActions({ text, onQuote }: { text: string; onQuote?: (t: string) => void }) {
-  const [copied, setCopied] = useState(false);
+/** Menu of a bubble (right click, or the discreet ⋯ shown on hover with a mouse): reply to the message, copy it. */
+function BubbleMenu({ at, text, onQuote, onClose }: { at: { x: number; y: number } | null; text: string; onQuote?: (t: string) => void; onClose: () => void }) {
   return (
-    <Box className="bubble-actions" sx={{ position: 'absolute', top: -14, right: 10, display: 'flex', bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 2, opacity: 0, transition: 'opacity .12s',
-      '@media (hover: none)': { opacity: 0.8 } }}>
-      {onQuote && <Tooltip title={t('chat.reply')}><IconButton size="small" aria-label={t('chat.reply')} onClick={() => onQuote(text)}><FormatQuote fontSize="small" /></IconButton></Tooltip>}
-      <Tooltip title={copied ? t('chat.copied') : t('chat.copy')}>
-        <IconButton size="small" aria-label={t('chat.copy')} onClick={() => void copyText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}>
-          {copied ? <Check fontSize="small" /> : <ContentCopy fontSize="small" />}
-        </IconButton>
-      </Tooltip>
-    </Box>
+    <Menu open={!!at} onClose={onClose} anchorReference="anchorPosition" anchorPosition={at ? { top: at.y, left: at.x } : undefined} slotProps={{ paper: { sx: { minWidth: 160 } } }}>
+      {onQuote && <MenuItem onClick={() => { onQuote(text); onClose(); }}><ListItemIcon><FormatQuote fontSize="small" /></ListItemIcon><ListItemText>{t('chat.reply')}</ListItemText></MenuItem>}
+      <MenuItem onClick={() => { void copyText(text); onClose(); }}><ListItemIcon><ContentCopy fontSize="small" /></ListItemIcon><ListItemText>{t('chat.copy')}</ListItemText></MenuItem>
+    </Menu>
   );
 }
 
@@ -127,6 +121,14 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
   allTools?: ToolCallLike[];
 }) {
   const mine = m.role === 'user';
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const quotable = m.status !== 'streaming' && !!plainText(m.text);
+  // Right click opens the bubble menu, except on a selection, a link, an image or a control: the browser's own menu stays there for those.
+  const onContextMenu = (e: MouseEvent<HTMLElement>) => {
+    if (!quotable || !window.getSelection()?.isCollapsed || (e.target as Element).closest('a, button, input, textarea, img, [role="button"]')) return;
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY });
+  };
   // The widget of an `agentui_<type>` tool takes the place of the token the agent wrote in its text; the call is also still listed with the other tools.
   // Widgets that evolve during the run (progress): shown as soon as their tool call, without waiting for the agent's text.
   const live = useMemo(() => (m.role === 'user' ? [] : outOfTextWidgets(m.toolCalls ?? [], allTools)), [m.role, m.toolCalls, allTools]);
@@ -166,8 +168,8 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
       {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
         '--halo': (t) => alpha(t.palette.primary.main, 0.5), animation: working ? `${halo} 1.6s infinite` : 'none' }}>{agentName[0]}</Avatar>}
-      <Paper data-role={m.role} data-bubble="" sx={{
-        position: 'relative', '&:hover .bubble-actions, &:focus-within .bubble-actions': { opacity: 1 },
+      <Paper data-role={m.role} data-bubble="" data-mid={m.id} onContextMenu={onContextMenu} sx={{
+        position: 'relative', '&:hover .bubble-more, &:focus-within .bubble-more': { opacity: 1 },
         maxWidth: mine ? 'min(640px, 88%)' : 'min(760px, calc(100% - 44px))', px: 2, py: 1.25, borderRadius: mine ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
         bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
         '& pre': { overflow: 'auto', p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: 1, borderColor: 'divider', fontSize: 13 },
@@ -191,7 +193,12 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         {mine ? (m.text ? <UserText text={m.text} /> : null)
           : <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeTableLabels]} components={components}>{text}</ReactMarkdown>}
         {!mine && <Attachments m={m} />}
-        {m.status !== 'streaming' && plainText(m.text) && <BubbleActions text={plainText(m.text)} onQuote={onQuote} />}
+        {quotable && (
+          <>
+            <IconButton className="bubble-more" size="small" aria-label={t('chat.more')} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.right, y: r.bottom }); }}
+              sx={{ display: 'none', '@media (hover: hover)': { display: 'inline-flex' }, position: 'absolute', top: 2, right: 2, opacity: 0, transition: 'opacity .12s', color: 'text.secondary' }}><MoreHoriz fontSize="small" /></IconButton>
+            <BubbleMenu at={menu} text={plainText(m.text)} onQuote={onQuote} onClose={() => setMenu(null)} />
+          </>)}
         {working && <Working m={m} />}
         {m.status === 'aborted' && <Typography variant="caption" color="text.secondary">{t('chat.aborted')}</Typography>}
       </Paper>

@@ -78,7 +78,7 @@ export default function Chat(props: {
       <Composer agentName={props.agentName} running={props.running} awaiting={props.awaiting} canAbort={props.canAbort} attachments={attachments} onAbort={props.onAbort} modelPicker={props.modelPicker}
         quote={quote} onClearQuote={() => setQuote(null)}
         onSubmit={async (t, f) => { scroll.pin(); const ok = await props.onSend(withQuote(props.awaiting ? null : quote, t), f); if (ok) setQuote(null); return ok; }} />
-      <SelectionQuote onQuote={onQuote} />
+      <SelectionQuote onQuote={onQuote} onQuoteMessage={onQuote && ((id) => { const m = props.messages.find((x) => x.id === id); if (m) onQuote(m.text); })} />
     </Box>
   );
 }

@@ -223,6 +223,8 @@ export const en: Record<FullKey, string> = {
   'chat.quoting': "Replying to",
   'chat.quoteRemove': "Remove the quote",
   'chat.selection': "Selected text",
+  'chat.more': "More actions",
+  'chat.wholeMessage': "Message",
   'miniapps.notFound': "This miniapp no longer exists.",
   'miniapps.fs.title': "This miniapp asks for access to files on the server",
   'miniapps.fs.button': "File access",

@@ -221,6 +221,8 @@ export const fr = {
   'chat.quoting': "En réponse à",
   'chat.quoteRemove': "Retirer la citation",
   'chat.selection': "Texte sélectionné",
+  'chat.more': "Plus d’actions",
+  'chat.wholeMessage': "Message",
   'miniapps.notFound': "Cette miniapp n'existe plus.",
   'miniapps.fs.title': "Cette miniapp demande l'accès à des fichiers du serveur",
   'miniapps.fs.button': "Accès aux fichiers",
