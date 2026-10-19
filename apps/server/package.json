@@ -13,7 +13,7 @@
   "dependencies": {
     "@agentui/shared": "*",
     "@fastify/cookie": "^11.0.1",
-    "@fastify/static": "^8.0.3",
+    "@fastify/static": "^10.1.6",
     "@fastify/websocket": "^11.0.1",
     "esbuild": "^0.21.5",
     "fastify": "^5.1.0",
