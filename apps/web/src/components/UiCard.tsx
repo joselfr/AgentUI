@@ -8,7 +8,7 @@ import { getLang, t, useLang } from '../i18n';
 interface Ui { code: string; title?: string; maxHeight: number }
 
 const MIN_HEIGHT = 40;
-const MAX_HEIGHT = 1200;
+const MAX_HEIGHT = 4000;
 
 /** Arguments of the `ui` widget: `{ code, title?, height? }`. `code` is a TSX module that default-exports a React component. `undefined` if invalid. */
 export function parseUi(a: Record<string, unknown>): Ui | undefined {
@@ -17,7 +17,7 @@ export function parseUi(a: Record<string, unknown>): Ui | undefined {
   return {
     code: a.code,
     title: typeof a.title === 'string' && a.title.trim() ? a.title.trim() : undefined,
-    maxHeight: typeof h === 'number' && isFinite(h) ? Math.min(Math.max(h, 120), MAX_HEIGHT) : 640,
+    maxHeight: typeof h === 'number' && isFinite(h) ? Math.min(Math.max(h, 120), MAX_HEIGHT) : 2400,
   };
 }
 

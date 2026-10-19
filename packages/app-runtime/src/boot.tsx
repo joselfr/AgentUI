@@ -30,7 +30,7 @@ async function main() {
 /** `agentui_ui` widget shown in the chat: no full-height page, the iframe is sized to its content and transparent. */
 function inlineWidget() {
   const style = document.createElement('style');
-  style.textContent = 'html, body, #root { height: auto; } body { background: transparent; overflow: hidden; }';
+  style.textContent = 'html, body, #root { height: auto; } body { background: transparent; overflow-x: hidden; overflow-y: auto; }';
   document.head.appendChild(style);
   let last = 0;
   const report = () => {
