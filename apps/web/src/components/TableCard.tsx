@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { fmtNumber, getLang, t as tr } from '../i18n';
 import { Box, Button, Typography } from '@mui/material';
+import Markdown from './Markdown';
 
 type Cell = string | number | boolean | null;
 interface Column { label: string; kind: 'text' | 'number'; unit?: string }
@@ -99,7 +100,7 @@ export default function TableCard({ table: t }: { table: Table }) {
                   return (
                     <Box component="td" key={ci}
                       sx={{ ...cellSx, ...(ri === visible.length - 1 && { borderBottom: 0 }), ...(ci === 0 && { position: 'sticky', left: 0, zIndex: 1, bgcolor: 'background.paper' }), textAlign: col.kind === 'number' ? 'right' : 'left', ...(col.kind === 'number' && { fontVariantNumeric: 'tabular-nums' }), color: v === null ? 'text.secondary' : 'text.primary', ...(long && { whiteSpace: 'normal', minWidth: 180, maxWidth: 300 }) }}>
-                      {show(v, col)}
+                      {typeof v === 'string' && col.kind === 'text' ? <Markdown>{v}</Markdown> : show(v, col)}
                       {col.unit && typeof v === 'number' && <Box component="span" sx={{ ml: 0.25, fontSize: 12, color: 'text.secondary' }}>{col.unit}</Box>}
                     </Box>
                   );

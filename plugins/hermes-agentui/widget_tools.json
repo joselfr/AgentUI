@@ -201,7 +201,7 @@
                   "null"
                 ]
               },
-              "description": "One value per column, in order. null = empty cell."
+              "description": "One value per column, in order. null = empty cell. Text cells (string, text columns) accept inline Markdown: **bold**, *italic*, `code`, [links](https://…), lists."
             }
           }
         },
