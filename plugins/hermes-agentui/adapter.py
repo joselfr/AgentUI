@@ -51,7 +51,8 @@ PROTOCOL = 1
 HOME_CHAT = "home"  # chat_id of proactive messages without a chat: AgentUI files them in its "home" chat
 OWNER_ID = "agentui-owner"  # the user is authenticated by AgentUI, not by Hermes
 MAX_RESULT = 20_000
-MAX_MEDIA = 20 * 1024 * 1024
+MAX_MEDIA = 20 * 1024 * 1024  # what the user may send (attachments)
+MAX_OUT_MEDIA = 45 * 1024 * 1024  # what the agent may send to the chat (video, PDF…): base64 stays under the 64 MB frame limit
 OUTBOX_LIMIT = 2_000
 PREVIEW_HOLD_S = 10.0  # a streamed preview outside a run waits this long for its next edit before being posted as is
 ASK_TIMEOUT = 1800.0  # seconds to wait for the answer to an interactive widget (agentui_ask / confirm / form)
@@ -254,7 +255,7 @@ def _read_source(src: str) -> tuple[str, bytes, Optional[str]]:
         return f"image{ext}", base64.b64decode(payload), mime
     if src.startswith(("http://", "https://")):
         with urllib.request.urlopen(src, timeout=30) as resp:  # noqa: S310 (URL provided by the agent)
-            data = resp.read(MAX_MEDIA + 1)
+            data = resp.read(MAX_OUT_MEDIA + 1)
             mime = resp.headers.get_content_type()
         return Path(src.split("?")[0]).name or "media", data, mime
     path = Path(src[7:] if src.startswith("file://") else src)
@@ -922,7 +923,7 @@ class AgentUIAdapter(BasePlatformAdapter):
             src_name, data, mime = await asyncio.to_thread(_read_source, src)
         except Exception as e:
             return SendResult(success=False, error=f"unreadable media: {e}")
-        if len(data) > MAX_MEDIA:
+        if len(data) > MAX_OUT_MEDIA:
             return SendResult(success=False, error="media too large")
         media = _media(name or src_name, data, mime)
         if not self._emit(chat_id, {"type": "message.media", **media}):
@@ -1330,6 +1331,73 @@ def _sniff_image(b: bytes) -> Optional[str]:
     return None
 
 
+FILE_WIDGETS = ("image", "video", "audio", "pdf", "markdown")  # widgets that show a file: a local one is copied into the chat
+MARKDOWN_EXT = (".md", ".markdown", ".txt")
+
+
+def _sniff_media(b: bytes) -> Optional[str]:
+    """Real type of a video, audio or PDF file from its first bytes (same rules as the AgentUI server, which serves it inline)."""
+    if b[:5] == b"%PDF-":
+        return "application/pdf"
+    if len(b) > 12 and b[4:8] == b"ftyp":
+        brand = b[8:12]
+        if brand in (b"M4A ", b"M4B ", b"M4P "):
+            return "audio/mp4"
+        return "video/quicktime" if brand == b"qt  " else "video/mp4"
+    if b[:4] == b"\x1a\x45\xdf\xa3":
+        return "video/webm"
+    if b[:4] == b"OggS":
+        return "audio/ogg"
+    if b[:4] == b"RIFF" and b[8:12] == b"WAVE":
+        return "audio/wav"
+    if b[:4] == b"fLaC":
+        return "audio/flac"
+    if b[:3] == b"ID3" or (len(b) > 2 and b[0] == 0xFF and (b[1] & 0xE6) == 0xE2):
+        return "audio/mpeg"
+    if len(b) > 2 and b[0] == 0xFF and (b[1] & 0xF6) == 0xF0:
+        return "audio/aac"
+    return None
+
+
+def _file_widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
+    """Shape check of the `video`, `audio`, `pdf` and `markdown` widgets (before any file read)."""
+    src = args.get("src")
+    if key == "markdown":
+        content = args.get("content")
+        if bool(str(content or "").strip()) == bool(src):
+            return "Give exactly one of `content` (the Markdown text) and `src` (absolute path of a .md file)."
+        if content and len(str(content)) > 400_000:
+            return "The content is too long (max 400,000 characters)."
+        if src and not str(src).startswith("/"):
+            return "`src` must be an absolute path (for text you have in memory, use `content`)."
+        return None
+    if key in ("video", "audio", "pdf"):
+        if not (isinstance(src, str) and (re.match(r"https?://", src, re.I) or src.startswith("/"))):
+            return "src must be an https://… URL or an absolute path (no data:, file: or relative path)."
+    return None
+
+
+def _read_local_media(path: str, kind: str) -> dict:
+    """Reads a local video, audio, PDF or Markdown file (blocking call); ValueError readable by the agent if missing, too large or of another type."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        raise ValueError(f"File not found or unreadable: {path}")
+    if len(data) > MAX_OUT_MEDIA:
+        raise ValueError(f"{path} exceeds {MAX_OUT_MEDIA // 1024 // 1024} MB.")
+    if kind == "markdown":
+        if not path.lower().endswith(MARKDOWN_EXT) or b"\x00" in data[:8000]:
+            raise ValueError(f"{path} is not a Markdown or text file (.md, .markdown, .txt).")
+        mime: Optional[str] = "text/markdown"
+    else:
+        mime = _sniff_media(data)
+        wanted = {"video": "video/", "audio": "audio/", "pdf": "application/pdf"}[kind]
+        if not mime or not mime.startswith(wanted):
+            raise ValueError(f"{path} is not a {kind} file in a supported format.")
+    name = f"{IMAGE_PREFIX}{hashlib.sha1(data).hexdigest()[:8]}-{re.sub(r'[^A-Za-z0-9_.-]+', '_', Path(path).name)}"
+    return _media(name, data, mime)
+
+
 def _images_error(args: Dict[str, Any]) -> Optional[str]:
     """Shape check of the `agentui_widget_image` sources (before any file read)."""
     images = args.get("images") or []
@@ -1384,34 +1452,34 @@ def _register_widget_tools(ctx) -> None:
                     return json.dumps({"error": "This component only exists in AgentUI; present the content in Markdown."}, ensure_ascii=False)
             except Exception:
                 pass
-            problem = _widget_error(key, args) or (_images_error(args) if key == "image" else None)
+            problem = _widget_error(key, args) or (_images_error(args) if key == "image" else None) or (_file_widget_error(key, args) if key in FILE_WIDGETS else None)
             if problem:
                 return json.dumps({"error": problem}, ensure_ascii=False)
             files: Dict[str, str] = {}
-            if key == "image":
-                # Local images: copied into the chat (message.media); the result says which attachment matches which path.
+            if key in FILE_WIDGETS:
+                # Local files: copied into the chat (message.media); the result says which attachment matches which path.
                 try:
                     from gateway.session_context import get_session_env
 
                     chat = get_session_env("HERMES_SESSION_CHAT_ID")
                 except Exception:
                     chat = None
-                for im in args.get("images") or []:
-                    src = im["src"]
+                sources = [im["src"] for im in args.get("images") or []] if key == "image" else [args["src"]] if args.get("src") else []
+                for src in sources:
                     if not src.startswith("/") or src in files:
                         continue
                     try:
-                        media = _read_local_image(src)
+                        media = _read_local_image(src) if key == "image" else _read_local_media(src, key)
                     except ValueError as e:
                         return json.dumps({"error": str(e)}, ensure_ascii=False)
                     if not chat or _ACTIVE is None or not _ACTIVE._emit(chat, {"type": "message.media", **media}):
-                        return json.dumps({"error": "No AgentUI exchange in progress: cannot copy the image."}, ensure_ascii=False)
+                        return json.dumps({"error": "No AgentUI exchange in progress: cannot copy the file."}, ensure_ascii=False)
                     files[src] = media["name"]
             update = args.get("update") if key in ("progress", "custom") else None
             if update:  # update: same token, the front shows the state of the latest call
                 return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
             instruction = spec["progressInstruction"] if key == "progress" else spec["tokenInstruction"]
-            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction, **({"files": files} if key == "image" else {})}, ensure_ascii=False)
+            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction, **({"files": files} if key in FILE_WIDGETS else {})}, ensure_ascii=False)
 
         return handler
 

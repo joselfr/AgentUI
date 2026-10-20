@@ -45,7 +45,9 @@ export function interactiveBlocks(text: string): string[] {
 /** Plugins expose each display widget as an `agentui_widget_<type>` tool (e.g. `agentui_widget_chart`): its arguments are the widget's. */
 const WIDGET_TOOL_PREFIX = 'agentui_widget_';
 export type ToolCallLike = { id?: string; name: string; args?: unknown; resultPreview?: string; startedAt?: number; endedAt?: number };
-const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'image', 'custom']);
+/** Widgets showing a file (URL, or local file copied by the plugin into the chat): the tool result carries `files` = { path → attachment name }. */
+export const FILE_WIDGETS = new Set(['image', 'video', 'audio', 'pdf', 'markdown']);
+const DISPLAY_WIDGETS = new Set(['chart', 'map', 'code', 'table', 'progress', 'custom', ...FILE_WIDGETS]);
 /** Tool names from before the `agentui_widget_` prefix (`agentui_chart`, `agentui_ui`, `agentui_custom_widget`…): conversations that used them keep rendering. */
 const LEGACY_TOOL_PREFIX = 'agentui_';
 const LEGACY_CUSTOM = new Set(['ui', 'custom_widget']);
@@ -134,7 +136,7 @@ export function stepTimes(calls: ToolCallLike[]): StepTime[] {
   return times;
 }
 
-/** `image` widget: the plugin copies local files and returns, in the tool result, `files` = { path → attachment name }. */
+/** Media widgets (`image`, `video`…): the plugin copies local files and returns, in the tool result, `files` = { path → attachment name }. */
 function filesOf(t: { resultPreview?: string }): Record<string, string> {
   try {
     const f = (JSON.parse(t.resultPreview ?? '') as { files?: unknown }).files;
@@ -165,7 +167,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
       // State update of a dynamic widget: the code stays that of the first call, only `state` follows the latest call.
       if (isUiUpdate(t)) { if (prev) widgets.set(id, { ...prev, arguments: { ...prev.arguments, state: w.arguments.state } }); continue; }
       // A dynamic widget knows its token: its events to the agent say which widget they come from.
-      widgets.set(id, w.type === 'image' ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w.type === 'custom' ? { ...w, arguments: { ...w.arguments, token: `[[agentui:${id}]]` } } : w);
+      widgets.set(id, FILE_WIDGETS.has(w.type) ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w.type === 'custom' ? { ...w, arguments: { ...w.arguments, token: `[[agentui:${id}]]` } } : w);
     }
   }
   const used = new Set<string>();

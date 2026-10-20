@@ -1,7 +1,7 @@
 {
   "id": "agentui",
   "channels": ["agentui"],
-  "contracts": { "tools": ["agentui_widget_chart", "agentui_widget_map", "agentui_widget_code", "agentui_widget_table", "agentui_widget_progress", "agentui_widget_image", "agentui_widget_custom", "agentui_ask", "agentui_confirm", "agentui_form", "agentui_widget_custom_wait", "agentui_miniapp_guide", "agentui_miniapp_create", "agentui_miniapp_write", "agentui_miniapp_read", "agentui_miniapp_list", "agentui_miniapp_delete_file", "agentui_miniapp_remove", "agentui_miniapp_logs", "agentui_miniapp_job", "agentui_miniapp_data", "agentui_notify", "agentui_set_thread_title", "agentui_get_thread_title"] },
+  "contracts": { "tools": ["agentui_widget_chart", "agentui_widget_map", "agentui_widget_code", "agentui_widget_table", "agentui_widget_progress", "agentui_widget_image", "agentui_widget_custom", "agentui_widget_video", "agentui_widget_audio", "agentui_widget_pdf", "agentui_widget_markdown", "agentui_ask", "agentui_confirm", "agentui_form", "agentui_widget_custom_wait", "agentui_miniapp_guide", "agentui_miniapp_create", "agentui_miniapp_write", "agentui_miniapp_read", "agentui_miniapp_list", "agentui_miniapp_delete_file", "agentui_miniapp_remove", "agentui_miniapp_logs", "agentui_miniapp_job", "agentui_miniapp_data", "agentui_notify", "agentui_set_thread_title", "agentui_get_thread_title"] },
   "name": "AgentUI",
   "description": "AgentUI channel: OpenClaw connects to AgentUI (outgoing WebSocket) using the AgentUI Channel Protocol v1.",
   "configSchema": {

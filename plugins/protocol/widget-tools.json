@@ -326,6 +326,94 @@
           }
         }
       }
+    },
+    "video": {
+      "description": "Displays a video player (fullscreen, speed, seeking) in the AgentUI chat. `src`: an https://… URL OR an absolute path of a video file on your machine (mp4, webm or mov; 45 MB max, H.264/AAC mp4 plays everywhere) that the plugin copies and serves to the user; use neither data: nor file:. Accompany the video with a sentence of explanation. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "https://… URL or absolute path of a video file on your machine (mp4, webm or mov, 45 MB max), which the plugin copies and serves to the user. No data:, file: or relative path."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Caption displayed under the video."
+          }
+        },
+        "required": [
+          "src"
+        ]
+      }
+    },
+    "audio": {
+      "description": "Displays an audio player (play/pause, seeking, speed) in the AgentUI chat: a voice note, a recording, a generated sound. `src`: an https://… URL OR an absolute path of an audio file on your machine (mp3, m4a, ogg, wav, flac, aac or webm; 45 MB max) that the plugin copies and serves to the user; use neither data: nor file:. One track per call. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "https://… URL or absolute path of an audio file on your machine (mp3, m4a, ogg, wav, flac, aac or webm, 45 MB max), which the plugin copies and serves to the user. No data:, file: or relative path."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Name shown in the player (default: the file name)."
+          }
+        },
+        "required": [
+          "src"
+        ]
+      }
+    },
+    "pdf": {
+      "description": "Displays a PDF document (page preview, full-screen reader with zoom, download) in the AgentUI chat. `src`: an https://… URL (its server must allow cross-origin reads, otherwise the user only gets a link) OR an absolute path of a PDF file on your machine (45 MB max) that the plugin copies and serves to the user; use neither data: nor file:. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "https://… URL or absolute path of a PDF file on your machine (PDF, 45 MB max), which the plugin copies and serves to the user. No data:, file: or relative path."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page shown in the preview (default 1)."
+          }
+        },
+        "required": [
+          "src"
+        ]
+      }
+    },
+    "markdown": {
+      "description": "Displays a long or standalone Markdown document as a card (rendered with tables and code, collapsed beyond a dozen lines with a full-screen view, copy and download buttons): a report, notes, a README. Give exactly one of `content` (the Markdown text) and `src` (absolute path of a .md or .txt file on your machine, copied into the chat). For a normal answer, write Markdown directly in your reply instead. Returns a [[agentui:…]] token: write it as is in your reply, where the component should appear, and never write the JSON yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "content": {
+            "type": "string",
+            "description": "The Markdown text (max 400,000 characters)."
+          },
+          "src": {
+            "type": "string",
+            "description": "Absolute path of a .md, .markdown or .txt file on your machine."
+          }
+        }
+      }
     }
   },
   "tokenInstruction": "Place this token as is in your reply, where the component should appear.",
@@ -811,5 +899,5 @@
       }
     }
   },
-  "usageGuide": "You are chatting through AgentUI, a web chat that renders Markdown and rich components. Prefer its tools over plain text whenever they fit; do not announce them, just use them:\n- agentui_widget_chart: numeric series or trends (line, bar, pie) instead of listing numbers.\n- agentui_widget_table: comparing several items on several criteria, instead of a Markdown table.\n- agentui_widget_map: any place or route you can locate with certainty.\n- agentui_widget_code: a code, config or diff excerpt the user will copy or reread.\n- agentui_widget_image: showing images or screenshots (URL or local file).\n- agentui_widget_progress: a long task with several steps, updated as you go.\n- agentui_confirm: BEFORE any sensitive or irreversible action (deleting, sending, paying, overwriting).\n- agentui_ask / agentui_form: whenever you need an answer or several inputs from the user; never ask them as plain text.\n- agentui_widget_custom: a one-off interactive component (simulator, converter, filterable list, quiz) written as a React component. For a back-and-forth with the user inside the same component (chess, wizard), make it a live widget: keep a session open with agentui_widget_custom_wait for the user's action, then agentui_widget_custom with `update` + `state`, in a loop.\n- agentui_miniapp_guide then agentui_miniapp_*: a persistent tool the user will keep using (tracker, dashboard, list).\n- agentui_notify: a push notification when a long task finishes or something needs attention while the user is away.\n- agentui_set_thread_title: give the discussion a short, descriptive title once its topic is clear, or when it changes; agentui_get_thread_title reads the current one first. Do not mention them.\nDisplay tools return a [[agentui:…]] token: write it in your reply where the component should appear."
+  "usageGuide": "You are chatting through AgentUI, a web chat that renders Markdown and rich components. Prefer its tools over plain text whenever they fit; do not announce them, just use them:\n- agentui_widget_chart: numeric series or trends (line, bar, pie) instead of listing numbers.\n- agentui_widget_table: comparing several items on several criteria, instead of a Markdown table.\n- agentui_widget_map: any place or route you can locate with certainty.\n- agentui_widget_code: a code, config or diff excerpt the user will copy or reread.\n- agentui_widget_image: showing images or screenshots (URL or local file).\n- agentui_widget_video / agentui_widget_audio / agentui_widget_pdf: a video, a voice note or sound, a PDF document (URL or local file).\n- agentui_widget_markdown: a long document or report as a card (inline content or a .md file).\nFiles you attach with MEDIA:/path are shown automatically in the matching player: no tool needed for those.\n- agentui_widget_progress: a long task with several steps, updated as you go.\n- agentui_confirm: BEFORE any sensitive or irreversible action (deleting, sending, paying, overwriting).\n- agentui_ask / agentui_form: whenever you need an answer or several inputs from the user; never ask them as plain text.\n- agentui_widget_custom: a one-off interactive component (simulator, converter, filterable list, quiz) written as a React component. For a back-and-forth with the user inside the same component (chess, wizard), make it a live widget: keep a session open with agentui_widget_custom_wait for the user's action, then agentui_widget_custom with `update` + `state`, in a loop.\n- agentui_miniapp_guide then agentui_miniapp_*: a persistent tool the user will keep using (tracker, dashboard, list).\n- agentui_notify: a push notification when a long task finishes or something needs attention while the user is away.\n- agentui_set_thread_title: give the discussion a short, descriptive title once its topic is clear, or when it changes; agentui_get_thread_title reads the current one first. Do not mention them.\nDisplay tools return a [[agentui:…]] token: write it in your reply where the component should appear."
 }

@@ -4,7 +4,7 @@ import type { Capabilities } from '@agentui/shared';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AttachmentError, AttachmentStore, prepareAttachments, sanitizeName, sniffImage } from './attachments.js';
+import { AttachmentError, AttachmentStore, effectiveMime, parseRange, prepareAttachments, sanitizeName, sniffImage, sniffMedia } from './attachments.js';
 import { openDb } from './db.js';
 
 const caps = (images: boolean, files: boolean, maxBytes = 20 * 1048576): Capabilities =>
@@ -71,4 +71,40 @@ test('safeJoin stays inside its base', async () => {
   expect(safeJoin('/data', '.')).toBe('/data');
   for (const bad of [['..'], ['a', '..', '..', 'etc'], ['/etc/passwd'], ['../data2']]) expect(() => safeJoin('/data', ...bad)).toThrow(/leaves its folder/);
   expect(() => safeJoin('/data', '../data-other')).toThrow(); // a sibling sharing the prefix is outside too
+});
+
+const box = (brand: string) => Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftyp' + brand), Buffer.alloc(16)]);
+
+test('sniffMedia: recognizes video, audio and PDF by content', () => {
+  expect(sniffMedia(box('isom'))).toBe('video/mp4');
+  expect(sniffMedia(box('qt  '))).toBe('video/quicktime');
+  expect(sniffMedia(box('M4A '))).toBe('audio/mp4');
+  expect(sniffMedia(Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0]))).toBe('video/webm');
+  expect(sniffMedia(Buffer.from('OggS\0\0\0\0'))).toBe('audio/ogg');
+  expect(sniffMedia(Buffer.from('RIFF\0\0\0\0WAVEfmt '))).toBe('audio/wav');
+  expect(sniffMedia(Buffer.from('ID3\x04\0\0\0\0\0\0'))).toBe('audio/mpeg');
+  expect(sniffMedia(Buffer.from([0xff, 0xfb, 0x90, 0x00]))).toBe('audio/mpeg');
+  expect(sniffMedia(Buffer.from('%PDF-1.7\n'))).toBe('application/pdf');
+  expect(sniffMedia(Buffer.from('hello world, not a media'))).toBeNull();
+});
+
+test('effectiveMime: verified type wins, an unverified media type is never kept, Markdown by extension', () => {
+  expect(effectiveMime('clip.bin', 'application/octet-stream', box('isom'))).toBe('video/mp4');
+  expect(effectiveMime('evil.mp4', 'video/mp4', Buffer.from('<script>alert(1)</script>'))).toBe('application/octet-stream');
+  expect(effectiveMime('evil.pdf', 'application/pdf', Buffer.from('<html>'))).toBe('application/octet-stream');
+  expect(effectiveMime('notes.md', 'application/octet-stream', Buffer.from('# Title'))).toBe('text/markdown');
+  expect(effectiveMime('notes.md', 'application/octet-stream', Buffer.from([0, 1, 2]))).toBe('application/octet-stream');
+  expect(effectiveMime('a.txt', 'text/plain', Buffer.from('hi'))).toBe('text/plain');
+});
+
+test('parseRange: byte ranges', () => {
+  expect(parseRange(undefined, 1000)).toBeNull();
+  expect(parseRange('bytes=0-99', 1000)).toEqual({ start: 0, end: 99 });
+  expect(parseRange('bytes=900-', 1000)).toEqual({ start: 900, end: 999 });
+  expect(parseRange('bytes=-100', 1000)).toEqual({ start: 900, end: 999 });
+  expect(parseRange('bytes=500-5000', 1000)).toEqual({ start: 500, end: 999 });
+  expect(parseRange('bytes=1000-', 1000)).toBe('invalid');
+  expect(parseRange('bytes=50-10', 1000)).toBe('invalid');
+  expect(parseRange('bytes=abc', 1000)).toBe('invalid');
+  expect(parseRange('bytes=0-1,5-9', 1000)).toBeNull();
 });

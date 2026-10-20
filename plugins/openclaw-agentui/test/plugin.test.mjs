@@ -130,6 +130,36 @@ const runtime = {
           ro.onAgentRunTerminalOutcome?.('completed');
           return { dispatched: true };
         }
+        if (input.rawText === 'media-widgets') {
+          // video / audio / pdf / markdown tools: same mechanism as the image one (local file copied into the chat, mapping in the result).
+          const entry = (await import('../dist/index.js')).default;
+          let factory;
+          entry.registerFull({ registerService: () => {}, registerTool: (f) => (factory = f) });
+          const tools = factory({ messageChannel: 'agentui', sessionKey: plan.route.sessionKey });
+          ro.onAgentRunStart?.('oc-run');
+          const run = (name, args) => tools.find((t) => t.name === `agentui_widget_${name}`).execute('tm', args).then((r) => JSON.parse(r.content[0].text), (e) => ({ error: e.message }));
+          const w = (name, bytes) => { const f = join(imgDir, name); writeFileSync(f, bytes); return f; };
+          const mp4 = w('clip.mp4', Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypisom'), Buffer.alloc(32)]));
+          const mp3 = w('memo.mp3', Buffer.concat([Buffer.from('ID3'), Buffer.alloc(32)]));
+          const pdf = w('doc.pdf', Buffer.from('%PDF-1.7\n1 0 obj\n'));
+          const md = w('rapport.md', '# Rapport\n\nTexte.');
+          toolRuns.push(
+            await run('video', { src: mp4 }),
+            await run('audio', { src: mp3, title: 'Memo' }),
+            await run('pdf', { src: pdf }),
+            await run('markdown', { src: md }),
+            await run('markdown', { content: '# Inline' }),
+            await run('video', { src: mp3 }),
+            await run('pdf', { src: w('fake.pdf', 'not a pdf') }),
+            await run('markdown', { src: w('bin.md', Buffer.from([0, 1, 2, 3])) }),
+            await run('markdown', { content: 'x', src: md }),
+            await run('markdown', {}),
+            await run('audio', { src: 'relatif/a.mp3' }),
+            await run('video', { src: 'https://exemple.org/a.mp4' }),
+          );
+          ro.onAgentRunTerminalOutcome?.('completed');
+          return { dispatched: true };
+        }
         if (input.rawText.startsWith('/approve')) return { dispatched: true };
         const key = `${plan.route.agentId}|${plan.route.sessionKey}`;
         if (input.rawText.startsWith('/model')) {
@@ -424,11 +454,33 @@ test('agentui_widget_image: copies a local file into message.media, mapping in t
   assert.match(scheme.error, /absolute path/);
 });
 
+test('video / audio / pdf / markdown widgets: local file copied with its verified type, readable rejections', async () => {
+  send({ type: 'inbound', conversationId: 'cm', runId: 'rm', text: 'media-widgets' });
+  const ev = eventsOf(await until(isTerminal('rm')), 'rm');
+  const media = ev.filter((e) => e.type === 'message.media');
+  assert.deepEqual(media.map((m) => m.mimeType), ['video/mp4', 'audio/mpeg', 'application/pdf', 'text/markdown']);
+  for (const m of media) assert.match(m.name, /^agentui-img-[0-9a-f]{8}-/);
+  const [video, audio, pdf, md, inline, audioAsVideo, fakePdf, binMd, both, empty, relative, remote] = toolRuns.slice(-12);
+  assert.deepEqual(Object.values(video.files), [media[0].name]);
+  assert.deepEqual(Object.values(audio.files), [media[1].name]);
+  assert.deepEqual(Object.values(pdf.files), [media[2].name]);
+  assert.deepEqual(Object.values(md.files), [media[3].name]);
+  assert.match(video.widget, /^\[\[agentui:[0-9a-f]{6}\]\]$/);
+  assert.deepEqual(inline.files, {}, 'inline Markdown: nothing to copy');
+  assert.match(audioAsVideo.error, /is not a video file/);
+  assert.match(fakePdf.error, /is not a pdf file/);
+  assert.match(binMd.error, /not a Markdown or text file/);
+  assert.match(both.error, /exactly one of/);
+  assert.match(empty.error, /exactly one of/);
+  assert.match(relative.error, /absolute path/);
+  assert.deepEqual(remote.files, {}, 'external URL: not copied');
+});
+
 test('widget tools: agentui_widget_chart / map / code, reserved for AgentUI runs', async () => {
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_widget_chart', 'agentui_widget_map', 'agentui_widget_code', 'agentui_widget_table', 'agentui_widget_progress', 'agentui_widget_image', 'agentui_widget_custom', 'agentui_ask', 'agentui_confirm', 'agentui_form', 'agentui_widget_custom_wait', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'job', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify', 'agentui_set_thread_title', 'agentui_get_thread_title']);
+  assert.deepEqual(opts.names, ['agentui_widget_chart', 'agentui_widget_map', 'agentui_widget_code', 'agentui_widget_table', 'agentui_widget_progress', 'agentui_widget_image', 'agentui_widget_custom', 'agentui_widget_video', 'agentui_widget_audio', 'agentui_widget_pdf', 'agentui_widget_markdown', 'agentui_ask', 'agentui_confirm', 'agentui_form', 'agentui_widget_custom_wait', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'job', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify', 'agentui_set_thread_title', 'agentui_get_thread_title']);
   // The manifest declares exactly these tools (contracts.tools), otherwise OpenClaw warns at load
   assert.deepEqual(JSON.parse(readFileSync(new URL('../openclaw.plugin.json', import.meta.url), 'utf8')).contracts.tools, opts.names);
   assert.equal(factory({ messageChannel: 'telegram' }), null);

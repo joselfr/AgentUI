@@ -52,7 +52,7 @@ Identical to the `AgentEvent` type of `packages/shared` (a single exception: `me
 | `tool.started` | `id`, `name`, `args?`, `parentSubAgentRunId?` |
 | `tool.completed` | `id`, `name?`, `result?`, `truncated?`, `failed?` |
 | `subagent.start` / `subagent.sync` / `subagent.end` | `id`, `name`, `sessionId?` / `id` / `id`, `failed?` |
-| `message.media` | `name`, `mimeType`, `data` (base64) — **instead of `url`**: the plugin pushes the content |
+| `message.media` | `name`, `mimeType`, `data` (base64) — **instead of `url`**: the plugin pushes the content (45 MB at most). AgentUI checks the real type from the content and shows the attachment in the matching player (images in one gallery, video, audio, PDF, Markdown), or as a download chip for anything else: this is how `MEDIA:/path` lines and `send_*` calls appear. |
 | `conversation.title` | `title` — renames the conversation (backs the `agentui_set_thread_title` tool); emitted into the chat's running run, applied by AgentUI and not shown in the chat |
 | `usage` | `usage`: `{ model?, provider?, inputTokens, outputTokens, cacheReadTokens?, reasoningTokens?, costUsd?, costEstimated? }` — **accumulated** consumption of the session, emitted before `run.completed` (if `capabilities.models`) |
 | `approval.request` | `id`, `description`, `payload?` |

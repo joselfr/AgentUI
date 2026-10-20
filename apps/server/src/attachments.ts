@@ -32,6 +32,58 @@ export function sniffImage(b: Buffer): string | null {
   return null;
 }
 
+const MARKDOWN_EXT = /\.(md|markdown)$/i;
+
+/**
+ * Real type of a video, audio or PDF file from its first bytes (the type announced by the sender is not reliable).
+ * `null` if it is none of those. MP4 family: the `ftyp` brand tells audio (M4A…) from video.
+ */
+export function sniffMedia(b: Buffer): string | null {
+  const s = (from: number, to: number) => b.subarray(from, to).toString('latin1');
+  if (b.length > 5 && s(0, 5) === '%PDF-') return 'application/pdf';
+  if (b.length > 12 && s(4, 8) === 'ftyp') {
+    const brand = s(8, 12);
+    if (brand === 'M4A ' || brand === 'M4B ' || brand === 'M4P ') return 'audio/mp4';
+    if (brand === 'qt  ') return 'video/quicktime';
+    return 'video/mp4';
+  }
+  if (b.length > 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'video/webm'; // Matroska/WebM (EBML)
+  if (b.length > 4 && s(0, 4) === 'OggS') return 'audio/ogg';
+  if (b.length > 12 && s(0, 4) === 'RIFF' && s(8, 12) === 'WAVE') return 'audio/wav';
+  if (b.length > 4 && s(0, 4) === 'fLaC') return 'audio/flac';
+  if (b.length > 3 && s(0, 3) === 'ID3') return 'audio/mpeg';
+  if (b.length > 2 && b[0] === 0xff && (b[1]! & 0xe6) === 0xe2) return 'audio/mpeg'; // MPEG audio frame sync
+  if (b.length > 2 && b[0] === 0xff && (b[1]! & 0xf6) === 0xf0) return 'audio/aac'; // ADTS
+  return null;
+}
+
+/** Types the browser may play inline from /api/attachments (verified by `sniffMedia`); everything else is served as a download. */
+export const INLINE_MEDIA = /^(video\/(mp4|webm|quicktime)|audio\/(mpeg|mp4|ogg|wav|flac|aac|webm))$/;
+
+/** Type to store for a file: the verified one (image, video, audio, PDF), `text/markdown` for a .md file, else what the sender said. */
+export function effectiveMime(name: string, announced: string, data: Buffer): string {
+  const sniffed = sniffImage(data) ?? sniffMedia(data);
+  if (sniffed) return sniffed;
+  if (MARKDOWN_EXT.test(name) && !data.subarray(0, 8000).includes(0)) return 'text/markdown';
+  return /^(video|audio)\/|^application\/pdf$/.test(announced) ? 'application/octet-stream' : announced; // announced but not verified: kept only as a download
+}
+
+/** `Range: bytes=a-b` header → bounds (inclusive) within a file of `size` bytes; `null` if absent, `'invalid'` if unsatisfiable. Single range only. */
+export function parseRange(header: string | undefined, size: number): { start: number; end: number } | 'invalid' | null {
+  if (!header) return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!m || (m[1] === '' && m[2] === '')) return header.startsWith('bytes=') && /,/.test(header) ? null : 'invalid'; // several ranges: the whole file is sent
+  let start: number, end: number;
+  if (m[1] === '') { // suffix: the last N bytes
+    const n = Number(m[2]);
+    if (n === 0) return 'invalid';
+    start = Math.max(0, size - n); end = size - 1;
+  } else {
+    start = Number(m[1]); end = m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
+  }
+  return start >= size || start > end ? 'invalid' : { start, end };
+}
+
 function looksLikeText(name: string, mime: string, b: Buffer): boolean {
   const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : name.toLowerCase();
   if (!(TEXT_MIME.test(mime) || TEXT_EXT.has(ext))) return false;
@@ -108,10 +160,11 @@ export class AttachmentStore {
       const id = randomUUID();
       const path = safeJoin(folder, id);
       writeFileSync(path, f.data, { mode: 0o600 });
+      const mimeType = effectiveMime(f.name, f.mimeType, f.data);
       this.db
         .prepare('INSERT INTO attachments (id, message_id, name, mime_type, size, path) VALUES (?,?,?,?,?,?)')
-        .run(id, messageId, f.name, f.mimeType, f.data.length, path);
-      metas.push({ id, name: f.name, mimeType: f.mimeType, size: f.data.length });
+        .run(id, messageId, f.name, mimeType, f.data.length, path);
+      metas.push({ id, name: f.name, mimeType, size: f.data.length });
     }
     return metas;
   }

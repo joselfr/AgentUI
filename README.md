@@ -22,7 +22,7 @@ Instead of a wall of text, your agents answer with interactive charts, tables, m
 
 ## What you get
 
-- **Rich answers.** The agent calls a tool and the chat renders a real component: charts, sortable tables, maps, code with diffs, images, step-by-step progress.
+- **Rich answers.** The agent calls a tool and the chat renders a real component: charts, sortable tables, maps, code with diffs, images, video, audio, PDF, Markdown documents, step-by-step progress. Files the agent attaches (`MEDIA:/path`) are shown the same way, with no tool.
 - **Questions and approvals inside the chat.** Choice buttons, confirmations before something risky, forms — the agent waits for your answer and carries on.
 - **Custom widgets.** When nothing fits, the agent writes the component itself (a simulator, a converter, a game…) and it runs in a sandbox in the chat. It can even stay *live* with the agent, or open full screen.
 - **Miniapps.** The agent builds a persistent app — a React front plus a small server-side backend — that appears in its own tab.
@@ -135,7 +135,7 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 
 | Tool | What it does |
 |---|---|
-| `agentui_widget_chart`, `_map`, `_code`, `_table`, `_progress`, `_image` | Display a component in the chat. |
+| `agentui_widget_chart`, `_map`, `_code`, `_table`, `_progress`, `_image`, `_video`, `_audio`, `_pdf`, `_markdown` | Display a component in the chat. Video, audio, PDF and Markdown take a URL or a file of the agent's machine (copied into the chat, 45 MB max). |
 | `agentui_widget_custom` | A component written by the agent (React, same UI kit as miniapps, plus chart.js and Leaflet maps), sandboxed. If it crashes, a button sends the traces to the agent. |
 | `agentui_widget_custom_wait` | Keeps a *live* two-way session with a custom widget: the user’s clicks reach the agent, which updates the widget in place. |
 | `agentui_ask`, `agentui_confirm`, `agentui_form` | Ask the user and wait for the answer. |

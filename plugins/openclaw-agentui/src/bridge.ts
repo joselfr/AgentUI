@@ -18,7 +18,9 @@ import { askReplyText, askWidget, parseAskQuestions, type AskQuestion } from './
 
 export const CHANNEL = 'agentui';
 export const HOME_CONVERSATION = 'home';
-export const MAX_MEDIA = 20 * 1024 * 1024;
+export const MAX_MEDIA = 20 * 1024 * 1024; // what the user may send (attachments)
+/** What the agent may send to the chat (video, PDF…): base64 stays under the frame limit of the channel. */
+export const MAX_OUT_MEDIA = 45 * 1024 * 1024;
 const MAX_RESULT = 20_000;
 const ABORT_GRACE_MS = 5_000;
 
@@ -768,13 +770,13 @@ export async function readMedia(url: string, readLocal?: (path: string) => Promi
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = Buffer.from(await res.arrayBuffer());
-    if (data.length > MAX_MEDIA) throw new Error('media too large');
+    if (data.length > MAX_OUT_MEDIA) throw new Error('media too large');
     const mimeType = res.headers.get('content-type')?.split(';')[0] ?? 'application/octet-stream';
     return { name: basename(new URL(url).pathname) || 'media', mimeType, data: data.toString('base64') };
   }
   const path = url.startsWith('file://') ? new URL(url).pathname : url;
   const data = readLocal ? await readLocal(path) : await readFile(path);
-  if (data.length > MAX_MEDIA) throw new Error('media too large');
+  if (data.length > MAX_OUT_MEDIA) throw new Error('media too large');
   return { name: basename(path), mimeType: mimeOf(path), data: data.toString('base64') };
 }
 

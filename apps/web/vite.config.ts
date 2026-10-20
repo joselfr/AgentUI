@@ -10,7 +10,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      injectManifest: { globPatterns: ['**/*.{js,css,html,svg,webmanifest}'] },
+      injectManifest: { globPatterns: ['**/*.{js,css,html,svg,webmanifest}'], globIgnores: ['**/pdf*.js'] }, // pdf.js (+ its worker) is fetched on first PDF, not precached
       manifest: {
         name: 'AgentUI',
         short_name: 'AgentUI',

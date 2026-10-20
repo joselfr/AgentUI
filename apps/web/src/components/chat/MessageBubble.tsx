@@ -11,17 +11,22 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks'; // a line break = a line (cron outputs, short messages)
 import type { Message, WidgetEvent } from '@agentui/shared';
 import { rehypeTableLabels } from './markdownTables';
-import { formatSize, isImage, type AttachmentView } from '../../attachments';
+import { formatSize, type AttachmentView } from '../../attachments';
 import ActivityBlock from './ActivityBlock';
 import AskCard, { parseAsk, parseLegacyAsk } from '../AskCard';
-import { dropStrayFence, expandWidgetTokens, interactiveBlocks, outOfTextWidgets, parseWidget, WIDGET_ATTACHMENT_PREFIX, type ToolCallLike } from '../widget';
+import { dropStrayFence, expandWidgetTokens, interactiveBlocks, FILE_WIDGETS, outOfTextWidgets, parseWidget, WIDGET_ATTACHMENT_PREFIX, type ToolCallLike } from '../widget';
 import { isAwaiting } from '../../reducer';
 import ConfirmCard, { parseConfirm } from '../ConfirmCard';
 import ChartCard, { parseChart } from '../ChartCard';
 import MapCard, { parseMap } from '../MapCard';
 import TableCard, { parseTable } from '../TableCard';
 import ProgressCard, { parseProgress } from '../ProgressCard';
-import ImageCard, { Lightbox, isRemote, parseImage, type Resolved } from '../ImageCard';
+import ImageCard, { isRemote, parseImage, type Resolved } from '../ImageCard';
+import VideoCard, { parseVideo } from '../VideoCard';
+import AudioCard, { parseAudio } from '../AudioCard';
+import PdfCard, { parsePdf } from '../PdfCard';
+import MarkdownCard, { parseMarkdown } from '../MarkdownCard';
+import { mediaKind } from '../media';
 import CodeCard, { parseCode } from '../CodeCard';
 import UiCard, { parseUi } from '../UiCard';
 import FormCard, { parseForm } from '../FormCard';
@@ -47,27 +52,35 @@ function Working({ m }: { m: Message }) {
   );
 }
 
-/** Images (clickable preview) and files (download chips) attached to a message. */
+/**
+ * Files attached to a message (what the agent sends with `MEDIA:/path`, or the user uploads), shown like the matching widget:
+ * images grouped in one gallery, video / audio / PDF / Markdown in their player, the rest as download chips.
+ */
 function Attachments({ m }: { m: Message }) {
-  const shown = (m.attachments ?? []).filter((a) => !a.name.startsWith(WIDGET_ATTACHMENT_PREFIX)); // copies of an image widget: already in the widget
-  const [open, setOpen] = useState<number | null>(null);
+  const shown = ((m.attachments ?? []) as AttachmentView[]).filter((a) => !a.name.startsWith(WIDGET_ATTACHMENT_PREFIX)); // copies made for a widget: already in the widget
   if (!shown.length) return null;
   const urlOf = (a: AttachmentView) => a.url ?? `/api/attachments/${a.id}`;
-  const images = (shown as AttachmentView[]).filter((a) => isImage(a.mimeType));
-  const gallery = { images: images.map((a) => ({ src: urlOf(a), alt: a.name })) };
+  const ok = (src: string): Resolved => ({ state: 'ok', url: src });
+  const images = shown.filter((a) => mediaKind(a) === 'image');
+  const chips = shown.filter((a) => mediaKind(a) === 'file');
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: m.text ? 1 : 0 }}>
-      {(shown as AttachmentView[]).map((a) => {
-        const href = urlOf(a);
-        // In-app viewer: a link opened outside the PWA would not carry the (SameSite=strict) session cookie
-        return isImage(a.mimeType) ? (
-          <Box key={a.id} component="button" type="button" onClick={() => setOpen(images.indexOf(a))} sx={{ p: 0, border: 0, bgcolor: 'transparent', cursor: 'zoom-in', display: 'block' }}><img src={href} alt={a.name} title={a.name} style={{ maxWidth: 'min(100%, 480px)', maxHeight: 320, borderRadius: 8, display: 'block' }} /></Box>
-        ) : (
-          <Chip key={a.id} component="a" href={href} download={a.name} clickable icon={<InsertDriveFileOutlined />} label={`${a.name} · ${formatSize(a.size)}`}
-            sx={{ bgcolor: 'action.selected', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } }} />
-        );
+    <Box sx={{ mb: m.text ? 1 : 0 }}>
+      {images.length > 0 && <ImageCard gallery={{ images: images.map((a) => ({ src: urlOf(a), alt: a.name })) }} resolve={ok} />}
+      {shown.map((a) => {
+        const src = urlOf(a), kind = mediaKind(a);
+        if (kind === 'video') return <VideoCard key={a.id} video={{ src, title: a.name }} resolve={ok} />;
+        if (kind === 'audio') return <AudioCard key={a.id} audio={{ src, title: a.name }} resolve={ok} />;
+        if (kind === 'pdf') return <PdfCard key={a.id} pdf={{ src, title: a.name, page: 1 }} resolve={ok} />;
+        if (kind === 'markdown') return <MarkdownCard key={a.id} doc={{ src, title: a.name }} resolve={ok} />;
+        return null;
       })}
-      {open !== null && <Lightbox gallery={gallery} resolve={(src) => ({ state: 'ok', url: src })} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
+      {chips.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {chips.map((a) => (
+            <Chip key={a.id} component="a" href={urlOf(a)} download={a.name} clickable icon={<InsertDriveFileOutlined />} label={`${a.name} · ${formatSize(a.size)}`}
+              sx={{ bgcolor: 'action.selected', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } }} />
+          ))}
+        </Box>)}
     </Box>
   );
 }
@@ -75,24 +88,28 @@ function Attachments({ m }: { m: Message }) {
 /** What a dynamic widget may do for the chat: `undefined` while it must stay inactive. `widget` is the widget's own token, to tell the live one apart. */
 export type ReplyFor = (widget?: string) => ((text: string, event?: WidgetEvent) => Promise<boolean>) | undefined;
 
+/**
+ * Where the file of a media widget comes from: an external URL is loaded directly by the browser; a local file was copied by the plugin as
+ * an attachment of the message (the tool result says which one: `files` = { path → attachment name }).
+ */
+const resolverOf = (args: Record<string, unknown>, m: Message) => (src: string): Resolved => {
+  if (isRemote(src)) return { state: 'ok', url: src };
+  const files = (args.files ?? {}) as Record<string, string>;
+  const a = m.attachments?.find((x) => x.name === files[src]);
+  return a ? { state: 'ok', url: `/api/attachments/${a.id}` } : m.status === 'streaming' && files[src] ? { state: 'loading' } : { state: 'error' };
+};
+
 /** Display widgets (no answer): ```widget block or `agentui_widget_<type>` tool. `undefined` if the type or arguments are invalid. */
 function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message, onReply?: ReplyFor): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
   if (w?.type === 'map') { const map = parseMap(w.arguments); if (map) return <MapCard map={map} />; }
   if (w?.type === 'table') { const table = parseTable(w.arguments); if (table) return <TableCard table={table} />; }
-  if (w?.type === 'image') {
-    const gallery = parseImage(w.arguments);
-    if (gallery) {
-      const files = (w.arguments.files ?? {}) as Record<string, string>;
-      // Local file: copied by the plugin as a message attachment; external URL: loaded directly by the browser.
-      const resolve = (src: string): Resolved => {
-        if (isRemote(src)) return { state: 'ok', url: src };
-        const a = m.attachments?.find((x) => x.name === files[src]);
-        return a ? { state: 'ok', url: `/api/attachments/${a.id}` } : m.status === 'streaming' && files[src] ? { state: 'loading' } : { state: 'error' };
-      };
-      return <ImageCard gallery={gallery} resolve={resolve} />;
-    }
-  }
+  const resolve = w && FILE_WIDGETS.has(w.type) ? resolverOf(w.arguments, m) : undefined;
+  if (w?.type === 'image') { const gallery = parseImage(w.arguments); if (gallery && resolve) return <ImageCard gallery={gallery} resolve={resolve} />; }
+  if (w?.type === 'video') { const video = parseVideo(w.arguments); if (video && resolve) return <VideoCard video={video} resolve={resolve} />; }
+  if (w?.type === 'audio') { const audio = parseAudio(w.arguments); if (audio && resolve) return <AudioCard audio={audio} resolve={resolve} />; }
+  if (w?.type === 'pdf') { const pdf = parsePdf(w.arguments); if (pdf && resolve) return <PdfCard pdf={pdf} resolve={resolve} />; }
+  if (w?.type === 'markdown') { const doc = parseMarkdown(w.arguments); if (doc && resolve) return <MarkdownCard doc={doc} resolve={resolve} />; }
   if (w?.type === 'custom') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply?.(ui.token)} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
