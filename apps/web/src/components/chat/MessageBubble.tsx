@@ -21,7 +21,7 @@ import ChartCard, { parseChart } from '../ChartCard';
 import MapCard, { parseMap } from '../MapCard';
 import TableCard, { parseTable } from '../TableCard';
 import ProgressCard, { parseProgress } from '../ProgressCard';
-import ImageCard, { isRemote, parseImage, type Resolved } from '../ImageCard';
+import ImageCard, { Lightbox, isRemote, parseImage, type Resolved } from '../ImageCard';
 import CodeCard, { parseCode } from '../CodeCard';
 import UiCard, { parseUi } from '../UiCard';
 import FormCard, { parseForm } from '../FormCard';
@@ -50,18 +50,24 @@ function Working({ m }: { m: Message }) {
 /** Images (clickable preview) and files (download chips) attached to a message. */
 function Attachments({ m }: { m: Message }) {
   const shown = (m.attachments ?? []).filter((a) => !a.name.startsWith(WIDGET_ATTACHMENT_PREFIX)); // copies of an image widget: already in the widget
+  const [open, setOpen] = useState<number | null>(null);
   if (!shown.length) return null;
+  const urlOf = (a: AttachmentView) => a.url ?? `/api/attachments/${a.id}`;
+  const images = (shown as AttachmentView[]).filter((a) => isImage(a.mimeType));
+  const gallery = { images: images.map((a) => ({ src: urlOf(a), alt: a.name })) };
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: m.text ? 1 : 0 }}>
       {(shown as AttachmentView[]).map((a) => {
-        const href = a.url ?? `/api/attachments/${a.id}`;
+        const href = urlOf(a);
+        // In-app viewer: a link opened outside the PWA would not carry the (SameSite=strict) session cookie
         return isImage(a.mimeType) ? (
-          <a key={a.id} href={href} target="_blank" rel="noreferrer"><img src={href} alt={a.name} title={a.name} style={{ maxWidth: 'min(100%, 480px)', maxHeight: 320, borderRadius: 8, display: 'block' }} /></a>
+          <Box key={a.id} component="button" type="button" onClick={() => setOpen(images.indexOf(a))} sx={{ p: 0, border: 0, bgcolor: 'transparent', cursor: 'zoom-in', display: 'block' }}><img src={href} alt={a.name} title={a.name} style={{ maxWidth: 'min(100%, 480px)', maxHeight: 320, borderRadius: 8, display: 'block' }} /></Box>
         ) : (
           <Chip key={a.id} component="a" href={href} download={a.name} clickable icon={<InsertDriveFileOutlined />} label={`${a.name} · ${formatSize(a.size)}`}
             sx={{ bgcolor: 'action.selected', color: 'inherit', '& .MuiChip-icon': { color: 'inherit' } }} />
         );
       })}
+      {open !== null && <Lightbox gallery={gallery} resolve={(src) => ({ state: 'ok', url: src })} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
     </Box>
   );
 }

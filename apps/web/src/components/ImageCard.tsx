@@ -56,7 +56,7 @@ function Tile({ img, r, onOpen, last, more, single }: { img: Img; r: Resolved; o
   );
 }
 
-function Lightbox({ gallery, resolve, index, onIndex, onClose }: { gallery: Gallery; resolve: (src: string) => Resolved; index: number; onIndex: (i: number) => void; onClose: () => void }) {
+export function Lightbox({ gallery, resolve, index, onIndex, onClose }: { gallery: Gallery; resolve: (src: string) => Resolved; index: number; onIndex: (i: number) => void; onClose: () => void }) {
   useBackClose(true, onClose);
   const n = gallery.images.length;
   const img = gallery.images[index]!;
