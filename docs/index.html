@@ -261,7 +261,7 @@
           <span class="kicker">Maps</span>
           <h3>A route, places, and an “Open in Maps” button.</h3>
           <p>Up to ten points with Markdown popups, and a direct link to your maps app for navigation.</p>
-          <ul><li>Map style that follows the theme</li><li>Detailed popup for each point</li><li>Opens in Maps</li></ul>
+          <ul><li>Light OpenStreetMap background, readable in both themes</li><li>Detailed popup for each point</li><li>Opens in Maps</li></ul>
           <p><span class="tag">agentui_widget_map</span></p>
         </div>
         <div class="shot">
@@ -317,7 +317,7 @@
           <span class="kicker">Custom</span>
           <h3>When nothing fits, the agent codes the widget.</h3>
           <p>Simulator, converter, filterable list, mini quiz: the agent writes a React component with <strong>the same library as the miniapps</strong>. It shows up in the conversation, follows the theme and reacts to your input live.</p>
-          <ul><li>Runs in an isolated iframe, with no access to your session</li><li>Same components and colors as the miniapps</li><li>Its buttons can write in the conversation: “Details”, “Book”… the agent receives the answer as a message</li><li>To keep the tool, the agent turns it into a miniapp</li></ul>
+          <ul><li>Runs in an isolated iframe, with no access to your session</li><li>Same components and colors as the miniapps</li><li>Its buttons can write in the conversation: “Details”, “Book”… the agent receives the answer as a message</li><li>To keep the tool, the agent turns it into a miniapp</li><li>Interactive maps (Leaflet), charts and canvases; if the widget crashes, one click sends the traces to the agent so it can fix it</li></ul>
           <p><span class="tag">agentui_widget_custom</span></p>
         </div>
         <div class="shot">
@@ -544,13 +544,13 @@
 <footer>
   <div class="wrap">
     <span class="brand"><img src="img/icon.svg" alt="" width="26" height="26">AgentUI</span>
-    <span>Screenshots were generated with a demo agent, using the English interface.</span>
+    <span>Screenshots were generated with a demo agent, using the English interface. · <a href="https://github.com/joselfr/AgentUI" rel="noopener">GitHub</a></span>
   </div>
 </footer>
 
 <script>
   // Repository URL: set it to show the GitHub buttons.
-  const REPO_URL = '';
+  const REPO_URL = 'https://github.com/joselfr/AgentUI';
   if (REPO_URL) document.querySelectorAll('[data-repo-link]').forEach((a) => { a.href = REPO_URL; a.hidden = false; });
 
   // Soft reveal on scroll (without JS or with reduced motion: everything is visible)

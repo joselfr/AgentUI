@@ -261,7 +261,7 @@
           <span class="kicker">Cartes</span>
           <h3>Un itinéraire, des lieux, un bouton « Ouvrir dans Maps ».</h3>
           <p>Jusqu’à dix points avec leur popup en Markdown, et un lien direct vers votre application de cartes pour la navigation.</p>
-          <ul><li>Fond de carte adapté au thème</li><li>Popups détaillées par point</li><li>Ouverture dans Maps</li></ul>
+          <ul><li>Fond OpenStreetMap clair, lisible dans les deux thèmes</li><li>Popups détaillées par point</li><li>Ouverture dans Maps</li></ul>
           <p><span class="tag">agentui_widget_map</span></p>
         </div>
         <div class="shot">
@@ -317,7 +317,7 @@
           <span class="kicker">Sur mesure</span>
           <h3>Quand rien ne convient, l’agent code le widget.</h3>
           <p>Simulateur, convertisseur, liste filtrable, mini-quiz : l’agent écrit un composant React avec <strong>la même bibliothèque que les miniapps</strong>. Il s’affiche dans la conversation, suit le thème et réagit à vos saisies en direct.</p>
-          <ul><li>Exécuté dans un iframe isolé, sans accès à votre session</li><li>Mêmes composants et mêmes couleurs que les miniapps</li><li>Ses boutons peuvent écrire dans la conversation : « Détails », « Réserver »… l’agent reçoit la réponse comme un message</li><li>Pour garder l’outil, l’agent en fait une miniapp</li></ul>
+          <ul><li>Exécuté dans un iframe isolé, sans accès à votre session</li><li>Mêmes composants et mêmes couleurs que les miniapps</li><li>Ses boutons peuvent écrire dans la conversation : « Détails », « Réserver »… l’agent reçoit la réponse comme un message</li><li>Pour garder l’outil, l’agent en fait une miniapp</li><li>Cartes interactives (Leaflet), graphiques et canvas ; si le widget plante, un clic envoie les traces à l’agent pour qu’il le corrige</li></ul>
           <p><span class="tag">agentui_widget_custom</span></p>
         </div>
         <div class="shot">
@@ -544,13 +544,13 @@
 <footer>
   <div class="wrap">
     <span class="brand"><img src="../img/icon.svg" alt="" width="26" height="26">AgentUI</span>
-    <span>Les captures de cette page ont été générées avec un agent de démonstration.</span>
+    <span>Les captures de cette page ont été générées avec un agent de démonstration. · <a href="https://github.com/joselfr/AgentUI" rel="noopener">GitHub</a></span>
   </div>
 </footer>
 
 <script>
   // URL du dépôt : à renseigner pour afficher les boutons GitHub.
-  const REPO_URL = '';
+  const REPO_URL = 'https://github.com/joselfr/AgentUI';
   if (REPO_URL) document.querySelectorAll('[data-repo-link]').forEach((a) => { a.href = REPO_URL; a.hidden = false; });
 
   // Apparition douce des blocs au défilement (sans JS ou avec mouvement réduit : tout est visible)

@@ -136,7 +136,7 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 | Tool | What it does |
 |---|---|
 | `agentui_widget_chart`, `_map`, `_code`, `_table`, `_progress`, `_image` | Display a component in the chat. |
-| `agentui_widget_custom` | A component written by the agent (React, same UI kit as miniapps), sandboxed. |
+| `agentui_widget_custom` | A component written by the agent (React, same UI kit as miniapps, plus chart.js and Leaflet maps), sandboxed. If it crashes, a button sends the traces to the agent. |
 | `agentui_widget_custom_wait` | Keeps a *live* two-way session with a custom widget: the user’s clicks reach the agent, which updates the widget in place. |
 | `agentui_ask`, `agentui_confirm`, `agentui_form` | Ask the user and wait for the answer. |
 | `agentui_miniapp_*` | Create, write, read, list and remove miniapps, and push data into them. |
@@ -149,7 +149,7 @@ Schemas and descriptions live in [`plugins/protocol/widget-tools.json`](plugins/
 Agents with a channel plugin can build **miniapps** with the `agentui_miniapp_*` tools and the guide in [`plugins/protocol/miniapps-guide.md`](plugins/protocol/miniapps-guide.md) (also shipped as the `agentui-miniapps` skill).
 
 - Files live in `DATA_DIR/miniapps/<id>/`; the server compiles them with esbuild.
-- The front runs in a sandboxed iframe with no access to your session. The `@agentui/ui` kit (React, chart.js, components, and the `--au-*` CSS variables of the current theme) is built from `packages/app-runtime`.
+- The front runs in a sandboxed iframe with no access to your session. The `@agentui/ui` kit (React, chart.js, Leaflet, components, and the `--au-*` CSS variables of the current theme) is built from `packages/app-runtime`. Map tiles (OpenStreetMap) are fetched through the AgentUI server, so the iframe needs no network access and OpenStreetMap only sees the server.
 - Handlers (`server/*.js`) run in an isolated worker, namespaced per miniapp and protected by the AgentUI session. Data is stored in SQLite, scoped per miniapp. Handlers can call public HTTP APIs with `ctx.fetch`; private and internal addresses are refused.
 
 ### Push notifications
