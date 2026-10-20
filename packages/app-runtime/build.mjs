@@ -1,4 +1,4 @@
-// Builds the runtime served to the miniapp iframes (dist/): react, react-dom, jsx-runtime, chart.js, @agentui/ui, boot, base.css, fonts.
+// Builds the runtime served to the miniapp iframes (dist/): react, react-dom, jsx-runtime, chart.js, leaflet, @agentui/ui, boot, base.css, fonts.
 import { createRequire } from 'node:module';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -45,7 +45,24 @@ await build({
   stdin: { resolveDir: here, contents: "import 'chart.js/auto'; export * from 'chart.js'; import { Chart } from 'chart.js'; export default Chart;" },
 });
 
-await build({ ...common, entryPoints: { ui: join(here, 'src/ui.tsx'), boot: join(here, 'src/boot.tsx') }, jsx: 'automatic', external: ['react', 'react/jsx-runtime', 'react-dom/client', 'chart.js', '@agentui/ui'] });
+// leaflet: default marker icons inlined (the CSS cannot find them next to itself); its stylesheet is built with the images as data URIs
+const leafletImg = (n) => `leaflet/dist/images/${n}.png`;
+await build({
+  ...common, outfile: join(dist, 'leaflet.js'), outdir: undefined, loader: { '.png': 'dataurl' },
+  stdin: {
+    resolveDir: here,
+    contents: `import * as L from 'leaflet'; export * from 'leaflet'; export default L;
+      import icon from '${leafletImg('marker-icon')}'; import icon2x from '${leafletImg('marker-icon-2x')}'; import shadow from '${leafletImg('marker-shadow')}';
+      // OSM tiles go through the server (the sandboxed iframe sends no Referer, which OSM refuses): same URL for the app, rewritten here
+      const osm = 'https://tile.openstreetmap.org/', proxy = import.meta.url.replace(/_runtime\\/[^/]*$/, 'tiles/');
+      const init = L.TileLayer.prototype.initialize;
+      L.TileLayer.prototype.initialize = function (url, options) { return init.call(this, typeof url === 'string' && url.startsWith(osm) ? proxy + url.slice(osm.length) : url, options); };
+      delete L.Icon.Default.prototype._getIconUrl; L.Icon.Default.mergeOptions({ iconUrl: icon, iconRetinaUrl: icon2x, shadowUrl: shadow });`,
+  },
+});
+await build({ ...common, entryPoints: { leaflet: require.resolve('leaflet/dist/leaflet.css') }, loader: { '.png': 'dataurl' } });
+
+await build({ ...common, entryPoints: { ui: join(here, 'src/ui.tsx'), boot: join(here, 'src/boot.tsx') }, jsx: 'automatic', external: ['react', 'react/jsx-runtime', 'react-dom/client', 'chart.js', 'leaflet', '@agentui/ui'] });
 
 copyFileSync(join(here, 'src/base.css'), join(dist, 'base.css'));
 for (const [pkg, f] of [['inter', 'inter-latin-wght-normal.woff2'], ['inter', 'inter-latin-ext-wght-normal.woff2'], ['jetbrains-mono', 'jetbrains-mono-latin-wght-normal.woff2']]) {

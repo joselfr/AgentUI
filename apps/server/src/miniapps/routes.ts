@@ -65,11 +65,13 @@ function indexHtml(base: string, appId: string, name: string, version: number, h
     '@agentui/ui': `${rt}ui.js`,
     'chart.js': `${rt}chart.js`,
     'chart.js/auto': `${rt}chart.js`,
+    leaflet: `${rt}leaflet.js`,
   };
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(name)}</title>
-<link rel="stylesheet" href="${rt}base.css">${hasCss ? `\n<link rel="stylesheet" href="${base}app.css?v=${version}">` : ''}
+<link rel="stylesheet" href="${rt}base.css">
+<link rel="stylesheet" href="${rt}leaflet.css">${hasCss ? `\n<link rel="stylesheet" href="${base}app.css?v=${version}">` : ''}
 <script type="importmap" nonce="${nonce}">${JSON.stringify({ imports })}</script>
 <script nonce="${nonce}">window.__AGENTUI=${JSON.stringify({ appId, entry: `${base}app.js?v=${version}` })};</script>
 </head><body><div id="root"></div><script type="module" nonce="${nonce}" src="${rt}boot.js"></script></body></html>`;
@@ -217,6 +219,26 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     return sendFile(reply, file, 'public, max-age=300');
   };
 
+  /**
+   * OpenStreetMap tiles for every Leaflet map (the `map` widget through `/api/tiles/`, custom widgets and miniapps through their own `tiles/`).
+   * A sandboxed iframe has an opaque origin and sends no Referer, which OSM refuses (and its CSP forbids remote images), so tiles go
+   * through the server: it identifies itself as the usage policy asks, and OSM never sees the user's IP.
+   */
+  const sendTile = async (reply: FastifyReply, path: string) => {
+    const m = /^(\d{1,2})\/(\d{1,7})\/(\d{1,7})\.png$/.exec(path);
+    const z = Number(m?.[1]), x = Number(m?.[2]), y = Number(m?.[3]);
+    if (!m || z > 19 || x >= 2 ** z || y >= 2 ** z) return reply.code(404).send({ error: 'not found' });
+    try {
+      const r = await fetch(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`, { headers: { 'User-Agent': 'AgentUI (+https://github.com/joselfr/AgentUI)' }, signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return reply.code(502).send({ error: 'tile unavailable' });
+      return reply.header('Content-Type', 'image/png').header('Cache-Control', 'public, max-age=86400').header('X-Content-Type-Options', 'nosniff').send(Buffer.from(await r.arrayBuffer()));
+    } catch {
+      return reply.code(502).send({ error: 'tile unavailable' });
+    }
+  };
+
+  app.get<{ Params: { '*': string } }>('/api/tiles/*', { config: { rateLimit: FILE_RATE_LIMIT } }, (req, reply) => sendTile(reply, req.params['*']));
+
   // ---------- Widgets of the `agentui_widget_custom` tool: compiled on demand, same runtime and sandbox as the miniapps ----------
   /** Compiles the code of a widget; answers the iframe base URL (token-protected, like a miniapp's) or the build errors. */
   app.post<{ Body: { code?: unknown } }>('/api/widgets', async (req) => {
@@ -239,6 +261,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         .header('Content-Security-Policy', `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'`)
         .send(indexHtml(base, 'widget', 'Widget', 1, false, nonce)); // content-addressed: version never changes
     }
+    if (rest.startsWith('tiles/')) return sendTile(reply, rest.slice('tiles/'.length));
     if (rest.startsWith('_runtime/')) return sendRuntime(reply, rest.slice('_runtime/'.length));
     if (rest === 'app.js') {
       const file = widgets.file(hash);
@@ -267,6 +290,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         )
         .send(indexHtml(base, id, a.name, a.version, !!store.distFile(id, 'app.css'), nonce));
     }
+    if (rest.startsWith('tiles/')) return sendTile(reply, rest.slice('tiles/'.length));
     if (rest.startsWith('_runtime/')) return sendRuntime(reply, rest.slice('_runtime/'.length));
     if (rest === 'app.js' || rest === 'app.css') {
       const file = store.distFile(id, rest);

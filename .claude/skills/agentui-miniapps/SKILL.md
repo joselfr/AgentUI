@@ -35,6 +35,7 @@ React 18 (automatic JSX runtime, no need to import React). Import everything fro
 - `react`, `react-dom/client`
 - `@agentui/ui` — the UI kit and helpers below
 - `chart.js` / `chart.js/auto` — for custom charts
+- `leaflet` — interactive maps (use OpenStreetMap tiles `https://tile.openstreetmap.org/{z}/{x}/{y}.png` (served through AgentUI) with attribution; its CSS is preloaded, default markers work; no other network)
 
 ```tsx
 import { useState } from 'react';

@@ -84,7 +84,7 @@ AgentUI chats only: Hermes through `platform_hint`, OpenClaw through a `before_p
 AgentUI sessions.
 
 `agentui_widget_custom` is the **dynamic** display widget: its `code` argument is a single TSX module (default-exported React component)
-that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js` only). Plugins only validate it (non-empty, ≤ 64 KB, has an
+that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js`, `leaflet` only). Plugins only validate it (non-empty, ≤ 64 KB, has an
 `export default`); the front end sends the code to `POST /api/widgets`, which compiles it (esbuild, cached by hash) and returns the
 URL of a token-protected sandboxed iframe (`/w/<hash>/<token>/`, same runtime and CSP as a miniapp, no backend, no `/api`).
 Nothing is stored apart from the tool call itself, so the widget survives a reload but not the component state.

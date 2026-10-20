@@ -385,6 +385,7 @@ describe('widgets (agentui_widget_custom)', () => {
     const bad = await w.compile("import x from 'lodash'; export default () => <div>{x}</div>");
     expect(bad.ok).toBe(false);
     expect(!bad.ok && bad.errors[0]?.message).toMatch(/Cannot import "lodash"/);
+    expect((await w.compile("import L from 'leaflet'; export default () => <div>{String(L.version)}</div>")).ok).toBe(true);
     expect((await w.compile('export default () => <div>')).ok).toBe(false);
     await expect(w.compile('x'.repeat(70 * 1024))).rejects.toBeInstanceOf(AppError);
   });

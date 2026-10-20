@@ -10,7 +10,7 @@ export interface BuildError {
 }
 
 /** Modules provided by the runtime (import map of the iframe): never bundled in the app. */
-export const RUNTIME_EXTERNALS = ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@agentui/ui', 'chart.js', 'chart.js/auto'];
+export const RUNTIME_EXTERNALS = ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@agentui/ui', 'chart.js', 'chart.js/auto', 'leaflet'];
 
 const fmt = (m: Message): BuildError => ({
   file: m.location?.file,
