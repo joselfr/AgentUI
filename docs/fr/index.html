@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AgentUI — Le chat qui affiche vraiment ce que font vos agents</title>
-<meta name="description" content="AgentUI est une PWA de chat pour agents IA : graphiques, tableaux, cartes, formulaires et suivis de tâches interactifs, sur mobile comme sur desktop. Auto-hébergée.">
+<title>AgentUI — Une interface de chat pour agents IA, avec de vrais widgets</title>
+<meta name="description" content="AgentUI est une PWA de chat auto-hébergée pour agents IA (Hermes, OpenClaw…). L’agent appelle des outils, l’interface affiche graphiques, tableaux, cartes, formulaires et suivis de progression.">
 <meta name="theme-color" content="#0e1015">
-<meta property="og:title" content="AgentUI — Le chat qui affiche vraiment ce que font vos agents">
-<meta property="og:description" content="Graphiques, tableaux, cartes, formulaires et suivis de tâches interactifs dans le chat de vos agents IA.">
+<meta property="og:title" content="AgentUI — Une interface de chat pour agents IA, avec de vrais widgets">
+<meta property="og:description" content="Une interface de chat auto-hébergée pour agents IA : graphiques, tableaux, cartes, formulaires et miniapps plutôt que des murs de texte.">
 <meta property="og:image" content="https://joselfr.github.io/AgentUI/img/fr/hero-desktop.webp">
 <link rel="canonical" href="https://joselfr.github.io/AgentUI/fr/">
 <link rel="alternate" hreflang="fr" href="./">
@@ -196,10 +196,10 @@
   <div class="hero">
     <div class="wrap">
       <span class="pill"><i></i>PWA open source · auto-hébergée</span>
-      <h1>Vos agents IA méritent mieux qu’<em>un mur de texte</em>.</h1>
-      <p class="lead">AgentUI transforme les réponses de vos agents en graphiques, tableaux, cartes, formulaires et suivis de tâches <strong>interactifs</strong> — sur desktop comme sur mobile.</p>
+      <h1>Une interface de chat pour vos agents qui affiche <em>plus que du texte</em>.</h1>
+      <p class="lead">Votre agent appelle un outil, AgentUI affiche un graphique, un tableau, une carte, un formulaire ou une progression dans le chat. Auto-hébergé, installable en PWA, sur desktop comme sur téléphone.</p>
       <div class="cta">
-        <a class="btn primary" href="#widgets">Découvrir les widgets</a>
+        <a class="btn primary" href="#widgets">Voir les widgets</a>
         <a class="btn ghost" href="#" data-repo-link hidden>Voir sur GitHub</a>
       </div>
       <div class="hero-shot reveal">
@@ -214,7 +214,7 @@
 
   <div class="strip">
     <div class="wrap">
-      <p>Se branche sur vos plateformes d’agents</p>
+      <p>Compatible avec</p>
       <ul><li>Hermes</li><li>OpenClaw</li><li>Votre agent, via le protocole canal</li></ul>
     </div>
   </div>
@@ -224,15 +224,15 @@
     <div class="wrap">
       <div class="center reveal">
         <span class="kicker">Les widgets</span>
-        <h2>Le bon composant, au bon moment.</h2>
-        <p class="sub">Chaque widget est un <strong>outil</strong> que l’agent appelle : il valide ses arguments, et l’interface affiche un vrai composant — pas du Markdown bricolé.</p>
+        <h2>Les widgets sont des outils.</h2>
+        <p class="sub">L’agent appelle un outil avec des arguments JSON, le schéma les valide, et l’interface affiche un vrai composant au lieu de Markdown.</p>
       </div>
 
       <div class="row reveal">
         <div class="copy">
           <span class="kicker">Graphiques</span>
-          <h3>Des courbes, barres et camemberts qui répondent au doigt.</h3>
-          <p>L’agent passe ses séries, AgentUI trace. Info-bulles au survol, graduations lisibles, donut interactif, copie des données en un clic.</p>
+          <h3>Courbes, barres et camemberts.</h3>
+          <p>L’agent envoie ses séries, AgentUI les trace avec Chart.js. Info-bulles, légendes, et un bouton pour copier les données.</p>
           <ul><li>Courbes, barres, camemberts</li><li>Unités et légendes automatiques</li><li>Clair et sombre</li></ul>
           <p><span class="tag">agentui_widget_chart</span></p>
         </div>
@@ -245,8 +245,8 @@
       <div class="row flip reveal">
         <div class="copy">
           <span class="kicker">Tableaux</span>
-          <h3>Des données triables, prêtes à être copiées.</h3>
-          <p>Colonnes typées, nombres alignés, unités affichées et export CSV. Jusqu’à 200 lignes sans quitter la conversation.</p>
+          <h3>Tableaux triables.</h3>
+          <p>Colonnes typées, nombres alignés, unités, export CSV. Jusqu’à 200 lignes.</p>
           <ul><li>Tri numérique et alphabétique</li><li>Unités par colonne</li><li>Copie au format CSV</li></ul>
           <p><span class="tag">agentui_widget_table</span></p>
         </div>
@@ -259,8 +259,8 @@
       <div class="row reveal">
         <div class="copy">
           <span class="kicker">Cartes</span>
-          <h3>Un itinéraire, des lieux, un bouton « Ouvrir dans Maps ».</h3>
-          <p>Jusqu’à dix points avec leur popup en Markdown, et un lien direct vers votre application de cartes pour la navigation.</p>
+          <h3>Cartes avec marqueurs et itinéraires.</h3>
+          <p>Jusqu’à dix points avec popups en Markdown, et un bouton qui ouvre l’itinéraire dans votre application de cartes.</p>
           <ul><li>Fond OpenStreetMap clair, lisible dans les deux thèmes</li><li>Popups détaillées par point</li><li>Ouverture dans Maps</li></ul>
           <p><span class="tag">agentui_widget_map</span></p>
         </div>
@@ -273,8 +273,8 @@
       <div class="row flip reveal">
         <div class="copy">
           <span class="kicker">Suivi de tâches</span>
-          <h3>Voyez l’agent travailler, étape par étape.</h3>
-          <p>Une checklist vivante : l’agent met à jour le même composant au fil de l’eau, avec la durée de chaque étape et un compteur en direct pour celle en cours.</p>
+          <h3>Progression des tâches longues.</h3>
+          <p>Une checklist que l’agent met à jour sur place pendant qu’il travaille, avec la durée de chaque étape.</p>
           <ul><li>Statuts : en attente, en cours, terminé, échec, ignoré</li><li>Détail et durée par étape</li><li>Un seul composant, mis à jour sur place</li></ul>
           <p><span class="tag">agentui_widget_progress</span></p>
         </div>
@@ -287,8 +287,8 @@
       <div class="row reveal">
         <div class="copy">
           <span class="kicker">Code & diff</span>
-          <h3>Du code lisible, avec les changements en couleur.</h3>
-          <p>Coloration syntaxique, numéros de ligne, lignes mises en évidence et rendu diff pour montrer exactement ce qui change.</p>
+          <h3>Code et diffs.</h3>
+          <p>Coloration syntaxique, numéros de ligne, lignes mises en évidence et rendu diff.</p>
           <ul><li>Coloration par langage</li><li>Diff ajouté / supprimé</li><li>Bouton Copier</li></ul>
           <p><span class="tag">agentui_widget_code</span></p>
         </div>
@@ -301,8 +301,8 @@
       <div class="row flip reveal">
         <div class="copy">
           <span class="kicker">Interactif</span>
-          <h3>L’agent pose la question, vous répondez d’un geste.</h3>
-          <p>Confirmations (y compris en mode « danger »), questions à choix et formulaires complets : l’agent <strong>attend votre réponse</strong>, puis reprend son travail là où il s’était arrêté.</p>
+          <h3>Questions, confirmations, formulaires.</h3>
+          <p>L’agent <strong>attend votre réponse</strong>, puis continue. Pratique avant toute action destructive.</p>
           <ul><li>Confirmer / annuler avant une action sensible</li><li>Formulaires : texte, date, liste, case à cocher…</li><li>Validation avant envoi</li></ul>
           <p><span class="tag">agentui_confirm</span><span class="tag">agentui_form</span><span class="tag">agentui_ask</span></p>
         </div>
@@ -315,8 +315,8 @@
       <div class="row reveal">
         <div class="copy">
           <span class="kicker">Sur mesure</span>
-          <h3>Quand rien ne convient, l’agent code le widget.</h3>
-          <p>Simulateur, convertisseur, liste filtrable, mini-quiz : l’agent écrit un composant React avec <strong>la même bibliothèque que les miniapps</strong>. Il s’affiche dans la conversation, suit le thème et réagit à vos saisies en direct.</p>
+          <h3>Widgets sur mesure : l’agent écrit le composant.</h3>
+          <p>Quand aucun widget ne convient (simulateur, convertisseur, liste filtrable, jeu), l’agent écrit un composant React avec <strong>le même kit que les miniapps</strong>. AgentUI le compile et l’affiche dans le chat.</p>
           <ul><li>Exécuté dans un iframe isolé, sans accès à votre session</li><li>Mêmes composants et mêmes couleurs que les miniapps</li><li>Ses boutons peuvent écrire dans la conversation : « Détails », « Réserver »… l’agent reçoit la réponse comme un message</li><li>Pour garder l’outil, l’agent en fait une miniapp</li><li>Cartes interactives (Leaflet), graphiques et canvas ; si le widget plante, un clic envoie les traces à l’agent pour qu’il le corrige</li></ul>
           <p><span class="tag">agentui_widget_custom</span></p>
         </div>
@@ -333,15 +333,15 @@
     <div class="wrap">
       <div class="center reveal">
         <span class="kicker">Miniapps</span>
-        <h2>Vos agents ne se contentent plus de répondre. Ils construisent vos outils.</h2>
-        <p class="sub">Un suivi de dépenses, un tableau de bord, une liste partagée : demandez-le à l’agent, il écrit une <strong>miniapp</strong> — un front React et ses handlers côté serveur — qui apparaît dans l’onglet Miniapps, aux couleurs d’AgentUI.</p>
+        <h2>Miniapps : l’agent construit ses propres outils.</h2>
+        <p class="sub">Suivi de dépenses, tableau de bord, liste partagée : l’agent écrit une <strong>miniapp</strong> (un front React et des handlers côté serveur) qui apparaît dans l’onglet Miniapps.</p>
       </div>
 
       <div class="row reveal">
         <div class="copy">
           <span class="kicker">Aux couleurs d’AgentUI</span>
-          <h3>Une vraie application, pas une page web collée à côté.</h3>
-          <p>L’agent dispose d’un kit de composants React et des variables CSS du thème : la miniapp suit le <strong>mode clair ou sombre</strong>, la langue et le format mobile de l’application, sans une ligne de style en dur.</p>
+          <h3>Même look que l’application.</h3>
+          <p>L’agent dispose d’un kit de composants React et des variables CSS du thème : la miniapp suit le mode clair/sombre, la langue et le format mobile sans style en dur.</p>
           <ul><li>Composants prêts à l’emploi : formulaires, listes, tableaux, graphiques</li><li>Pensées d’abord pour le téléphone</li><li>Mise à jour en direct quand l’agent modifie la miniapp</li></ul>
           <span class="tag">agentui_miniapp_write</span>
         </div>
@@ -360,8 +360,8 @@
       <div class="row flip reveal">
         <div class="copy">
           <span class="kicker">Données et API</span>
-          <h3>Un backend par miniapp, sans rien à héberger.</h3>
-          <p>Chaque miniapp a ses collections de documents et son stockage clé/valeur, isolés des autres. Ses handlers peuvent appeler des <strong>API publiques</strong> pour afficher des données en direct ; les adresses internes de votre serveur restent inaccessibles.</p>
+          <h3>Un petit backend par miniapp.</h3>
+          <p>Chaque miniapp a ses collections et son stockage clé/valeur, isolés des autres. Les handlers peuvent appeler des <strong>API publiques</strong> ; les adresses privées et internes sont refusées.</p>
           <ul><li>Routes protégées par la session AgentUI, un espace de noms par miniapp</li><li>Appels HTTP sortants bornés (durée, taille, adresses publiques uniquement)</li><li>L’agent lit et écrit les données avec <code>agentui_miniapp_data</code></li></ul>
           <div class="note">Une miniapp n’accède qu’à ses propres routes et données : ni à vos conversations, ni aux autres miniapps.</div>
         </div>
@@ -378,15 +378,15 @@
     <div class="wrap">
       <div class="center reveal">
         <span class="kicker">Tâches planifiées</span>
-        <h2>Vos agents travaillent la nuit. Vous retrouvez tout au réveil.</h2>
-        <p class="sub">Résumés du matin, veilles, sauvegardes… Chaque tâche cron de vos agents a sa <strong>propre discussion</strong> : le résultat arrive comme un vrai message, widgets compris.</p>
+        <h2>Chaque tâche cron a sa discussion.</h2>
+        <p class="sub">Résumé du matin, veille, contrôle de sauvegarde… Chaque tâche cron de vos agents a sa <strong>discussion</strong> où le résultat est posté comme un message, widgets compris.</p>
       </div>
 
       <div class="row reveal">
         <div class="copy">
           <span class="kicker">Messages de cron</span>
-          <h3>Le résultat arrive dans la discussion de la tâche.</h3>
-          <p>L’agent n’attend pas que vous lui parliez : à chaque exécution, il poste un <strong>message proactif</strong> dans la discussion « ⏰ nom de la tâche ». Vous pouvez y répondre et continuer la conversation à partir de ce résultat.</p>
+          <h3>Messages proactifs des crons.</h3>
+          <p>À chaque exécution, l’agent poste un message dans la discussion « ⏰ nom de la tâche ». Vous pouvez y répondre et continuer à partir de là.</p>
           <ul><li>Une discussion par tâche, rangée dans la section « Tâches cron »</li><li>Pastille « non lu » et repère « Nouveau message »</li><li>Tableaux, listes et autres widgets dans le message</li></ul>
         </div>
         <div class="shot">
@@ -404,8 +404,8 @@
       <div class="row flip reveal">
         <div class="copy">
           <span class="kicker">Page « Tâches »</span>
-          <h3>Ce qui a marché, ce qui a échoué — et pourquoi.</h3>
-          <p>Planification, prochaine exécution, dernier statut : tout est sur une page. En cas d’échec, le message d’erreur complet est à un clic, sans aller fouiller les journaux du serveur.</p>
+          <h3>Statut et erreurs des tâches.</h3>
+          <p>Planification, prochaine exécution et dernier statut sur une page. En cas d’échec, l’erreur complète est à un clic, sans fouiller les logs.</p>
           <ul><li>Statut et erreur de la dernière exécution</li><li>Accès direct à la discussion de la tâche</li><li>Pause, reprise, « Exécuter maintenant », suppression</li></ul>
           <div class="note">Une tâche poste dans AgentUI quand elle est configurée pour y livrer ses résultats ; ses échecs peuvent suivre le même chemin.</div>
         </div>
@@ -422,8 +422,8 @@
     <div class="wrap">
       <div class="center reveal">
         <span class="kicker">L’interface</span>
-        <h2>Pensée pour le mobile. À l’aise partout.</h2>
-        <p class="sub">Une PWA installable sur l’écran d’accueil, avec un thème clair, un thème sombre et un tiroir de discussions qui s’efface devant la conversation.</p>
+        <h2>Mobile et desktop.</h2>
+        <p class="sub">PWA installable, thèmes clair et sombre, et un tiroir de discussions sur mobile.</p>
       </div>
       <div class="themes-grid">
         <div class="stack reveal">
@@ -449,16 +449,16 @@
     <div class="wrap">
       <div class="center reveal">
         <span class="kicker">Et aussi</span>
-        <h2>Tout ce qu’il faut pour vivre avec vos agents.</h2>
+        <h2>Et aussi</h2>
       </div>
       <div class="features">
-        <div class="card reveal"><div class="ico">🔔</div><h3>Notifications push</h3><p>Soyez prévenu quand un agent répond ou qu’une tâche planifiée se termine — un clic ouvre la bonne discussion.</p></div>
-        <div class="card reveal"><div class="ico">🧩</div><h3>Miniapps créées par l’agent</h3><p>Suivi, tableau de bord, liste : l’agent écrit une petite application qui apparaît dans AgentUI, aux couleurs de l’interface.</p></div>
+        <div class="card reveal"><div class="ico">🔔</div><h3>Notifications push</h3><p>Push web quand un agent répond ou qu’une tâche cron se termine.</p></div>
+        <div class="card reveal"><div class="ico">🧩</div><h3>Miniapps créées par l’agent</h3><p>Suivis, tableaux de bord, listes : de petites applications écrites par l’agent.</p></div>
         <div class="card reveal"><div class="ico">⏰</div><h3>Tâches planifiées</h3><p>Visualisez les crons de vos agents, leur dernier statut et leurs erreurs. Mettez en pause, lancez ou supprimez.</p></div>
         <div class="card reveal"><div class="ico">🧠</div><h3>Skills lisibles</h3><p>Parcourez les skills de chaque agent et lisez leur contenu directement dans l’application.</p></div>
         <div class="card reveal"><div class="ico">🤖</div><h3>Plusieurs agents</h3><p>Hermes, OpenClaw ou les vôtres, côte à côte. Filtrez la liste par agent et reprenez n’importe quelle discussion.</p></div>
         <div class="card reveal"><div class="ico">📎</div><h3>Pièces jointes & images</h3><p>Envoyez fichiers et images à l’agent ; il vous renvoie des visuels affichés dans la conversation.</p></div>
-        <div class="card reveal"><div class="ico">🔒</div><h3>Chez vous, sous votre contrôle</h3><p>Auto-hébergé via Docker. Chaque plateforme s’authentifie par son propre jeton ; vos données restent sur votre serveur.</p></div>
+        <div class="card reveal"><div class="ico">🔒</div><h3>Auto-hébergé</h3><p>Tourne avec Docker. Chaque plateforme s’authentifie avec son propre jeton ; les données restent sur votre serveur.</p></div>
       </div>
     </div>
   </section>
@@ -468,14 +468,14 @@
     <div class="wrap">
       <div class="reveal">
         <span class="kicker">Comment ça marche</span>
-        <h2>Un plugin, un protocole, zéro bricolage.</h2>
-        <p class="sub">AgentUI se connecte à votre plateforme comme Telegram à un bot : par un plugin canal qui parle un protocole WebSocket simple.</p>
+        <h2>Un plugin, un protocole WebSocket.</h2>
+        <p class="sub">AgentUI parle à votre plateforme d’agents via un plugin canal, sur un protocole WebSocket simple, un peu comme un bot Telegram.</p>
       </div>
       <div class="how">
         <div class="steps reveal">
           <div class="step"><div><h3>Installez le plugin</h3><p>Plugins fournis pour Hermes et OpenClaw. La plateforme ouvre la connexion vers AgentUI — rien à exposer de son côté.</p></div></div>
-          <div class="step"><div><h3>L’agent reçoit de nouveaux outils</h3><p>Graphique, tableau, carte, progression, code, formulaire… décrits comme de vrais outils, avec leurs schémas.</p></div></div>
-          <div class="step"><div><h3>L’interface fait le reste</h3><p>L’agent appelle l’outil et place le jeton dans sa réponse. AgentUI le remplace par le composant, en direct pendant le streaming.</p></div></div>
+          <div class="step"><div><h3>L’agent reçoit de nouveaux outils</h3><p>Graphique, tableau, carte, progression, code, formulaire… déclarés comme des outils classiques avec leurs schémas JSON.</p></div></div>
+          <div class="step"><div><h3>L’interface l’affiche</h3><p>L’agent appelle l’outil et écrit le jeton retourné dans sa réponse. AgentUI remplace le jeton par le composant, même pendant le streaming.</p></div></div>
         </div>
         <pre class="reveal"><span class="c">// L’agent appelle un outil…</span>
 <span class="n">agentui_widget_chart</span>({
@@ -499,8 +499,8 @@
     <div class="wrap">
       <div class="center reveal">
         <span class="kicker">Comparatif</span>
-        <h2>Où AgentUI se place, honnêtement.</h2>
-        <p class="sub">Face aux messageries (Telegram, Discord…) et aux interfaces web qui passent par l’API (Open WebUI, Hermes WebUI…). Chaque approche a ses forces.</p>
+        <h2>Comparatif</h2>
+        <p class="sub">Face aux messageries (Telegram, Discord…) et aux interfaces web qui passent par l’API (Open WebUI, Hermes WebUI…). Chacune a ses forces.</p>
       </div>
       <div class="cmp-wrap reveal">
         <table class="cmp">
@@ -530,10 +530,10 @@
   <section class="final">
     <div class="wrap">
       <div class="box reveal">
-        <h2>Donnez un vrai visage à vos agents.</h2>
-        <p class="sub">Déployez AgentUI en quelques minutes avec Docker, branchez vos agents, et regardez vos conversations prendre vie.</p>
+        <h2>À essayer</h2>
+        <p class="sub">Lancez-le avec Docker, installez le plugin de votre plateforme, connectez. Les étapes sont dans le README.</p>
         <div class="cta">
-          <a class="btn primary" href="#" data-repo-link hidden>Démarrer sur GitHub</a>
+          <a class="btn primary" href="#" data-repo-link hidden>Le code sur GitHub</a>
           <a class="btn ghost" href="#widgets">Revoir les widgets</a>
         </div>
       </div>
