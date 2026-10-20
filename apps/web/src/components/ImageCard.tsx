@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Dialog, IconButton, Link, Typography } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import { useBackClose } from '../useBackClose';
+import { usePinchZoom } from './pinchZoom';
 import { t } from '../i18n';
 
 interface Img { src: string; caption?: string; alt?: string }
@@ -10,6 +11,8 @@ interface Gallery { title?: string; images: Img[] }
 export type Resolved = { state: 'ok'; url: string } | { state: 'loading' } | { state: 'error' };
 
 const MAX_IMAGES = 12;
+/** Beyond this width / height ratio an image (before/after comparison, panorama, screenshot) gets a full row, uncropped. */
+const WIDE_RATIO = 1.6;
 const MAX_TILES = 6; // beyond that, the last thumbnail shows "+N"
 export const isRemote = (src: string) => /^https?:\/\//i.test(src);
 
@@ -30,8 +33,10 @@ const host = (src: string) => { try { return new URL(src).hostname; } catch { re
 
 function Tile({ img, r, onOpen, last, more, single }: { img: Img; r: Resolved; onOpen: () => void; last: boolean; more: number; single: boolean }) {
   const [broken, setBroken] = useState(false);
+  const [ratio, setRatio] = useState<number>();
+  const wide = !single && ratio !== undefined && ratio >= WIDE_RATIO;
   const failed = r.state === 'error' || broken;
-  const frame = { position: 'relative', borderRadius: '8px', overflow: 'hidden', bgcolor: 'action.hover', border: 1, borderColor: 'divider', aspectRatio: single ? undefined : '4 / 3' } as const;
+  const frame = { position: 'relative', borderRadius: '8px', overflow: 'hidden', bgcolor: 'action.hover', border: 1, borderColor: 'divider', aspectRatio: single ? undefined : wide ? String(ratio) : '4 / 3', ...(wide && { gridColumn: '1 / -1' }) } as const;
   if (r.state === 'loading') {
     return <Box sx={{ ...frame, aspectRatio: single ? '4 / 3' : '4 / 3', backgroundImage: (t) => `linear-gradient(90deg, transparent, ${alpha(t.palette.text.secondary, 0.18)}, transparent)`, backgroundSize: '200% 100%', animation: `${pulse} 1.4s ease-in-out infinite`, '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />;
   }
@@ -46,8 +51,8 @@ function Tile({ img, r, onOpen, last, more, single }: { img: Img; r: Resolved; o
   return (
     <Box component="button" type="button" onClick={onOpen} aria-label={img.alt ?? img.caption ?? t('chat.enlarge')}
       sx={{ ...frame, p: 0, m: 0, cursor: 'zoom-in', display: 'block', width: '100%', font: 'inherit', color: 'inherit', ...(single && { maxHeight: 'min(420px, 60dvh)' }) }}>
-      <img src={r.state === 'ok' ? r.url : ''} alt={img.alt ?? img.caption ?? ''} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)}
-        style={{ width: '100%', height: single ? 'auto' : '100%', maxHeight: single ? 'calc(min(420px, 60dvh) - 2px)' : undefined, objectFit: single ? 'contain' : 'cover', display: 'block' }} />
+      <img src={r.state === 'ok' ? r.url : ''} alt={img.alt ?? img.caption ?? ''} loading="lazy" referrerPolicy="no-referrer" onLoad={(e) => setRatio(e.currentTarget.naturalWidth / (e.currentTarget.naturalHeight || 1))} onError={() => setBroken(true)}
+        style={{ width: '100%', height: single ? 'auto' : '100%', maxHeight: single ? 'calc(min(420px, 60dvh) - 2px)' : undefined, objectFit: single || wide ? 'contain' : 'cover', display: 'block' }} />
       {isRemote(img.src) && !last && (
         <Box component="span" sx={{ position: 'absolute', left: 6, bottom: 6, bgcolor: 'rgba(0,0,0,.55)', color: '#fff', borderRadius: '6px', px: 0.75, fontSize: 11 }}>{host(img.src)}</Box>
       )}
@@ -67,7 +72,8 @@ export function Lightbox({ gallery, resolve, index, onIndex, onClose }: { galler
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [go]);
-  const touch = useRef<number | null>(null);
+  const zoom = usePinchZoom((d) => go(d));
+  useEffect(() => zoom.reset, [index]); // eslint-disable-line react-hooks/exhaustive-deps
   const url = r.state === 'ok' ? r.url : undefined;
   const btn = { color: '#fff', bgcolor: 'rgba(255,255,255,.12)', '&:hover': { bgcolor: 'rgba(255,255,255,.2)' }, borderRadius: '8px', fontSize: 13, px: 1.25 } as const;
   return (
@@ -78,11 +84,9 @@ export function Lightbox({ gallery, resolve, index, onIndex, onClose }: { galler
         {url && <IconButton component="a" href={url} download sx={btn}>{t('image.download')}</IconButton>}
         <IconButton onClick={onClose} aria-label={t('common.close')} sx={btn}>✕</IconButton>
       </Box>
-      <Box sx={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: 0, overflow: 'hidden', p: 1 }}
-        onTouchStart={(e) => { touch.current = e.touches[0]!.clientX; }}
-        onTouchEnd={(e) => { if (touch.current === null) return; const dx = e.changedTouches[0]!.clientX - touch.current; touch.current = null; if (Math.abs(dx) > 50 && n > 1) go(dx < 0 ? 1 : -1); }}>
-        {url ? <img src={url} alt={img.alt ?? img.caption ?? ''} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', minHeight: 0, objectFit: 'contain' }} /> : <Typography color="inherit" sx={{ opacity: 0.7 }}>{t('image.unavailable')}</Typography>}
-        {n > 1 && (<>
+      <Box sx={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: 0, overflow: 'hidden', p: 1, touchAction: 'none' }} {...zoom.handlers}>
+        {url ? <img src={url} alt={img.alt ?? img.caption ?? ''} referrerPolicy="no-referrer" draggable={false} style={{ width: '100%', height: '100%', minHeight: 0, objectFit: 'contain', transform: zoom.transform, willChange: zoom.zoomed ? 'transform' : undefined, userSelect: 'none' }} /> : <Typography color="inherit" sx={{ opacity: 0.7 }}>{t('image.unavailable')}</Typography>}
+        {n > 1 && !zoom.zoomed && (<>
           <IconButton onClick={() => go(-1)} aria-label={t('image.previous')} sx={{ ...btn, position: 'absolute', left: 8, top: '50%', fontSize: 22 }}>‹</IconButton>
           <IconButton onClick={() => go(1)} aria-label={t('image.next')} sx={{ ...btn, position: 'absolute', right: 8, top: '50%', fontSize: 22 }}>›</IconButton>
         </>)}
