@@ -251,6 +251,7 @@ export type ServerPush =
   | { type: 'agent.status'; agentId: string; status: ConnStatus; detail?: string }
   /** Chat marked read (from another device): remove its "unread" indicator. */
   | { type: 'conversation.read'; conversationId: string }
+  | { type: 'conversation.renamed'; conversationId: string; title: string }
   /** A miniapp was created, rebuilt or removed: refresh the Miniapps tab / reload the open iframe. */
   | { type: 'miniapp.changed'; appId: string; removed?: boolean }
   /** The data of a miniapp changed: its open iframe refetches. */

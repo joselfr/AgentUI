@@ -10,6 +10,8 @@ export function useLive(opts: {
   onStatus: (agentId: string, s: ConnStatus, detail?: string) => void;
   /** Chat marked read from another device. */
   onRead?: (conversationId: string) => void;
+  /** Chat renamed (automatic title from the first message, or another device). */
+  onRenamed?: (conversationId: string, title: string) => void;
   /** A miniapp was created / rebuilt / removed. */
   onMiniappChanged?: (appId: string, removed: boolean) => void;
   /** The data of a miniapp changed. */
@@ -38,6 +40,7 @@ export function useLive(opts: {
         const p = JSON.parse(m.data as string) as ServerPush;
         if (p.type === 'event') ref.current.onEvent(p);
         else if (p.type === 'conversation.read') ref.current.onRead?.(p.conversationId);
+        else if (p.type === 'conversation.renamed') ref.current.onRenamed?.(p.conversationId, p.title);
         else if (p.type === 'miniapp.data') ref.current.onMiniappData?.(p.appId);
         else if (p.type === 'miniapp.changed') ref.current.onMiniappChanged?.(p.appId, !!p.removed);
         else ref.current.onStatus(p.agentId, p.status, p.detail);

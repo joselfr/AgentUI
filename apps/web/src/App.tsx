@@ -208,6 +208,7 @@ export default function App() {
     onStatus: (id, status, detail) => setAgents((as) => as.map((a) => (a.id === id ? { ...a, status, statusDetail: detail } : a))),
     onMiniappChanged: () => setMiniappsTick((n) => n + 1),
     onMiniappData: (appId) => setDataTick((d) => ({ appId, n: d.n + 1 })),
+    onRenamed: (id, title) => setConvs((cs) => cs.map((c) => (c.id === id ? { ...c, title } : c))),
     onRead: (id) => setConvs((cs) => cs.map((c) => (c.id === id ? { ...c, unread: false } : c))),
     onOpen: () => { refreshLists(); if (currentRef.current) loadMessages(currentRef.current); },
     onUnauthorized: onUnauth,

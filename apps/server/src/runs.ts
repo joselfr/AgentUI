@@ -220,6 +220,7 @@ export class RunManager {
   }
   renameConversation(id: string, title: string) {
     this.db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);
+    this.broadcast({ type: 'conversation.renamed', conversationId: id, title });
   }
 
   getMessages(convId: string): Message[] {
