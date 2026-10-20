@@ -54,12 +54,11 @@ function PopupBody({ p }: { p: Point }) {
 export default function MapCard({ map: m }: { map: MapData }) {
   const t = useTheme();
   const el = useRef<HTMLDivElement>(null);
-  const dark = t.palette.mode === 'dark';
 
   useEffect(() => {
     if (!el.current) return;
     const map = L.map(el.current, { scrollWheelZoom: false, attributionControl: true });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>' }).addTo(map);
+    L.tileLayer('/api/tiles/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>' }).addTo(map);
     const roots: ReturnType<typeof createRoot>[] = [];
     m.points.forEach((p) => {
       const marker = L.marker([p.lat, p.lon], { icon: pin(t.palette.primary.main), title: p.title, alt: p.title || tr('map.point') }).addTo(map);
@@ -81,8 +80,6 @@ export default function MapCard({ map: m }: { map: MapData }) {
       {m.points.length > 1 && <Typography variant="caption" color="text.secondary">{tr('map.points', { count: m.points.length })}</Typography>}
       <Box ref={el} sx={{
         mt: 1, height: { xs: 240, sm: 300 }, borderRadius: '10px', overflow: 'hidden', border: 1, borderColor: 'divider', isolation: 'isolate',
-        // OSM tiles darkened in dark theme
-        ...(dark && { '& .leaflet-tile-pane': { filter: 'invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)' } }),
         '& .leaflet-popup-content-wrapper, & .leaflet-popup-tip': { bgcolor: 'background.paper', color: 'text.primary', border: 1, borderColor: 'divider', boxShadow: `0 6px 20px ${alpha('#000', 0.25)}` },
         '& .leaflet-popup-content-wrapper': { borderRadius: '12px' },
         '& .leaflet-popup-content': { m: '10px 12px' },
