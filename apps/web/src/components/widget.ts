@@ -152,7 +152,8 @@ const tokenOf = (t: { resultPreview?: string }) => t.resultPreview?.match(/\[\[a
    * Replaces with their widget the tokens the agent placed in its text after an `agentui_widget_<type>` tool call.
    * The widget arguments are those of the call (`own`: tools of the message; `all`: whole chat, since the agent may
    * reuse a token from an earlier message). An unknown or in-progress token disappears; a widget whose token
-   * was never written is appended at the end of the message once it is finished, so that it is not lost.
+   * was never written is appended at the end of the message once it is finished, so that it is not lost
+   * (unless the agent redid it: a later widget of the same type is in the text).
  */
 export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolCallLike[] = own, done = true): string {
   const widgets = new Map<string, { type: string; arguments: Record<string, unknown> }>();
@@ -176,11 +177,14 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
     return fence(w);
   });
   out = stripPartialToken(out);
-  if (done) for (const t of own) {
-    if (isUiUpdate(t)) continue; // the widget lives where it was created
+  if (done) own.forEach((t, i) => {
+    if (isUiUpdate(t)) return; // the widget lives where it was created
     const id = tokenOf(t);
     const w = id ? widgets.get(id) : undefined;
-    if (id && w && !used.has(id) && !OUT_OF_TEXT.has(w.type)) out += fence(w);
-  }
+    if (!id || !w || used.has(id) || OUT_OF_TEXT.has(w.type)) return;
+    // A draft the agent redid: a later widget of the same type was placed in the text, this one is superseded (not shown twice)
+    if (own.slice(i + 1).some((n) => { const nid = tokenOf(n); return !!nid && used.has(nid) && widgets.get(nid)?.type === w.type; })) return;
+    out += fence(w);
+  });
   return out;
 }

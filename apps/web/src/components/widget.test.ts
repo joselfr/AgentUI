@@ -56,6 +56,15 @@ describe('expandWidgetTokens', () => {
     expect(expandWidgetTokens('Texte', [tool('t1')], undefined, false)).toBe('Texte');
     expect(expandWidgetTokens('Texte', [tool('t1')])).toBe(`Texte\n\n${widget}\n\n`);
   });
+  it('does not show twice a widget the agent redid: the earlier draft is dropped', () => {
+    const draft = tool('t1', 'aaaaaa'), redo = tool('t2', 'bbbbbb');
+    const out = expandWidgetTokens('Voici [[agentui:bbbbbb]] fin', [draft, redo]);
+    expect(out.match(/```widget/g)).toHaveLength(1);
+    // another type, not written: still appended
+    const table = tool('t3', 'cccccc', { columns: [], rows: [] }, 'agentui_widget_table');
+    expect(expandWidgetTokens('Voici [[agentui:bbbbbb]]', [draft, redo, table]).match(/```widget/g)).toHaveLength(2);
+  });
+
   it("resolves the token of an earlier message", () => {
     const out = expandWidgetTokens('Again [[agentui:a3f9c1]]', [], [tool('t1')]);
     expect(out).toContain('```widget');
