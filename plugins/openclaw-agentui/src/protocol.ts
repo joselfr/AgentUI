@@ -75,12 +75,15 @@ export type PluginMessage =
   | { type: 'miniapp.op'; id: string; op: string; args?: unknown }
   /** Push notification to the user's devices; answered by `notify.result`. */
   | { type: 'notify'; id: string; title: string; body?: string; url?: string }
+  /** Current title of a chat; answered by `thread.result`. */
+  | { type: 'thread.get'; id: string; conversationId: string }
   | { type: 'pong' };
 
 export type GatewayMessage =
   | { type: 'welcome'; protocol: number; miniapps?: boolean; notify?: boolean }
   | { type: 'miniapp.result'; id: string; ok: boolean; result?: unknown; error?: string }
   | { type: 'notify.result'; id: string; ok: boolean; result?: unknown; error?: string }
+  | { type: 'thread.result'; id: string; ok: boolean; result?: { title: string }; error?: string }
   | { type: 'inbound'; conversationId: string; runId: string; text: string; subAgentId?: string; attachments?: Media[] }
   | { type: 'abort'; conversationId: string; runId: string }
   | { type: 'reply'; conversationId: string; runId: string; text: string }

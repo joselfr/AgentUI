@@ -124,6 +124,9 @@ export class GatewayAdapter implements AgentAdapter {
   /** Push notification requested by the plugin (frame `notify`); the result goes back in `notify.result`. */
   onNotify?: (n: { title: string; body?: string; url?: string }) => Promise<unknown>;
 
+  /** Current title of the chat (conversationId of the protocol), asked by the plugin (frame `thread.get`); `undefined` if unknown. */
+  onThreadTitle?: (conversationId: string) => string | undefined;
+
   constructor(private cfg: GatewayConfig) {
     this.id = cfg.id;
     this.name = cfg.name;
@@ -258,6 +261,14 @@ export class GatewayAdapter implements AgentAdapter {
         } catch (e) {
           this.write({ type: 'notify.result', id, ok: false, error: (e as Error).message });
         }
+        return;
+      }
+      case 'thread.get': {
+        if (from !== this.socket) return;
+        const id = String(msg.id);
+        const title = typeof msg.conversationId === 'string' ? this.onThreadTitle?.(msg.conversationId) : undefined;
+        if (title === undefined) return this.write({ type: 'thread.result', id, ok: false, error: 'Conversation not found.' });
+        this.write({ type: 'thread.result', id, ok: true, result: { title } });
         return;
       }
       case 'rpc.result': {

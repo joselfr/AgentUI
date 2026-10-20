@@ -396,6 +396,7 @@ class AgentUIAdapter(BasePlatformAdapter):
         self._approvals: Dict[str, str] = {}  # approval id → Hermes session_key
         self._clarifies: Dict[str, Tuple[str, str]] = {}  # chat → (session_key, clarify_id) of the pending question
         self._asks: Dict[str, _Ask] = {}  # chat → question of a pending interactive tool
+        self._thread_ops: Dict[str, concurrent.futures.Future] = {}  # thread.get id → future resolved by thread.result
         self._notify_ops: Dict[str, concurrent.futures.Future] = {}  # notify id → future resolved by notify.result
         self._miniapp_ops: Dict[str, concurrent.futures.Future] = {}  # miniapp.op id → future resolved by miniapp.result
         self._session_chat: Dict[str, str] = {}  # Hermes session_id (agent or sub-agent) → conversationId
@@ -562,6 +563,14 @@ class AgentUIAdapter(BasePlatformAdapter):
                     fut.set_result(msg.get("result"))
                 else:
                     fut.set_exception(RuntimeError(msg.get("error") or "Notification failed."))
+        elif kind == "thread.result":
+            with self._lock:
+                fut = self._thread_ops.pop(str(msg.get("id")), None)
+            if fut is not None and not fut.done():
+                if msg.get("ok"):
+                    fut.set_result(msg.get("result"))
+                else:
+                    fut.set_exception(RuntimeError(msg.get("error") or "Conversation not found."))
         elif kind == "ping":
             self._post({"type": "pong"})
 
@@ -579,6 +588,21 @@ class AgentUIAdapter(BasePlatformAdapter):
         finally:
             with self._lock:
                 self._miniapp_ops.pop(op_id, None)
+
+    def thread_title(self, conversation_id: str, timeout: float = 15.0) -> Any:
+        """Current title of the chat, asked to AgentUI (agent thread)."""
+        fut: concurrent.futures.Future = concurrent.futures.Future()
+        op_id = f"thread_{uuid.uuid4().hex[:12]}"
+        with self._lock:
+            self._thread_ops[op_id] = fut
+        self._post({"type": "thread.get", "id": op_id, "conversationId": conversation_id})
+        try:
+            return fut.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise RuntimeError("No answer from AgentUI (is the server up to date? reading the title needs a recent AgentUI).")
+        finally:
+            with self._lock:
+                self._thread_ops.pop(op_id, None)
 
     def notify(self, title: str, body: str = "", url: str = "", timeout: float = 30.0) -> Any:
         """Sends a push notification to the user's devices through AgentUI and waits for its result (agent thread)."""
@@ -1444,7 +1468,7 @@ def _register_widget_tools(ctx) -> None:
 
         return handler
 
-    def make_title_handler(_key: str):
+    def make_title_handler(key: str):
         def handler(args: Dict[str, Any], **_kw: Any) -> str:
             try:
                 from gateway.session_context import get_session_env
@@ -1452,6 +1476,13 @@ def _register_widget_tools(ctx) -> None:
                 chat = get_session_env("HERMES_SESSION_CHAT_ID") if get_session_env("HERMES_SESSION_PLATFORM") == PLATFORM else None
             except Exception:
                 chat = None
+            if key == "get_thread_title":
+                if not chat or _ACTIVE is None:
+                    return json.dumps({"error": "This tool only works within an AgentUI discussion."}, ensure_ascii=False)
+                try:
+                    return json.dumps(_ACTIVE.thread_title(chat), ensure_ascii=False)
+                except Exception as e:
+                    return json.dumps({"error": str(e) or type(e).__name__}, ensure_ascii=False)
             title = " ".join(str(args.get("title") or "").split())[:80]
             if not title:
                 return json.dumps({"error": "The title is empty."}, ensure_ascii=False)

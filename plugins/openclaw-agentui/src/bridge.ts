@@ -71,6 +71,7 @@ const NOTIFY_TIMEOUT_MS = 30_000;
 
 export class AgentUIBridge implements RunHost {
   private runs = new Map<string, Run>();
+  private threadOps = new Map<string, { resolve: (v: { title: string }) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private notifyOps = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private miniappOps = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 
@@ -106,6 +107,15 @@ export class AgentUIBridge implements RunHost {
         this.miniappOps.delete(msg.id);
         if (msg.ok) p.resolve(msg.result);
         else p.reject(new Error(msg.error ?? 'Miniapp operation failed.'));
+        return;
+      }
+      case 'thread.result': {
+        const p = this.threadOps.get(msg.id);
+        if (!p) return;
+        clearTimeout(p.timer);
+        this.threadOps.delete(msg.id);
+        if (msg.ok && msg.result) p.resolve(msg.result);
+        else p.reject(new Error(msg.error ?? 'Conversation not found.'));
         return;
       }
       case 'notify.result': {
@@ -352,6 +362,21 @@ export class AgentUIBridge implements RunHost {
       timer.unref?.();
       this.notifyOps.set(id, { resolve, reject, timer });
       client.send({ type: 'notify', id, title, ...(body ? { body } : {}), ...(url ? { url } : {}) });
+    });
+  }
+
+  getTitle(conversationId: string): Promise<{ title: string }> | undefined {
+    const client = this.p.client();
+    if (!client) return undefined;
+    const id = `thread_${randomBytes(6).toString('hex')}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.threadOps.delete(id);
+        reject(new Error('No answer from AgentUI (is the server up to date? reading the title needs a recent AgentUI).'));
+      }, NOTIFY_TIMEOUT_MS);
+      timer.unref?.();
+      this.threadOps.set(id, { resolve, reject, timer });
+      client.send({ type: 'thread.get', id, conversationId });
     });
   }
 

@@ -316,3 +316,17 @@ test('notify: the plugin asks for a push notification and gets notify.result', a
   expect(p.sent.find((m) => m.id === 'n1')).toEqual({ type: 'notify.result', id: 'n1', ok: true, result: { sent: 2 } });
   expect(p.sent.find((m) => m.id === 'n2')).toMatchObject({ ok: false, error: 'The title is empty.' });
 });
+
+test('thread.get: the plugin reads the current title of a chat and gets thread.result', async () => {
+  const { adapter } = setup();
+  adapter.onThreadTitle = (id) => (id === 'conv-1' ? 'Recette de crêpes' : undefined);
+  const p = new FakePlugin();
+  adapter.attach(p, hello());
+  p.frame({ type: 'thread.get', id: 't1', conversationId: 'conv-1' });
+  p.frame({ type: 'thread.get', id: 't2', conversationId: 'unknown' });
+  p.frame({ type: 'thread.get', id: 't3' });
+  await tick();
+  expect(p.sent.find((m) => m.id === 't1')).toEqual({ type: 'thread.result', id: 't1', ok: true, result: { title: 'Recette de crêpes' } });
+  expect(p.sent.find((m) => m.id === 't2')).toMatchObject({ type: 'thread.result', ok: false });
+  expect(p.sent.find((m) => m.id === 't3')).toMatchObject({ ok: false });
+});

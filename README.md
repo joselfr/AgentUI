@@ -141,7 +141,7 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 | `agentui_ask`, `agentui_confirm`, `agentui_form` | Ask the user and wait for the answer. |
 | `agentui_miniapp_*` | Create, write, read, list and remove miniapps, and push data into them. |
 | `agentui_notify` | Send a push notification. |
-| `agentui_set_thread_title` | Rename the current discussion. |
+| `agentui_set_thread_title` / `agentui_get_thread_title` | Rename the current discussion / read its title. |
 
 Schemas and descriptions live in [`plugins/protocol/widget-tools.json`](plugins/protocol/widget-tools.json); the protocol is documented in [`plugins/protocol/PROTOCOL.md`](plugins/protocol/PROTOCOL.md).
 

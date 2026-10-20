@@ -22,6 +22,7 @@ Protocol between AgentUI (the "gateway", like Telegram for a bot) and a **channe
 | `rpc.result` | `id`, `result?` \| `error?` | Answer to an `rpc`. |
 | `miniapp.op` | `id`, `op`, `args?` | Operation on the agent's **miniapps** (Miniapps tab): `create`, `write`, `read`, `list`, `delete_file`, `remove`, `logs`, `data`. Answer: `miniapp.result`. An agent only touches its own apps. |
 | `notify` | `id`, `title`, `body?`, `url?` | **Push notification** to the user's devices (backs the `agentui_notify` tool). `url`: opened on tap — an AgentUI path (`/…`) or an `https://` URL (default `/`). Answer: `notify.result`. |
+| `thread.get` | `id`, `conversationId` | Current **title** of the chat (backs the `agentui_get_thread_title` tool). Answer: `thread.result`. |
 | `pong` | — | Answer to `ping`. |
 
 ## AgentUI → plugin messages
@@ -36,6 +37,7 @@ Protocol between AgentUI (the "gateway", like Telegram for a bot) and a **channe
 | `rpc` | `id`, `method`, `params?` | Optional call. Unknown method: `rpc.result` with `error`. Methods: `listSubAgents` → `[{ id, name, description?, isDefault? }]`; `listJobs {subAgentId?}` → `[{ id, name, schedule, mode?: agent\|script, prompt?, script?, enabled, nextRunAt?, lastRunAt?, lastStatus? }]` (if `capabilities.jobs`); `readJobScript {jobId}` → `{ name, content }` (source of the task's script, if `capabilities.jobs`); `jobAction {jobId, action: pause\|resume\|run\|delete}` → `{ ok: true }` (if `capabilities.jobControl`); `listSkills {subAgentId?}` → `[{ id, name, description?, category?, enabled? }]` (if `capabilities.skills`); `readSkill {skillId, subAgentId?}` → `{ content }` (Markdown of the skill, if `capabilities.skills`); `deleteSession {conversationId}` → `{ ok: true }` (if `capabilities.sessionDelete`); `listModels` → `[{ provider, providerName, id }]`, `setModel {conversationId, model, provider?, subAgentId?}` → `{ model, provider?, message? }` and `sessionUsage {conversationId, subAgentId?}` → `Usage` or `null` (if `capabilities.models`). Dates in milliseconds. |
 | `miniapp.result` | `id`, `ok`, `result?` \| `error?` | Answer to a `miniapp.op`. `ok: false`: `error` is a message readable by the agent (invalid id, miniapp of another agent…). A failing build is **not** an error: `ok: true` with `result = { ok: false, errors: [{ file, line, message }] }`. |
 | `notify.result` | `id`, `ok`, `result?` \| `error?` | Answer to a `notify`. `result = { sent, note? }` (`sent`: devices reached; `0` if none is subscribed). |
+| `thread.result` | `id`, `ok`, `result?: { title }` \| `error?` | Answer to a `thread.get`. |
 | `ping` | — | Keep-alive. |
 
 ## Events (`event.event`)

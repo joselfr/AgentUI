@@ -428,7 +428,7 @@ test('widget tools: agentui_widget_chart / map / code, reserved for AgentUI runs
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_widget_chart', 'agentui_widget_map', 'agentui_widget_code', 'agentui_widget_table', 'agentui_widget_progress', 'agentui_widget_image', 'agentui_widget_custom', 'agentui_ask', 'agentui_confirm', 'agentui_form', 'agentui_widget_custom_wait', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'job', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify', 'agentui_set_thread_title']);
+  assert.deepEqual(opts.names, ['agentui_widget_chart', 'agentui_widget_map', 'agentui_widget_code', 'agentui_widget_table', 'agentui_widget_progress', 'agentui_widget_image', 'agentui_widget_custom', 'agentui_ask', 'agentui_confirm', 'agentui_form', 'agentui_widget_custom_wait', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'job', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify', 'agentui_set_thread_title', 'agentui_get_thread_title']);
   // The manifest declares exactly these tools (contracts.tools), otherwise OpenClaw warns at load
   assert.deepEqual(JSON.parse(readFileSync(new URL('../openclaw.plugin.json', import.meta.url), 'utf8')).contracts.tools, opts.names);
   assert.equal(factory({ messageChannel: 'telegram' }), null);

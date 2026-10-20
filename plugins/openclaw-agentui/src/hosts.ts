@@ -11,6 +11,8 @@ export interface RunHost {
   emitMedia(conversationId: string, media: Media): boolean;
   /** Renames the chat through the running run; `false` if no run is in progress. */
   setTitle(conversationId: string, title: string): boolean;
+  /** Current title of the chat; `undefined` if this bridge is not connected. */
+  getTitle(conversationId: string): Promise<{ title: string }> | undefined;
   /** Miniapp operation on the AgentUI server; `undefined` if this bridge is not connected. */
   miniappOp(op: string, args: unknown): Promise<unknown> | undefined;
   /** Push notification to the user's devices; `undefined` if this bridge is not connected. */
@@ -36,6 +38,14 @@ export function emitMedia(conversationId: string, media: Media): boolean {
 export function setThreadTitle(conversationId: string, title: string): boolean {
   for (const host of runHosts.values()) if (host.setTitle(conversationId, title)) return true;
   return false;
+}
+
+export function getThreadTitle(conversationId: string): Promise<{ title: string }> {
+  for (const host of runHosts.values()) {
+    const pending = host.getTitle(conversationId);
+    if (pending) return pending;
+  }
+  return Promise.reject(new Error('AgentUI is not connected.'));
 }
 
 /** Runs a miniapp operation (`create`, `write`…) on the AgentUI server through the first connected account. */

@@ -384,6 +384,7 @@ async function main() {
       const r = await push.notify({ title: a.title, body: a.body ?? '', url: a.url ?? '/', tag: `notify-${Date.now()}` });
       return { sent: r.sent, ...(r.sent === 0 ? { note: 'No device is subscribed to notifications.' } : {}) };
     };
+    g.onThreadTitle = (conversationId) => runs.findByRemoteSession(g.id, conversationId)?.title;
     g.onOutbound = (m) => {
       const conv = runs.deliver(g.id, m.conversationId, m.text, m.media, g.name, m.title);
       app.log.info({ agent: g.id, conversation: conv.id }, 'proactive message received');

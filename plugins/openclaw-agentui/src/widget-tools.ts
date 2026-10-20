@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
-import { miniappOp, notifyUser, askUser, emitMedia, setThreadTitle } from './hosts.js';
+import { miniappOp, notifyUser, askUser, emitMedia, setThreadTitle, getThreadTitle } from './hosts.js';
 import { imagesError, readLocalImage } from './images.js';
 
 export const MINIAPP_TOOL_PREFIX = `${spec.prefix}miniapp_`;
@@ -170,6 +170,11 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
       description: tool.description,
       parameters: tool.parameters as any,
       async execute(_id: string, args: Args) {
+        if (key === 'get_thread_title') {
+          if (!conversationId) throw new Error('This tool only works within an AgentUI discussion.');
+          const current = await getThreadTitle(conversationId);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(current) }], details: { op: key } };
+        }
         const text = String(args.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
         if (!text) throw new Error('The title is empty.');
         if (!conversationId || !setThreadTitle(conversationId, text)) throw new Error('This tool only works within an ongoing AgentUI exchange.');
