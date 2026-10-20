@@ -339,6 +339,32 @@ test('consumption: the usage event is stored, rebroadcast and does not disturb t
   expect(runs.ensureRemoteSession(fresh.id)).toBe(sid);
 });
 
+test('agent title: the conversation.title event renames the chat, is broadcast as conversation.renamed and is not shown', async () => {
+  const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
+  const adapter = {
+    id: 'a', name: 'A', capabilities: () => ({}),
+    send: async () => ({
+      runId: 'r1', sessionId: 's1',
+      events: (async function* () {
+        yield { type: 'conversation.title', title: '  Recette   de   crêpes  ' } as const;
+        yield { type: 'conversation.title', title: '   ' } as const;
+        yield { type: 'message.final', text: 'Ok' } as const;
+        yield { type: 'run.completed' } as const;
+      })(),
+    }),
+  } as unknown as AgentAdapter;
+  const runs = new RunManager(db, new Map([['a', adapter]]));
+  const pushes: any[] = [];
+  runs.subscribe((p) => pushes.push(p));
+  const conv = runs.createConversation('a');
+  const finished = new Promise<string>((r) => (runs.onRunFinished = (_c, o) => r(o)));
+  await runs.start(conv.id, 'salut');
+  await finished;
+  expect(runs.getConversation(conv.id)!.title).toBe('Recette de crêpes');
+  expect(pushes.filter((p) => p.type === 'conversation.renamed').map((p) => p.title)).toEqual(['salut', 'Recette de crêpes']);
+  expect(pushes.filter((p) => p.type === 'event').map((p) => p.event.type)).toEqual(['message.final', 'run.completed']);
+});
+
 test('agent question: the answer resumes the current run, without opening another one', async () => {
   const db = openDb(mkdtempSync(join(tmpdir(), 'agentui-')));
   const replies: string[] = [];

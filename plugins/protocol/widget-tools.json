@@ -786,5 +786,23 @@
       }
     }
   },
-  "usageGuide": "You are chatting through AgentUI, a web chat that renders Markdown and rich components. Prefer its tools over plain text whenever they fit; do not announce them, just use them:\n- agentui_widget_chart: numeric series or trends (line, bar, pie) instead of listing numbers.\n- agentui_widget_table: comparing several items on several criteria, instead of a Markdown table.\n- agentui_widget_map: any place or route you can locate with certainty.\n- agentui_widget_code: a code, config or diff excerpt the user will copy or reread.\n- agentui_widget_image: showing images or screenshots (URL or local file).\n- agentui_widget_progress: a long task with several steps, updated as you go.\n- agentui_confirm: BEFORE any sensitive or irreversible action (deleting, sending, paying, overwriting).\n- agentui_ask / agentui_form: whenever you need an answer or several inputs from the user; never ask them as plain text.\n- agentui_widget_custom: a one-off interactive component (simulator, converter, filterable list, quiz) written as a React component. For a back-and-forth with the user inside the same component (chess, wizard), make it a live widget: keep a session open with agentui_widget_custom_wait for the user's action, then agentui_widget_custom with `update` + `state`, in a loop.\n- agentui_miniapp_guide then agentui_miniapp_*: a persistent tool the user will keep using (tracker, dashboard, list).\n- agentui_notify: a push notification when a long task finishes or something needs attention while the user is away.\nDisplay tools return a [[agentui:…]] token: write it in your reply where the component should appear."
+  "titleTool": {
+    "set_thread_title": {
+      "description": "Renames the current AgentUI discussion. The title is shown in the conversation list and in the header. Use it once the topic is clear (a discussion starts with the first words of the user's message as its title), or when the subject changes: short and descriptive, in the user's language, no quotes or emoji. Do not call it again without a reason, and do not mention it in your reply.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "The new title: a few words."
+          }
+        },
+        "required": [
+          "title"
+        ]
+      }
+    }
+  },
+  "usageGuide": "You are chatting through AgentUI, a web chat that renders Markdown and rich components. Prefer its tools over plain text whenever they fit; do not announce them, just use them:\n- agentui_widget_chart: numeric series or trends (line, bar, pie) instead of listing numbers.\n- agentui_widget_table: comparing several items on several criteria, instead of a Markdown table.\n- agentui_widget_map: any place or route you can locate with certainty.\n- agentui_widget_code: a code, config or diff excerpt the user will copy or reread.\n- agentui_widget_image: showing images or screenshots (URL or local file).\n- agentui_widget_progress: a long task with several steps, updated as you go.\n- agentui_confirm: BEFORE any sensitive or irreversible action (deleting, sending, paying, overwriting).\n- agentui_ask / agentui_form: whenever you need an answer or several inputs from the user; never ask them as plain text.\n- agentui_widget_custom: a one-off interactive component (simulator, converter, filterable list, quiz) written as a React component. For a back-and-forth with the user inside the same component (chess, wizard), make it a live widget: keep a session open with agentui_widget_custom_wait for the user's action, then agentui_widget_custom with `update` + `state`, in a loop.\n- agentui_miniapp_guide then agentui_miniapp_*: a persistent tool the user will keep using (tracker, dashboard, list).\n- agentui_notify: a push notification when a long task finishes or something needs attention while the user is away.\n- agentui_set_thread_title: give the discussion a short, descriptive title once its topic is clear, or when it changes. Do not mention it.\nDisplay tools return a [[agentui:…]] token: write it in your reply where the component should appear."
 }

@@ -4,13 +4,13 @@
 import { randomBytes } from 'node:crypto';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
-import { miniappOp, notifyUser, askUser, emitMedia } from './hosts.js';
+import { miniappOp, notifyUser, askUser, emitMedia, setThreadTitle } from './hosts.js';
 import { imagesError, readLocalImage } from './images.js';
 
 export const MINIAPP_TOOL_PREFIX = `${spec.prefix}miniapp_`;
 /** Prefix of a tool: `agentui_widget_` for the widgets (and what belongs to a widget, like its live session), `agentui_` for the interactions (ask, confirm, form). */
 const toolPrefix = (t: object) => ('widget' in t && t.widget ? spec.widgetPrefix : spec.prefix);
-export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools).map((k) => spec.widgetPrefix + k), ...Object.entries(spec.blockingTools).map(([k, t]) => toolPrefix(t) + k)].concat(Object.keys(spec.miniappTools).map((k) => MINIAPP_TOOL_PREFIX + k), Object.keys(spec.notifyTool).map((k) => spec.prefix + k));
+export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools).map((k) => spec.widgetPrefix + k), ...Object.entries(spec.blockingTools).map(([k, t]) => toolPrefix(t) + k)].concat(Object.keys(spec.miniappTools).map((k) => MINIAPP_TOOL_PREFIX + k), Object.keys(spec.notifyTool).map((k) => spec.prefix + k), Object.keys(spec.titleTool).map((k) => spec.prefix + k));
 
 type Args = Record<string, any>;
 
@@ -163,6 +163,20 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], details: { op: key } };
       },
     }));
-    return [...display, ...blocking, ...miniapps, ...notify];
+    // Renames the chat: an event of the running run, applied by the AgentUI server.
+    const title = Object.entries(spec.titleTool).map(([key, tool]) => ({
+      name: spec.prefix + key,
+      label: spec.prefix + key,
+      description: tool.description,
+      parameters: tool.parameters as any,
+      async execute(_id: string, args: Args) {
+        const text = String(args.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (!text) throw new Error('The title is empty.');
+        if (!conversationId || !setThreadTitle(conversationId, text)) throw new Error('This tool only works within an ongoing AgentUI exchange.');
+        const result = { title: text };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], details: { op: key } };
+      },
+    }));
+    return [...display, ...blocking, ...miniapps, ...notify, ...title];
   }, { names: WIDGET_TOOL_NAMES });
 }

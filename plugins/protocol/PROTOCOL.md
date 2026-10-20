@@ -51,6 +51,7 @@ Identical to the `AgentEvent` type of `packages/shared` (a single exception: `me
 | `tool.completed` | `id`, `name?`, `result?`, `truncated?`, `failed?` |
 | `subagent.start` / `subagent.sync` / `subagent.end` | `id`, `name`, `sessionId?` / `id` / `id`, `failed?` |
 | `message.media` | `name`, `mimeType`, `data` (base64) — **instead of `url`**: the plugin pushes the content |
+| `conversation.title` | `title` — renames the conversation (backs the `agentui_set_thread_title` tool); emitted into the chat's running run, applied by AgentUI and not shown in the chat |
 | `usage` | `usage`: `{ model?, provider?, inputTokens, outputTokens, cacheReadTokens?, reasoningTokens?, costUsd?, costEstimated? }` — **accumulated** consumption of the session, emitted before `run.completed` (if `capabilities.models`) |
 | `approval.request` | `id`, `description`, `payload?` |
 | `question.requested` | `id` | The agent awaits a user answer **without ending the run** (Hermes' `clarify` tool, OpenClaw's `ask_user`…). To emit **before** the message that carries the question, which the plugin renders in the text (`ask` widget, or `form` for several questions at once). While it is open, AgentUI accepts a user message as the answer (`reply` frame) instead of refusing with "run already in progress". |

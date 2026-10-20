@@ -355,6 +355,13 @@ export class AgentUIBridge implements RunHost {
     });
   }
 
+  setTitle(conversationId: string, title: string): boolean {
+    const run = [...this.runs.values()].find((r) => r.conversationId === conversationId && !r.terminal);
+    if (!run) return false;
+    this.emit(run, { type: 'conversation.title', title });
+    return true;
+  }
+
   emitMedia(conversationId: string, media: Media): boolean {
     const run = [...this.runs.values()].find((r) => r.conversationId === conversationId && !r.terminal);
     if (!run) return false;

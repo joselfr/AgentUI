@@ -9,6 +9,8 @@ export interface RunHost {
   askBlocking(conversationId: string, key: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<AskResult> | undefined;
   /** Pushes a media into the chat's running run; `false` if no run is in progress. */
   emitMedia(conversationId: string, media: Media): boolean;
+  /** Renames the chat through the running run; `false` if no run is in progress. */
+  setTitle(conversationId: string, title: string): boolean;
   /** Miniapp operation on the AgentUI server; `undefined` if this bridge is not connected. */
   miniappOp(op: string, args: unknown): Promise<unknown> | undefined;
   /** Push notification to the user's devices; `undefined` if this bridge is not connected. */
@@ -28,6 +30,11 @@ export function askUser(conversationId: string, key: string, args: Record<string
 
 export function emitMedia(conversationId: string, media: Media): boolean {
   for (const host of runHosts.values()) if (host.emitMedia(conversationId, media)) return true;
+  return false;
+}
+
+export function setThreadTitle(conversationId: string, title: string): boolean {
+  for (const host of runHosts.values()) if (host.setTitle(conversationId, title)) return true;
   return false;
 }
 

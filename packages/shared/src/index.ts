@@ -203,6 +203,8 @@ export type AgentEvent =
   | { type: 'subagent.end'; id: string; failed?: boolean }
   | { type: 'message.media'; url: string; name: string; mimeType?: string }
   | { type: 'attachment.added'; attachment: AttachmentMeta }
+  /** The agent renames the conversation (tool `agentui_set_thread_title`); applied by the server, not shown in the chat. */
+  | { type: 'conversation.title'; title: string }
   /** Accumulated consumption of the session, emitted at the end of a run. */
   | { type: 'usage'; usage: Usage }
   | { type: 'approval.request'; id: string; description: string; payload?: unknown }

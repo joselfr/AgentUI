@@ -531,6 +531,11 @@ export class RunManager {
           if (added) emit({ type: 'attachment.added', attachment: added });
           continue;
         }
+        if (ev.type === 'conversation.title') {
+          const title = String(ev.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+          if (title) this.renameConversation(conv.id, title);
+          continue;
+        }
         if (ev.type === 'usage') { this.setUsage(conv.id, ev.usage); emit(ev); continue; }
         text = this.apply(messageId, ev, text);
         if (ev.type === 'run.failed') outcome = 'failed';

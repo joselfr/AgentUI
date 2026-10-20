@@ -1444,7 +1444,24 @@ def _register_widget_tools(ctx) -> None:
 
         return handler
 
-    for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler), ("miniappTools", None), ("notifyTool", make_notify_handler)):
+    def make_title_handler(_key: str):
+        def handler(args: Dict[str, Any], **_kw: Any) -> str:
+            try:
+                from gateway.session_context import get_session_env
+
+                chat = get_session_env("HERMES_SESSION_CHAT_ID") if get_session_env("HERMES_SESSION_PLATFORM") == PLATFORM else None
+            except Exception:
+                chat = None
+            title = " ".join(str(args.get("title") or "").split())[:80]
+            if not title:
+                return json.dumps({"error": "The title is empty."}, ensure_ascii=False)
+            if not chat or _ACTIVE is None or not _ACTIVE._emit(chat, {"type": "conversation.title", "title": title}):
+                return json.dumps({"error": "This tool only works within an ongoing AgentUI exchange."}, ensure_ascii=False)
+            return json.dumps({"title": title}, ensure_ascii=False)
+
+        return handler
+
+    for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler), ("miniappTools", None), ("notifyTool", make_notify_handler), ("titleTool", make_title_handler)):
         for key, tool in spec.get(kind, {}).items():
             name = (spec["widgetPrefix"] if kind == "tools" or (kind == "blockingTools" and tool.get("widget")) else spec["prefix"]) + ("miniapp_" if kind == "miniappTools" else "") + key
             ctx.register_tool(
