@@ -15,6 +15,7 @@ import Sidebar, { DRAWER } from './components/Sidebar';
 import NavRail, { NAV, type View } from './components/NavRail';
 import Chat from './components/Chat';
 import ChatHeader from './components/ChatHeader';
+import { useSubAgents } from './useSubAgents';
 import ModelChip from './components/ModelChip';
 import NewConversation from './components/NewConversation';
 import SettingsDialog, { type ThemeMode } from './components/SettingsDialog';
@@ -82,6 +83,7 @@ export default function App() {
 
   const current = convs.find((c) => c.id === currentId);
   const agent = agents.find((a) => a.id === (current?.agentId ?? newAgent));
+  const subLabel = useSubAgents(agents);
 
   const onUnauth = useCallback(() => setAuth('out'), []);
   const { ask: askConfirm, dialog: confirmDialog } = useConfirm();
@@ -264,7 +266,7 @@ export default function App() {
   const unreadCount = shownConvs.filter((c) => c.unread && !c.archived).length;
   const nav = <NavRail unread={unreadCount} view={view} onView={(v) => { navigate(v === 'chats' ? chatPath.current : `/${v}`, { replace: !wide && drawer && v !== 'chats' }); if (v === 'chats') setDrawer(true); else closeDrawer(); }} onSettings={() => { setSettings(true); closeDrawer(); }} settingsOpen={settings} />;
   const sidebar = (
-    <Sidebar agents={agents} convs={shownConvs} currentId={currentId}
+    <Sidebar agents={agents} subLabel={subLabel} convs={shownConvs} currentId={currentId}
       onSelectConv={(id) => { setCurrentId(id, !wide && drawer); closeDrawer(); }}
       onNew={() => { setNewDlg(true); closeDrawer(); }}
       onDelete={deleteConv} onArchive={archiveConv} onArchiveMany={archiveMany} onDeleteMany={deleteMany} onToggleFavorite={toggleFavorite} onRename={renameConv} onClose={() => (wide ? setListOpen(false) : setDrawer(false))} />
@@ -285,7 +287,7 @@ export default function App() {
             sx={{ width: wide ? DRAWER : 0, flexShrink: 0, '& .MuiDrawer-paper': { width: wide ? DRAWER : `min(${NAV + DRAWER}px, 90vw)`, overflowX: 'hidden', position: wide ? 'relative' : 'fixed', borderWidth: '0 1px 0 0', borderStyle: 'solid' } }}>{drawerContent}</Drawer>)}
         {view === 'chats' ? (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <ChatHeader title={current?.title ?? t('chat.new')} agent={agent} showListButton={!wide || !listOpen} onShowList={() => (wide ? setListOpen(true) : setDrawer(true))} />
+          <ChatHeader title={current?.title ?? t('chat.new')} agent={agent} sub={current ? subLabel(current.agentId, current.subAgentId) : subLabel(newAgent ?? '', sub)} showListButton={!wide || !listOpen} onShowList={() => (wide ? setListOpen(true) : setDrawer(true))} />
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {agent ? (
               <Chat title={current?.title ?? ''} agentName={agent.name} messages={messages} loading={loadingMsgs} isNew={!currentId} running={running} awaiting={running && awaitingReply(messages)} expandTools={expandTools}

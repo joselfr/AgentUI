@@ -20,7 +20,7 @@ export const DRAWER = 280;
 
 /** Chat list: favorites first, Cron tasks / Archived sections, agent filter, search, multi-selection. */
 export default function Sidebar(props: {
-  agents: AgentInfo[]; convs: Conversation[]; currentId?: string;
+  agents: AgentInfo[]; subLabel: (agentId: string, subAgentId?: string) => string | undefined; convs: Conversation[]; currentId?: string;
   onSelectConv: (id: string) => void; onNew: () => void; onDelete: (c: Conversation) => void; onArchive: (c: Conversation, archived: boolean) => void;
   onArchiveMany: (cs: Conversation[], archived: boolean) => void; onDeleteMany: (cs: Conversation[]) => Promise<boolean>; onToggleFavorite: (c: Conversation) => void; onRename: (c: Conversation, title: string) => void; onClose: () => void;
 }) {
@@ -55,7 +55,7 @@ export default function Sidebar(props: {
   }, []);
 
   const item = (c: Conversation) => (
-    <ConversationItem key={c.id} conv={c} current={c.id === props.currentId} agentName={agentName(c.agentId)}
+    <ConversationItem key={c.id} conv={c} current={c.id === props.currentId} agentName={agentName(c.agentId)} sub={props.subLabel(c.agentId, c.subAgentId)}
       selecting={selection.selecting} checked={selection.has(c.id)} menuHandlers={itemMenu.bind(c)}
       onClick={() => { if (itemMenu.consumeClick()) return; if (selection.selecting) selection.toggle(c.id); else props.onSelectConv(c.id); }} />
   );

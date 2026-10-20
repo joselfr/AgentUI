@@ -6,7 +6,7 @@ import StatusDot from './StatusDot';
 import { t } from '../i18n';
 
 /** Chat top bar: list toggle button, chat title, agent and its connection status. */
-export default function ChatHeader({ title, agent, showListButton, onShowList }: { title: string; agent?: AgentInfo; showListButton: boolean; onShowList: () => void }) {
+export default function ChatHeader({ title, agent, sub, showListButton, onShowList }: { title: string; agent?: AgentInfo; sub?: string; showListButton: boolean; onShowList: () => void }) {
   return (
     <AppBar position="static" color="transparent" elevation={0}
       sx={{ border: 0, borderBottom: 1, borderColor: 'divider', backdropFilter: 'blur(12px)', bgcolor: (t) => alpha(t.palette.background.default, 0.8) }}>
@@ -15,9 +15,14 @@ export default function ChatHeader({ title, agent, showListButton, onShowList }:
         <Typography variant="subtitle1" noWrap sx={{ flex: 1 }}>{title}</Typography>
         {agent && (
           <Chip size="small" variant="outlined"
-            label={<Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><StatusDot status={agent.status} /><Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{agent.name}</Box></Box>}
+            label={(
+              <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <StatusDot status={agent.status} />
+                <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{agent.name}</Box>
+                {sub && <Box component="span" sx={{ flexShrink: 0, px: 0.9, lineHeight: '17px', fontSize: 11, fontWeight: 600, borderRadius: 999, border: 1, borderColor: 'divider', bgcolor: (t) => alpha(t.palette.text.primary, 0.07) }}>{sub}</Box>}
+              </Box>)}
             title={agent.status === 'connected' ? agent.type : agent.statusDetail ?? agent.status}
-            sx={{ height: 32, fontWeight: 600, maxWidth: { xs: 140, sm: 260 }, '& .MuiChip-label': { px: 1.5 } }} />)}
+            sx={{ height: 32, fontWeight: 600, maxWidth: { xs: 200, sm: 320 }, '& .MuiChip-label': { px: 1.5 } }} />)}
       </Toolbar>
     </AppBar>
   );
