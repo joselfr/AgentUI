@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Box, CircularProgress, IconButton, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, IconButton, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import Close from '@mui/icons-material/Close';
+import Send from '@mui/icons-material/Send';
 import { themeCssVars, type WidgetEvent } from '@agentui/shared';
 import { api } from '../api';
 import { getLang, t, useLang } from '../i18n';
@@ -37,6 +38,20 @@ const safeUrl = (u: unknown): string | undefined => {
  */
 export const REPLY_MAX = 2000;
 const REPLY_COOLDOWN_MS = 1500;
+const TRACES_MAX = 4000;
+const MAX_RUNTIME_ERRORS = 5;
+
+const cut = (e: string) => (e.length > 1000 ? `${e.slice(0, 1000)}…` : e); // keeps the context and the request below within the limit
+
+/** Message sent to the agent when its widget fails: everything it needs to debug it (it already has the code in the conversation). */
+export function tracesMessage(o: { token?: string; title?: string; build: string[]; runtime: string[]; mode: string; lang: string; width: number }): string {
+  const parts = [t('ui.traces.intro', { widget: o.token ?? o.title ?? t('ui.title') })];
+  if (o.build.length) parts.push(`${t('ui.traces.build')}\n${o.build.map(cut).join('\n')}`);
+  if (o.runtime.length) parts.push(`${t('ui.traces.runtime')}\n${o.runtime.map(cut).join('\n---\n')}`);
+  parts.push(`${t('ui.traces.context')} theme=${o.mode}, lang=${o.lang}, width=${o.width}px, ${navigator.userAgent}`);
+  parts.push(t('ui.traces.ask'));
+  return parts.join('\n\n').slice(0, TRACES_MAX);
+}
 
 export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: string, widget?: WidgetEvent) => Promise<boolean> }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -45,7 +60,8 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
   const mode = muiTheme.palette.mode;
   const [base, setBase] = useState<string>();
   const [errors, setErrors] = useState<string[]>([]);
-  const [runtimeError, setRuntimeError] = useState('');
+  const [runtimeErrors, setRuntimeErrors] = useState<string[]>([]);
+  const [sent, setSent] = useState(false);
   const [ready, setReady] = useState(false);
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
   // Full screen (`requestFullscreen()` in the widget): the SAME iframe is stretched over the viewport, never moved or remounted, so the widget keeps
@@ -72,7 +88,7 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
 
   useEffect(() => {
     let live = true;
-    setBase(undefined); setReady(false); setErrors([]); setRuntimeError('');
+    setBase(undefined); setReady(false); setErrors([]); setRuntimeErrors([]); setSent(false);
     api.buildWidget(ui.code).then((r) => {
       if (!live) return;
       if (r.ok) setBase(r.base);
@@ -122,7 +138,7 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
         } else leaveFs();
       }
       else if (m?.type === 'agentui:resize' && typeof m.height === 'number') setHeight(Math.max(MIN_HEIGHT, Math.min(m.height, ui.maxHeight)));
-      else if (m?.type === 'agentui:error') setRuntimeError(String(m.message ?? ''));
+      else if (m?.type === 'agentui:error') { const msg = String(m.message ?? ''); setSent(false); setRuntimeErrors((p) => (p.includes(msg) ? p : [...p, msg].slice(-MAX_RUNTIME_ERRORS))); }
       else if (m?.type === 'agentui:open') { const url = safeUrl(m.url); if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
       else if (m?.type === 'agentui:reply' && typeof m.id === 'string') {
         // The text goes to the agent as if the user had typed it, so it is only accepted when the user is plausibly the one acting:
@@ -141,11 +157,19 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
     return () => window.removeEventListener('message', onMsg);
   }, [postTheme, postChat, postState, postFs, enterFs, leaveFs, ui.maxHeight]);
 
+  const sendTraces = () => {
+    const text = tracesMessage({ token: ui.token, title: ui.title, build: errors, runtime: runtimeErrors, mode, lang, width: Math.round(wrap.current?.clientWidth ?? 0) });
+    void onReply?.(text).then((ok) => setSent(ok));
+  };
+  const tracesButton = onReply && (
+    <Button size="small" variant="outlined" startIcon={<Send />} disabled={sent} onClick={sendTraces} sx={{ mt: 1 }}>{sent ? t('ui.traces.sent') : t('ui.traces.send')}</Button>);
+
   if (errors.length) {
     return (
       <Alert severity="warning" sx={{ my: 1, '& .MuiAlert-message': { minWidth: 0 } }}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('ui.error')}</Typography>
         <Box component="pre" sx={{ m: 0, mt: 0.5, fontSize: 12, whiteSpace: 'pre-wrap', border: 0, p: 0, bgcolor: 'transparent' }}>{errors.join('\n')}</Box>
+        {tracesButton}
       </Alert>
     );
   }
@@ -165,7 +189,11 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
           </IconButton>)}
       </Box>
       </Box>
-      {runtimeError && <Alert severity="error" onClose={() => setRuntimeError('')} sx={{ mt: 0.5, whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{runtimeError}</Alert>}
+      {runtimeErrors.length > 0 && (
+        <Alert severity="error" onClose={() => setRuntimeErrors([])} sx={{ mt: 0.5, '& .MuiAlert-message': { minWidth: 0 } }}>
+          <Box sx={{ whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{runtimeErrors[runtimeErrors.length - 1]}</Box>
+          {tracesButton}
+        </Alert>)}
     </Box>
   );
 }
