@@ -288,14 +288,18 @@ async def main():
         await server.send({"type": "inbound", "conversationId": "cron-watch", "runId": "rc", "text": "long"})
         await asyncio.sleep(0.3)
         await adapter.send("cron-watch", "Task result", metadata={"job_id": "unknown", "notify": True})
+        await adapter.send("cron-watch", "⏳ Working — 3 min — iteration 2/150, terminal", metadata={"_interim_send": True})
+        await adapter.send("cron-watch", "↪ Redirected current run (1 min elapsed). I'll adjust using your correction.")
         await adapter.send("cron-watch", "text of the reply in progress")
         frames = await server.until(lambda f: f.get("type") == "outbound")
         out = frames[-1]
         assert out["conversationId"] == "cron-watch" and out["title"] == "⏰ watch" and out["text"] == "Task result", out
         assert not any(f.get("runId") == "rc" and "Task result" in json.dumps(f, ensure_ascii=False) for f in frames), "not mixed with the reply"
         agent.release.set()
-        await server.until(lambda f: f.get("runId") == "rc" and f["event"]["type"].startswith("run."))
+        frames += await server.until(lambda f: f.get("runId") == "rc" and f["event"]["type"].startswith("run."))
         agent.release.clear()
+        blob = json.dumps(frames, ensure_ascii=False)
+        assert "Working" not in blob and "Redirected" not in blob, "gateway notices stay out of the reply"
         print("✓ cron delivery separate and titled, even during a reply")
 
         # 4. approval

@@ -262,6 +262,24 @@ def _read_source(src: str) -> tuple[str, bytes, Optional[str]]:
     return path.name, path.read_bytes(), None
 
 
+# Gateway "busy" acknowledgements sent as plain replies while a turn is running (gateway/run_busy.py).
+_BUSY_ACK_PREFIXES = (
+    "↪ Redirected current run",
+    "⏩ Steered into current run",
+    "⏳ Queued for the next turn",
+    "⚡ Interrupting current task",
+    "⏳ Subagent working",
+    "⏳ Compressing context",
+)
+
+
+def _is_gateway_notice(content: str, metadata: Optional[Dict[str, Any]]) -> bool:
+    """Gateway status chatter (long-running heartbeat, busy acks) that is not part of the agent's reply."""
+    if (metadata or {}).get("_interim_send"):
+        return True
+    return (content or "").lstrip().startswith(_BUSY_ACK_PREFIXES)
+
+
 def _strip_cursor(text: str) -> str:
     """Removes the streaming cursor ("▉") added to previews by the stream consumer."""
     try:
@@ -857,6 +875,10 @@ class AgentUIAdapter(BasePlatformAdapter):
         if capture is not None:  # reply to a control command (rpc setModel), not a message of the chat
             if not capture.done():
                 self._loop.call_soon_threadsafe(lambda: capture.done() or capture.set_result(content))
+            return SendResult(success=True, message_id=message_id)
+        if _is_gateway_notice(content, metadata):
+            # "⏳ Working — N min…" heartbeats and busy acks: AgentUI already shows the run state, and keeping them
+            # as bubbles would glue them to the start of the stored reply.
             return SendResult(success=True, message_id=message_id)
         job_id = (metadata or {}).get("job_id")
         if job_id:
