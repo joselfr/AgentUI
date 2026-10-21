@@ -231,7 +231,9 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
         bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
         '& pre': { overflow: 'auto', p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: 1, borderColor: 'divider', fontSize: 13 },
         '& code': { fontSize: '0.88em' }, '& :not(pre) > code': { px: 0.6, py: 0.15, borderRadius: 1, bgcolor: 'action.selected' },
-        '& p': { my: 0.5 }, '& a': { color: 'primary.main' }, '& table': { borderCollapse: 'collapse', display: 'block', maxWidth: '100%', overflowX: 'auto' }, '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5 },
+        '& p': { my: 0.5 }, '& a': { color: 'primary.main' }, '& table': { borderCollapse: 'collapse', display: 'block', maxWidth: '100%', overflowX: 'auto' }, '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5, verticalAlign: 'top' },
+        // Browsers center <th> by default while <td> is left-aligned: align both the same unless the Markdown (:---:) says otherwise
+        '& th:not([align]):not([style*="text-align"])': { textAlign: 'start' },
         // Small screen: a table with 3 or more columns becomes a series of cards, one line per attribute
         '@media (max-width: 599.95px)': {
           '& table.stackable, & table.stackable tbody, & table.stackable tr, & table.stackable td': { display: 'block', overflowX: 'visible' },
