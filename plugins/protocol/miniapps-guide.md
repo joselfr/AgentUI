@@ -86,6 +86,7 @@ export default function App() {
 | `Dialog` | `open`, `title?`, `onClose`, `actions?`, children |
 | `Spinner` | `center?` |
 | `EmptyState` | `icon?`, `title`, `description?`, `action?` |
+| `Media` | `name`, `alt?`, `style?`, `className?` — an image, video (with controls) or audio file given by the agent (see *Media* below) |
 | `Chart` | `type`: `line` `bar` `doughnut`; `labels: string[]`; `series: {name, data: number[]}[]`; `height?` — themed chart.js |
 
 Icon names (`Icon`, `Button icon`, `IconButton icon`): add, close, check, delete, edit, search, refresh, back, forward, star, heart, info, warning, error, chevron-right, chevron-down, send, download, play, pause, more, home, person, apps, checklist.
@@ -104,7 +105,7 @@ The miniapp must look native. **Use the components above and the CSS variables; 
 - Custom CSS goes in a `.css` file imported from a module, referencing those variables: `border: 1px solid var(--au-line); background: var(--au-paper); border-radius: var(--au-radius);`.
 - Base font size is 14px; spacing multiples of 4/8px. Design **mobile first** (see the section below): the miniapp is mostly used on a phone.
 - The page itself does not scroll: `Page` scrolls internally. Do not use `100vh` tricks; fill the available space.
-- No external resources in the front (images, fonts, scripts, CDN, direct `fetch` to the internet): the iframe is sandboxed and its CSP blocks them. Use inline SVG or `data:` URLs; fetch external data through `ctx.fetch` in a handler. For live data, refresh with `setInterval` + `api.get(...)` or `useApi`.
+- No external resources in the front (images, fonts, scripts, CDN, direct `fetch` to the internet): the iframe is sandboxed and its CSP blocks them. For photos, videos and audio use the media files you add with `agentui_miniapp_asset` (see *Media* below); otherwise inline SVG or `data:` URLs; fetch external data through `ctx.fetch` in a handler. For live data, refresh with `setInterval` + `api.get(...)` or `useApi`.
 - External links: `window.open` and `target="_blank"` are blocked by the sandbox, so use `openUrl(url)` from `@agentui/ui` (or a plain `<a href="https://…">`, which is routed through it). The host opens it in a new tab; only `http(s):`, `mailto:` and `tel:` are accepted. Call it from a user action (click).
 - No `localStorage`/cookies (opaque origin): persist through the handlers (`ctx.db` / `ctx.kv`).
 
@@ -125,6 +126,19 @@ Users open miniapps on a phone at least as often as on a desktop. Design the nar
 - Charts: use `Chart` with a `height` around 200–240 and few labels; it adapts to the container width.
 - Dialogs fit the screen (`Dialog` is limited to the viewport and scrolls); keep their content short.
 - Test mentally (or with `getComputedStyle`) at 360 px wide before delivering.
+
+### Media (images, videos, audio)
+
+The iframe cannot load a URL or a file of your machine, so media go through AgentUI. Give the miniapp a file with `agentui_miniapp_asset` (`id`, `src` = absolute path on your machine, optional `name`): png, jpeg, gif, webp, mp4, webm, mov, mp3, m4a, ogg, wav, flac, up to 25 MB each and 40 files per miniapp. Calling it again with the same `name` replaces the file and open miniapps refresh; `agentui_miniapp_delete_asset` removes one. The assets are listed by `agentui_miniapp_list`.
+
+```tsx
+import { Media, useMedia } from '@agentui/ui';
+
+<Media name="cover.jpg" alt="Cover" style={{ borderRadius: 12 }} />   // image, <video controls> or <audio controls> depending on the file
+const m = useMedia('intro.mp4');   // { url, kind: 'image' | 'video' | 'audio', mimeType, loading, error } — url works as <img src>, <video src>, <audio src>, canvas drawImage… (set `crossOrigin="anonymous"` on your own <img>/<video> to read pixels back with getImageData)
+```
+
+Refer to assets by `name` only (no path). Store the names the user can pick in `ctx.db` if the list is dynamic (e.g. a photo gallery: one document per photo with `{ title, asset: 'cat.jpg' }`). Show a `Spinner` or the `Media` placeholder while loading, and handle `error` (file removed). PDFs and Markdown are not supported here.
 
 ## Handlers (`server/*.js`)
 

@@ -99,6 +99,15 @@ const resolverOf = (args: Record<string, unknown>, m: Message) => (src: string):
   return a ? { state: 'ok', url: `/api/attachments/${a.id}` } : m.status === 'streaming' && files[src] ? { state: 'loading' } : { state: 'error' };
 };
 
+/**
+ * Media of a custom widget: the widget may be shown while the agent is still copying the files, so until the end of the message a file
+ * the tool result has not mapped yet is awaited (then, if it never came, it is an error).
+ */
+const widgetMediaResolver = (args: Record<string, unknown>, m: Message) => (src: string): Resolved => {
+  const files = (args.files ?? {}) as Record<string, string>;
+  return m.status === 'streaming' && !(src in files) ? { state: 'loading' } : resolverOf(args, m)(src);
+};
+
 /** Display widgets (no answer): ```widget block or `agentui_widget_<type>` tool. `undefined` if the type or arguments are invalid. */
 function displayWidget(w: { type: string; arguments: Record<string, unknown> } | undefined, m: Message, onReply?: ReplyFor): ReactElement | undefined {
   if (w?.type === 'chart') { const chart = parseChart(w.arguments); if (chart) return <ChartCard chart={chart} />; }
@@ -110,7 +119,7 @@ function displayWidget(w: { type: string; arguments: Record<string, unknown> } |
   if (w?.type === 'audio') { const audio = parseAudio(w.arguments); if (audio && resolve) return <AudioCard audio={audio} resolve={resolve} />; }
   if (w?.type === 'pdf') { const pdf = parsePdf(w.arguments); if (pdf && resolve) return <PdfCard pdf={pdf} resolve={resolve} />; }
   if (w?.type === 'markdown') { const doc = parseMarkdown(w.arguments); if (doc && resolve) return <MarkdownCard doc={doc} resolve={resolve} />; }
-  if (w?.type === 'custom') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply?.(ui.token)} />; }
+  if (w?.type === 'custom') { const ui = parseUi(w.arguments); if (ui) return <UiCard ui={ui} onReply={onReply?.(ui.token)} resolve={ui.media?.length ? widgetMediaResolver(w.arguments, m) : undefined} />; }
   if (w?.type === 'code') { const code = parseCode(w.arguments); if (code) return <CodeCard code={code} />; }
   return undefined;
 }

@@ -480,7 +480,7 @@ test('widget tools: agentui_widget_chart / map / code, reserved for AgentUI runs
   const entry = (await import('../dist/index.js')).default;
   let factory, opts;
   entry.registerFull({ registerService: () => {}, registerTool: (f, o) => ((factory = f), (opts = o)) });
-  assert.deepEqual(opts.names, ['agentui_widget_chart', 'agentui_widget_map', 'agentui_widget_code', 'agentui_widget_table', 'agentui_widget_progress', 'agentui_widget_image', 'agentui_widget_custom', 'agentui_widget_video', 'agentui_widget_audio', 'agentui_widget_pdf', 'agentui_widget_markdown', 'agentui_ask', 'agentui_confirm', 'agentui_form', 'agentui_widget_custom_wait', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'job', 'data'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify', 'agentui_set_thread_title', 'agentui_get_thread_title']);
+  assert.deepEqual(opts.names, ['agentui_widget_chart', 'agentui_widget_map', 'agentui_widget_code', 'agentui_widget_table', 'agentui_widget_progress', 'agentui_widget_image', 'agentui_widget_custom', 'agentui_widget_video', 'agentui_widget_audio', 'agentui_widget_pdf', 'agentui_widget_markdown', 'agentui_ask', 'agentui_confirm', 'agentui_form', 'agentui_widget_custom_wait', ...['guide', 'create', 'write', 'read', 'list', 'delete_file', 'remove', 'logs', 'job', 'data', 'asset', 'delete_asset'].map((k) => `agentui_miniapp_${k}`), 'agentui_notify', 'agentui_set_thread_title', 'agentui_get_thread_title']);
   // The manifest declares exactly these tools (contracts.tools), otherwise OpenClaw warns at load
   assert.deepEqual(JSON.parse(readFileSync(new URL('../openclaw.plugin.json', import.meta.url), 'utf8')).contracts.tools, opts.names);
   assert.equal(factory({ messageChannel: 'telegram' }), null);
@@ -615,4 +615,25 @@ test('agentui_widget_custom_wait: a widget event, a typed message and a timeout 
   assert.deepEqual(waitResult(JSON.stringify({ agentui: 'timeout' })), { timeout: true });
   assert.match(askError('custom_wait', { widget: 'abc' }), /widget/);
   assert.equal(askError('custom_wait', { widget: '[[agentui:a1b2c3]]' }), undefined);
+});
+
+test('media for custom widgets and miniapps: images, videos and audio only, absolute paths, safe asset names', async () => {
+  const { readLocalVisual, assetName } = await import('../dist/src/images.js');
+  const { widgetError } = await import('../dist/src/widget-tools.js');
+  const dir = mkdtempSync(join(tmpdir(), 'agentui-oc-visual-'));
+  const put = (name, bytes) => { const f = join(dir, name); writeFileSync(f, bytes); return f; };
+  const png = await readLocalVisual(put('logo.png', Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(20)])));
+  assert.equal(png.mimeType, 'image/png');
+  assert.match(png.name, /^agentui-img-[0-9a-f]{8}-logo\.png$/, 'hidden under the message: it is only for the widget');
+  const mp4 = await readLocalVisual(put('clip.bin', Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom'), Buffer.alloc(20)])));
+  assert.equal(mp4.mimeType, 'video/mp4', 'the type comes from the content, not from the name');
+  await assert.rejects(readLocalVisual(put('doc.pdf', Buffer.from('%PDF-1.7 ........'))), /not an image/);
+  await assert.rejects(readLocalVisual(join(dir, 'missing.png')), /not found/);
+  assert.equal(assetName('/x/My photo (1).jpg'), 'My_photo_1_.jpg');
+  assert.equal(assetName('/x/a.png', '../evil.png'), '_evil.png');
+  assert.equal(assetName('/x/a.png', 'cover.png'), 'cover.png');
+  const ok = { code: 'export default function W() { return null; }' };
+  assert.equal(widgetError('custom', { ...ok, media: ['/a/b.png'] }), undefined);
+  assert.match(widgetError('custom', { ...ok, media: ['https://x/y.png'] }), /absolute path/);
+  assert.match(widgetError('custom', { ...ok, media: Array(9).fill('/a.png') }), /At most 8/);
 });

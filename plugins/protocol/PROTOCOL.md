@@ -90,6 +90,13 @@ AgentUI sessions.
 that uses the miniapps UI kit (`@agentui/ui`, `react`, `chart.js`, `leaflet` only). Plugins only validate it (non-empty, ≤ 64 KB, has an
 `export default`); the front end sends the code to `POST /api/widgets`, which compiles it (esbuild, cached by hash) and returns the
 URL of a token-protected sandboxed iframe (`/w/<hash>/<token>/`, same runtime and CSP as a miniapp, no backend, no `/api`).
+
+**Media in a custom widget.** The optional `media` argument lists absolute paths (8 at most) of images, videos or audio files on the agent's machine.
+For each one the plugin reads the file, checks its real type from the content, pushes it as a `message.media` named `agentui-img-<fingerprint>-<file>`
+(hidden under the message, like the media of the other widgets) and returns `files` = `{ path → attachment name }` in the tool result. The widget refers to a file by
+the path exactly as declared (`<Media name={path} />`, `useMedia(path)`): the iframe has no cookie and its CSP forbids remote loads, so it asks the host
+(`agentui:media`), which answers with a URL under the iframe's own token-protected base (`/w/<hash>/<token>/att/<attachment id>`, `agentui:media.result`), served with byte
+ranges (`media-src 'self'`: streaming, seeking, iOS Safari). A file still being copied is awaited until the end of the message.
 Nothing is stored apart from the tool call itself, so the widget survives a reload but not the component state.
 A widget can ask to be shown over the whole screen: `requestFullscreen()` / `exitFullscreen()` / `useFullscreen()` / `useHeight()` (`@agentui/ui`). The
 host (`UiCard`) does not move or reload the iframe, it stretches that same element over the viewport (`position: fixed`, so the component keeps its
@@ -133,7 +140,9 @@ live on the AgentUI server; the plugin is only a relay: each `agentui_miniapp_<o
 `widget-tools.json`) sends a `miniapp.op` frame and waits for the matching `miniapp.result` (suggested timeout: 60 s). Exception:
 `agentui_miniapp_guide`, local, returns the `miniapps-guide.md` guide (embedded by `sync-widget-tools.mjs` under `miniappGuide`, and also
 published as the `.claude/skills/agentui-miniapps` skill). The server compiles (esbuild), isolates the handlers (worker + vm) and serves
-the front in a sandboxed iframe. A miniapp's handlers have no direct network access: `ctx.fetch` goes through the server, which refuses private/internal addresses. See `miniapps-guide.md` for the agent-side constraint.
+the front in a sandboxed iframe. Media of a miniapp (images, videos, audio) are its **assets**: `agentui_miniapp_asset` (`id`, `src`, `name?`) is read by the plugin
+on the agent's machine and sent as the `asset` op (`id`, `name`, `data` base64, 25 MB, 40 per miniapp, type checked from the content); `delete_asset` removes one. The front shows them
+with `<Media name>` / `useMedia(name)`, through the same host bridge as above (`/m/<id>/<token>/assets/<name>`). A miniapp's handlers have no direct network access: `ctx.fetch` goes through the server, which refuses private/internal addresses. See `miniapps-guide.md` for the agent-side constraint.
 
 ## Rules
 

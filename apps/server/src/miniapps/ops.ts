@@ -14,6 +14,8 @@ const SCHEMAS = {
   list: z.object({}).passthrough(),
   delete_file: z.object({ id, path }),
   remove: z.object({ id }),
+  asset: z.object({ id, name: z.string().min(1).max(100), data: z.string().min(1) }), // base64 content, read by the plugin from the agent's machine
+  delete_asset: z.object({ id, name: z.string().min(1).max(100) }),
   logs: z.object({ id }),
   job: z.object({ id, action: z.enum(['link', 'unlink', 'list']), job_id: z.string().min(1).max(200).optional() }),
   data: z.object({
@@ -51,7 +53,7 @@ export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: s
     case 'read':
       return { path: a.path, content: store.readFile(a.id, agentId, a.path) };
     case 'list':
-      return store.list().filter((x) => x.agentId === agentId).map((x) => ({ ...x, files: store.files(x.id), fs: store.fsGrants(x.id) }));
+      return store.list().filter((x) => x.agentId === agentId).map((x) => ({ ...x, files: store.files(x.id), assets: store.assets(x.id), fs: store.fsGrants(x.id) }));
     case 'delete_file': {
       const r = await store.deleteFile(a.id, agentId, a.path);
       return r.ok ? { ok: true } : { ok: false, errors: r.errors };
@@ -67,6 +69,14 @@ export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: s
       else store.unlinkJob(agentId, a.job_id);
       return { ok: true, jobs: store.jobsOf(a.id) };
     }
+    case 'asset': {
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(a.data)) throw new AppError('The asset content must be base64.');
+      const r = store.writeAsset(a.id, agentId, a.name, Buffer.from(a.data, 'base64'));
+      return { ok: true, ...r, usage: `In the front: useMedia('${r.name}') or <Media name="${r.name}" />.` };
+    }
+    case 'delete_asset':
+      store.deleteAsset(a.id, agentId, a.name);
+      return { ok: true };
     case 'logs':
       return { lines: store.getLogs(a.id, agentId) };
     case 'data': {

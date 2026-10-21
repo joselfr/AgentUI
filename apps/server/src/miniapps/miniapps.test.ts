@@ -12,6 +12,7 @@ import { FILE_RATE_LIMIT, registerMiniApps, signAppToken, verifyAppToken } from 
 import { runHandler, sanitizeHeaders } from './sandbox.js';
 import { AppError, MiniAppStore } from './store.js';
 import { WidgetStore } from './widgets.js';
+import { AttachmentStore } from '../attachments.js';
 
 let dir: string;
 let db: DB;
@@ -67,6 +68,31 @@ describe('store', () => {
     expect(() => store.create('a1', { id: '../x', name: 'x' })).toThrow(AppError);
     await expect(store.writeFiles('todo', 'a1', [{ path: 'src/../../etc/passwd.js', content: 'x' }])).rejects.toThrow(/Invalid path/);
     await expect(store.writeFiles('todo', 'a1', [{ path: 'server/sub/x.js', content: 'x' }])).rejects.toThrow(/Invalid/);
+  });
+});
+
+describe('assets', () => {
+  const PNG = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(20)]);
+  const MP4 = Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom'), Buffer.alloc(20)]);
+
+  it('stores images and videos by their real type and refuses anything else', () => {
+    store.create('a1', { id: 'gal', name: 'Gallery' });
+    expect(store.writeAsset('gal', 'a1', 'logo.png', PNG)).toMatchObject({ mimeType: 'image/png' });
+    expect(store.writeAsset('gal', 'a1', 'clip.mov', MP4).mimeType).toBe('video/mp4'); // the extension means nothing
+    expect(store.assets('gal').map((a) => a.name)).toEqual(['clip.mov', 'logo.png']);
+    expect(() => store.writeAsset('gal', 'a1', 'x.png', Buffer.from('<svg onload=alert(1)>'))).toThrow(AppError);
+    expect(() => store.writeAsset('gal', 'a1', '../x.png', PNG)).toThrow(AppError);
+    expect(() => store.writeAsset('gal', 'a1', 'a/b.png', PNG)).toThrow(AppError);
+    expect(() => store.writeAsset('gal', 'other', 'y.png', PNG)).toThrow(AppError); // not the owner
+  });
+
+  it('serves them to the logged-in host only and removes them with the miniapp', async () => {
+    store.create('a1', { id: 'gal', name: 'Gallery' });
+    store.writeAsset('gal', 'a1', 'logo.png', PNG);
+    expect(store.asset('gal', 'logo.png')?.mimeType).toBe('image/png');
+    expect(store.asset('gal', '../../x')).toBeUndefined();
+    store.deleteAsset('gal', 'a1', 'logo.png');
+    expect(store.asset('gal', 'logo.png')).toBeUndefined();
   });
 });
 
@@ -196,7 +222,7 @@ describe('network', () => {
 describe('public handlers', () => {
   const server = async () => {
     const app = Fastify();
-    registerMiniApps(app, { store, widgets: new WidgetStore(dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
     await app.ready();
     return app;
   };
@@ -271,7 +297,7 @@ describe('file grants', () => {
 describe('handler response headers', () => {
   const server = async () => {
     const app = Fastify();
-    registerMiniApps(app, { store, widgets: new WidgetStore(dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as any, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as any, runtimeDir: dir });
     await app.ready();
     return app;
   };
@@ -393,7 +419,7 @@ describe('widgets (agentui_widget_custom)', () => {
   it('serves the iframe only with a valid token', async () => {
     const widgets = new WidgetStore(dir);
     const app = Fastify();
-    registerMiniApps(app, { store, widgets, data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as never, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets, attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as never, runtimeDir: dir });
     const r = await widgets.compile('export default () => <div>hi</div>');
     if (!r.ok) throw new Error('build');
     const base = `/w/${r.hash}/${signAppToken('s', 1, `widget-${r.hash}`)}/`;
@@ -416,12 +442,34 @@ describe('hardening of the file routes', () => {
   it('the widget and miniapp file routes are rate limited per client', async () => {
     const app = Fastify();
     await app.register(fastifyRateLimit, { global: false });
-    registerMiniApps(app, { store, widgets: new WidgetStore(dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
     await app.ready();
     const statuses = new Set<number>();
     for (let i = 0; i < FILE_RATE_LIMIT.max + 5; i++) statuses.add((await app.inject({ url: '/w/0123456789abcdef01234567/bad/app.js' })).statusCode);
     expect(statuses.has(403)).toBe(true); // refused by the token check while under the limit
     expect(statuses.has(429)).toBe(true); // then by the limiter
     await app.close();
+  });
+});
+
+describe('media served to the iframes', () => {
+  const MP4 = Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom'), Buffer.alloc(200)]);
+  it('streams assets with byte ranges and refuses a bad token, a missing asset and anything that is not media', async () => {
+    store.create('a1', { id: 'gal', name: 'Gallery' });
+    store.writeAsset('gal', 'a1', 'clip.mp4', MP4);
+    const app = Fastify();
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
+    const url = `/m/gal/${signAppToken('s', 1, 'gal')}/assets/clip.mp4`;
+    const full = await app.inject({ url });
+    expect(full.statusCode).toBe(200);
+    expect(full.headers['content-type']).toBe('video/mp4');
+    expect(full.headers['accept-ranges']).toBe('bytes');
+    const part = await app.inject({ url, headers: { range: 'bytes=0-9' } });
+    expect(part.statusCode).toBe(206);
+    expect(part.headers['content-range']).toBe(`bytes 0-9/${MP4.length}`);
+    expect(part.rawPayload.length).toBe(10);
+    expect((await app.inject({ url: `/m/gal/bad.token/assets/clip.mp4` })).statusCode).toBe(403);
+    expect((await app.inject({ url: url.replace('clip.mp4', 'nope.mp4') })).statusCode).toBe(404);
+    expect((await app.inject({ url: url.replace('clip.mp4', '..%2Fsrc') })).statusCode).toBe(404);
   });
 });

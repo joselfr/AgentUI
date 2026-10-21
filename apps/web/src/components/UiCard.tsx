@@ -6,8 +6,10 @@ import Send from '@mui/icons-material/Send';
 import { themeCssVars, type WidgetEvent } from '@agentui/shared';
 import { api } from '../api';
 import { getLang, t, useLang } from '../i18n';
+import type { Resolved } from './ImageCard';
+import { answerMedia, type MediaRequest } from './widgetMedia';
 
-interface Ui { code: string; title?: string; maxHeight: number; state?: unknown; token?: string }
+interface Ui { code: string; title?: string; maxHeight: number; state?: unknown; token?: string; media?: string[] }
 
 const MIN_HEIGHT = 40;
 const MAX_HEIGHT = 4000;
@@ -22,6 +24,7 @@ export function parseUi(a: Record<string, unknown>): Ui | undefined {
     maxHeight: typeof h === 'number' && isFinite(h) ? Math.min(Math.max(h, 120), MAX_HEIGHT) : 2400,
     state: a.state,
     token: typeof a.token === 'string' ? a.token : undefined,
+    media: Array.isArray(a.media) ? a.media.filter((x): x is string => typeof x === 'string' && x.startsWith('/')) : undefined,
   };
 }
 
@@ -53,12 +56,25 @@ export function tracesMessage(o: { token?: string; title?: string; build: string
   return parts.join('\n\n').slice(0, TRACES_MAX);
 }
 
-export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: string, widget?: WidgetEvent) => Promise<boolean> }) {
+export default function UiCard({ ui, onReply, resolve }: { ui: Ui; onReply?: (text: string, widget?: WidgetEvent) => Promise<boolean>; resolve?: (src: string) => Resolved }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  // Media the agent declared (`media` argument): the widget asks for them by `src`; a file still being copied by the plugin is answered once it is there.
+  const resolveRef = useRef(resolve);
+  resolveRef.current = resolve;
+  const waiting = useRef<MediaRequest[]>([]);
+  const baseRef = useRef<string>();
+  const flushMedia = useCallback(() => {
+    const w = frame.current?.contentWindow;
+    // The iframe loads an attachment through its own base (`/w/<hash>/<token>/att/<id>`): its token is what authorises the request there.
+    const frameUrl = (u: string) => { const id = /^\/api\/attachments\/([0-9a-f-]{36})$/i.exec(u)?.[1]; return id && baseRef.current ? `${baseRef.current}att/${id}` : undefined; };
+    if (w && waiting.current.length) waiting.current = answerMedia(w, waiting.current, (n) => (resolveRef.current ? resolveRef.current(n) : { state: 'error' }), frameUrl);
+  }, []);
+  useEffect(flushMedia);
   const muiTheme = useTheme();
   const lang = useLang() && getLang();
   const mode = muiTheme.palette.mode;
   const [base, setBase] = useState<string>();
+  baseRef.current = base;
   const [errors, setErrors] = useState<string[]>([]);
   const [runtimeErrors, setRuntimeErrors] = useState<string[]>([]);
   const [sent, setSent] = useState(false);
@@ -139,6 +155,10 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
       }
       else if (m?.type === 'agentui:resize' && typeof m.height === 'number') setHeight(Math.max(MIN_HEIGHT, Math.min(m.height, ui.maxHeight)));
       else if (m?.type === 'agentui:error') { const msg = String(m.message ?? ''); setSent(false); setRuntimeErrors((p) => (p.includes(msg) ? p : [...p, msg].slice(-MAX_RUNTIME_ERRORS))); }
+      else if (m?.type === 'agentui:media' && typeof m.id === 'string' && typeof (m as { name?: unknown }).name === 'string') {
+        waiting.current.push({ id: m.id, name: (m as { name: string }).name });
+        flushMedia();
+      }
       else if (m?.type === 'agentui:open') { const url = safeUrl(m.url); if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
       else if (m?.type === 'agentui:reply' && typeof m.id === 'string') {
         // The text goes to the agent as if the user had typed it, so it is only accepted when the user is plausibly the one acting:
@@ -155,7 +175,7 @@ export default function UiCard({ ui, onReply }: { ui: Ui; onReply?: (text: strin
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [postTheme, postChat, postState, postFs, enterFs, leaveFs, ui.maxHeight]);
+  }, [postTheme, postChat, postState, postFs, enterFs, leaveFs, flushMedia, ui.maxHeight]);
 
   const sendTraces = () => {
     const text = tracesMessage({ token: ui.token, title: ui.title, build: errors, runtime: runtimeErrors, mode, lang, width: Math.round(wrap.current?.clientWidth ?? 0) });

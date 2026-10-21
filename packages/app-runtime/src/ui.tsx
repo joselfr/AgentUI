@@ -2,12 +2,27 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Chart as ChartJS } from 'chart.js';
 import { Icon } from './icons';
-import { getTheme, onTheme, useTheme } from './host';
+import { getTheme, onTheme, useMedia, useTheme } from './host';
 
 export * from './host';
 export { Icon, ICON_NAMES } from './icons';
 
 const cx = (...c: (string | false | undefined | null)[]) => c.filter(Boolean).join(' ');
+
+// ---------- Media ----------
+/**
+ * Shows an image, a video (with controls) or an audio file given by the agent, by name (see `useMedia`). It fills the width of its container
+ * (images and videos keep their ratio); `style` / `className` apply to the media element. `alt` is the accessible text of an image.
+ */
+export function Media({ name, alt, style, className }: { name: string; alt?: string; style?: CSSProperties; className?: string }) {
+  const m = useMedia(name);
+  if (m.loading) return <div className="au-center"><span className="au-spinner" /></div>;
+  if (m.error || !m.url) return <div className="au-media-error">{name}: ✕</div>;
+  const css: CSSProperties = { display: 'block', maxWidth: '100%', borderRadius: 'var(--au-radius-sm)', ...style };
+  if (m.kind === 'video') return <video src={m.url} crossOrigin="anonymous" controls playsInline preload="metadata" className={className} style={{ width: '100%', ...css }} />;
+  if (m.kind === 'audio') return <audio src={m.url} crossOrigin="anonymous" controls preload="metadata" className={className} style={{ width: '100%', ...css }} />;
+  return <img src={m.url} crossOrigin="anonymous" alt={alt ?? name} className={className} style={css} />;
+}
 
 // ---------- Layout ----------
 export function Page({ title, actions, children, maxWidth = 860 }: { title?: ReactNode; actions?: ReactNode; children?: ReactNode; maxWidth?: number | string }) {

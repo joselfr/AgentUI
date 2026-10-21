@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import spec from './widget-tools.json' with { type: 'json' };
 import { miniappOp, notifyUser, askUser, emitMedia, setThreadTitle, getThreadTitle } from './hosts.js';
-import { FILE_KINDS, fileWidgetError, imagesError, readLocalImage, readLocalMedia, type FileKind } from './images.js';
+import { FILE_KINDS, assetName, fileWidgetError, imagesError, readLocalImage, readLocalMedia, readLocalVisual, type FileKind } from './images.js';
 
 export const MINIAPP_TOOL_PREFIX = `${spec.prefix}miniapp_`;
 /** Prefix of a tool: `agentui_widget_` for the widgets (and what belongs to a widget, like its live session), `agentui_` for the interactions (ask, confirm, form). */
@@ -38,6 +38,9 @@ export function widgetError(key: string, args: Args): string | undefined {
       if (args.state === undefined) return 'An update needs a `state`.';
       return undefined;
     }
+    const media: unknown[] = args.media ?? [];
+    if (media.length > 8) return 'At most 8 media per widget.';
+    if (media.some((m) => typeof m !== 'string' || !m.startsWith('/'))) return 'Each `media` entry must be an absolute path of a file on your machine.';
     const code = String(args.code ?? '');
     if (!code.trim()) return 'The code is empty.';
     if (Buffer.byteLength(code) > 64 * 1024) return 'The code is too large (max 64 KB).';
@@ -124,10 +127,11 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
         if (problem) throw new Error(problem);
         // Local files (images, video, audio, PDF, Markdown): copied into the chat (message.media); the result says which attachment matches which path.
         const files: Record<string, string> = {};
-        const sources: string[] = key === 'image' ? (args.images as Array<{ src: string }>).map((im) => im.src) : FILE_KINDS.includes(key) && args.src ? [String(args.src)] : [];
+        const widgetMedia: string[] = key === 'custom' && !args.update && Array.isArray(args.media) ? args.media : [];
+        const sources: string[] = widgetMedia.length ? widgetMedia : key === 'image' ? (args.images as Array<{ src: string }>).map((im) => im.src) : FILE_KINDS.includes(key) && args.src ? [String(args.src)] : [];
         for (const src of sources) {
           if (!src.startsWith('/') || files[src]) continue;
-          const media = key === 'image' ? await readLocalImage(src) : await readLocalMedia(src, key as FileKind);
+          const media = widgetMedia.length ? await readLocalVisual(src) : key === 'image' ? await readLocalImage(src) : await readLocalMedia(src, key as FileKind);
           if (!conversationId || !emitMedia(conversationId, media)) throw new Error('No AgentUI exchange in progress: cannot copy the file.');
           files[src] = media.name;
         }
@@ -136,7 +140,7 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: args.update, updated: true, instruction: spec.updateInstruction }) }], details: { token: args.update } };
         }
         const token = `[[agentui:${randomBytes(3).toString('hex')}]]`;
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: key === 'progress' ? spec.progressInstruction : spec.tokenInstruction, ...(key === 'image' || FILE_KINDS.includes(key) ? { files } : {}) }) }], details: { token } };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ widget: token, instruction: key === 'progress' ? spec.progressInstruction : spec.tokenInstruction, ...(key === 'image' || FILE_KINDS.includes(key) || widgetMedia.length ? { files } : {}) }) }], details: { token } };
       },
     }));
     // Miniapps: files are built and stored on the AgentUI server; the result (or the build errors) comes back to the model.
@@ -146,7 +150,14 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
       description: tool.description,
       parameters: tool.parameters as any,
       async execute(_id: string, args: Args) {
-        const result = op === 'guide' ? { guide: spec.miniappGuide } : await miniappOp(op, args);
+        let result: unknown;
+        if (op === 'guide') result = { guide: spec.miniappGuide };
+        else if (op === 'asset') {
+          // The file lives on the agent's machine: read here, stored by the AgentUI server.
+          if (!String(args.src ?? '').startsWith('/')) throw new Error('`src` must be an absolute path of a file on your machine.');
+          const file = await readLocalVisual(String(args.src));
+          result = await miniappOp('asset', { id: args.id, name: assetName(String(args.src), args.name), data: file.data });
+        } else result = await miniappOp(op, args);
         return { content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result) }], details: { op } };
       },
     }));

@@ -5,6 +5,7 @@ import type { DB } from '../db.js';
 import { buildApp, type BuildError } from './build.js';
 import { AppFs, checkGrantRequest, FS_LIMITS, type FsGrant, type FsMode } from './fs.js';
 import { safeJoin } from '../safe-path.js';
+import { INLINE_MEDIA, sniffImage, sniffMedia } from '../attachments.js';
 
 export const APP_LIMITS = {
   maxFiles: 80,
@@ -14,7 +15,13 @@ export const APP_LIMITS = {
   maxDocBytes: 256 * 1024,
   maxDocsPerApp: 20_000,
   maxKvBytes: 256 * 1024,
+  maxAssets: 40,
+  maxAssetBytes: 25 * 1024 * 1024,
+  maxAssetsTotalBytes: 100 * 1024 * 1024,
 };
+
+const ASSET_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/;
+
 
 /** Validation error meant for the agent (tool error) or the user (HTTP 4xx). */
 export class AppError extends Error {
@@ -221,6 +228,59 @@ export class MiniAppStore {
     const full = resolve(base, path);
     if (!full.startsWith(base + sep)) throw new AppError(`Invalid path "${path}".`);
     return full;
+  }
+
+  // ---------- Assets: images, videos and audio files the agent gives to the miniapp (`<dir>/assets/<name>`) ----------
+  private assetsDir(id: string): string {
+    return safeJoin(this.dir(id), 'assets');
+  }
+
+  /** Media files of a miniapp with their verified type. */
+  assets(id: string): { name: string; mimeType: string; size: number }[] {
+    const dir = this.assetsDir(id);
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir).filter((n) => ASSET_RE.test(n)).sort().map((name) => {
+      const p = join(dir, name);
+      return { name, mimeType: this.assetType(p) ?? 'application/octet-stream', size: statSync(p).size };
+    });
+  }
+
+  private assetType(path: string): string | undefined {
+    const head = readFileSync(path).subarray(0, 16);
+    const t = sniffImage(head) ?? sniffMedia(head);
+    return t && (/^image\//.test(t) || INLINE_MEDIA.test(t)) ? t : undefined;
+  }
+
+  /** Stored asset: its path and verified type, or undefined. Only what `writeAsset` accepted (image, video, audio) is ever served. */
+  asset(id: string, name: string): { path: string; mimeType: string; size: number } | undefined {
+    if (!ASSET_RE.test(name)) return undefined;
+    const path = safeJoin(this.assetsDir(id), name);
+    if (!existsSync(path)) return undefined;
+    const mimeType = this.assetType(path);
+    return mimeType ? { path, mimeType, size: statSync(path).size } : undefined;
+  }
+
+  /** Stores (or replaces) an image, video or audio file. The type is read from the content, never from the name. */
+  writeAsset(id: string, agentId: string, name: string, data: Buffer): { name: string; mimeType: string; size: number } {
+    this.owned(id, agentId);
+    if (!ASSET_RE.test(name)) throw new AppError(`Invalid asset name "${name}": letters, digits, ".", "_" and "-" only (100 characters at most, no slash).`);
+    const mimeType = sniffImage(data) ?? sniffMedia(data);
+    if (!mimeType || !(/^image\//.test(mimeType) || INLINE_MEDIA.test(mimeType))) throw new AppError(`"${name}" is not a png, jpeg, gif, webp image, nor an mp4, webm, mov or common audio file.`);
+    if (data.length > APP_LIMITS.maxAssetBytes) throw new AppError(`"${name}" is too large (maximum ${APP_LIMITS.maxAssetBytes / 1048576} MB).`);
+    const others = this.assets(id).filter((a) => a.name !== name);
+    if (others.length >= APP_LIMITS.maxAssets) throw new AppError(`Too many assets (maximum ${APP_LIMITS.maxAssets}).`);
+    if (others.reduce((n, a) => n + a.size, data.length) > APP_LIMITS.maxAssetsTotalBytes) throw new AppError(`The assets of this miniapp exceed ${APP_LIMITS.maxAssetsTotalBytes / 1048576} MB in total.`);
+    mkdirSync(this.assetsDir(id), { recursive: true });
+    writeFileSync(safeJoin(this.assetsDir(id), name), data, { mode: 0o600 });
+    this.dataChanged(id); // open iframes reload their media
+    return { name, mimeType, size: data.length };
+  }
+
+  deleteAsset(id: string, agentId: string, name: string): void {
+    this.owned(id, agentId);
+    if (!this.asset(id, name)) throw new AppError(`No such asset "${name}".`, 404);
+    rmSync(safeJoin(this.assetsDir(id), name));
+    this.dataChanged(id);
   }
 
   files(id: string): { path: string; size: number }[] {

@@ -1294,6 +1294,11 @@ def _widget_error(key: str, args: Dict[str, Any]) -> Optional[str]:
             if state is None:
                 return "An update needs a `state`."
             return None
+        media = args.get("media") or []
+        if len(media) > 8:
+            return "At most 8 media per widget."
+        if any(not (isinstance(m, str) and m.startswith("/")) for m in media):
+            return "Each `media` entry must be an absolute path of a file on your machine."
         code = str(args.get("code") or "")
         if not code.strip():
             return "The code is empty."
@@ -1420,6 +1425,26 @@ def _read_local_media(path: str, kind: str) -> dict:
     return _media(name, data, mime)
 
 
+def _read_local_visual(path: str) -> dict:
+    """Reads a local image, video or audio file (media of a custom widget or asset of a miniapp; blocking call); ValueError readable by the agent."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        raise ValueError(f"File not found or unreadable: {path}")
+    if len(data) > MAX_OUT_MEDIA:
+        raise ValueError(f"{path} exceeds {MAX_OUT_MEDIA // 1024 // 1024} MB.")
+    mime = _sniff_image(data) or _sniff_media(data)
+    if not mime or not re.match(r"(image|video|audio)/", mime):
+        raise ValueError(f"{path} is not an image (png, jpeg, gif, webp), video (mp4, webm, mov) or audio file in a supported format.")
+    name = f"{IMAGE_PREFIX}{hashlib.sha1(data).hexdigest()[:8]}-{re.sub(r'[^A-Za-z0-9_.-]+', '_', Path(path).name)}"
+    return _media(name, data, mime)
+
+
+def _asset_name(src: str, name: Optional[str] = None) -> str:
+    """Name of a miniapp asset: given, or the file name; letters, digits, `.`, `_` and `-` only."""
+    return re.sub(r"^[.-]+", "", re.sub(r"[^A-Za-z0-9_.-]+", "_", (name or "").strip() or Path(src).name))[:100]
+
+
 def _images_error(args: Dict[str, Any]) -> Optional[str]:
     """Shape check of the `agentui_widget_image` sources (before any file read)."""
     images = args.get("images") or []
@@ -1478,7 +1503,8 @@ def _register_widget_tools(ctx) -> None:
             if problem:
                 return json.dumps({"error": problem}, ensure_ascii=False)
             files: Dict[str, str] = {}
-            if key in FILE_WIDGETS:
+            widget_media = [m for m in (args.get("media") or [])] if key == "custom" and not args.get("update") else []
+            if key in FILE_WIDGETS or widget_media:
                 # Local files: copied into the chat (message.media); the result says which attachment matches which path.
                 try:
                     from gateway.session_context import get_session_env
@@ -1486,12 +1512,12 @@ def _register_widget_tools(ctx) -> None:
                     chat = get_session_env("HERMES_SESSION_CHAT_ID")
                 except Exception:
                     chat = None
-                sources = [im["src"] for im in args.get("images") or []] if key == "image" else [args["src"]] if args.get("src") else []
+                sources = widget_media or ([im["src"] for im in args.get("images") or []] if key == "image" else [args["src"]] if args.get("src") else [])
                 for src in sources:
                     if not src.startswith("/") or src in files:
                         continue
                     try:
-                        media = _read_local_image(src) if key == "image" else _read_local_media(src, key)
+                        media = _read_local_visual(src) if widget_media else _read_local_image(src) if key == "image" else _read_local_media(src, key)
                     except ValueError as e:
                         return json.dumps({"error": str(e)}, ensure_ascii=False)
                     if not chat or _ACTIVE is None or not _ACTIVE._emit(chat, {"type": "message.media", **media}):
@@ -1501,7 +1527,7 @@ def _register_widget_tools(ctx) -> None:
             if update:  # update: same token, the front shows the state of the latest call
                 return json.dumps({"widget": update, "updated": True, "instruction": spec["updateInstruction"]}, ensure_ascii=False)
             instruction = spec["progressInstruction"] if key == "progress" else spec["tokenInstruction"]
-            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction, **({"files": files} if key in FILE_WIDGETS else {})}, ensure_ascii=False)
+            return json.dumps({"widget": f"[[agentui:{uuid.uuid4().hex[:6]}]]", "instruction": instruction, **({"files": files} if key in FILE_WIDGETS or widget_media else {})}, ensure_ascii=False)
 
         return handler
 
@@ -1538,6 +1564,12 @@ def _register_widget_tools(ctx) -> None:
             if adapter is None:
                 return json.dumps({"error": "AgentUI is not connected."}, ensure_ascii=False)
             try:
+                if op == "asset":  # the file lives on the agent's machine: read here, stored by the AgentUI server
+                    src = str(args.get("src") or "")
+                    if not src.startswith("/"):
+                        return json.dumps({"error": "`src` must be an absolute path of a file on your machine."}, ensure_ascii=False)
+                    file = _read_local_visual(src)
+                    args = {"id": args.get("id"), "name": _asset_name(src, args.get("name")), "data": file["data"]}
                 return json.dumps(adapter.miniapp_op(op, args), ensure_ascii=False, default=str)
             except Exception as e:
                 return json.dumps({"error": str(e) or type(e).__name__}, ensure_ascii=False)

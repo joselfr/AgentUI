@@ -32,7 +32,8 @@ if (typeof window !== 'undefined') {
     if (e.source !== window.parent) return;
     const m = e.data as { type?: string; [k: string]: any } | null;
     if (m?.type === 'agentui:theme') applyTheme({ mode: m.mode, lang: m.lang, vars: m.vars ?? {} });
-    else if (m?.type === 'agentui:data') dataSubs.forEach((f) => f());
+    else if (m?.type === 'agentui:data') { refreshMedia(); dataSubs.forEach((f) => f()); }
+    else if (m?.type === 'agentui:media.result') mediaResult(m.id, !!m.ok, m.mimeType, m.url);
     else if (m?.type === 'agentui:chat') { canReplyNow = !!m.canReply; chatSubs.forEach((f) => f()); }
     else if (m?.type === 'agentui:fullscreen.state') {
       fullscreenOn = !!m.on;
@@ -52,6 +53,60 @@ if (typeof window !== 'undefined') {
 
 // Escape leaves the full screen even though the keyboard focus is inside the widget (the host only sees keys typed outside the iframe).
 if (typeof window !== 'undefined') window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fullscreenOn) toHost({ type: 'agentui:fullscreen', on: false }); });
+
+// ---------- Media given by the agent (images, videos, audio) ----------
+// The iframe has no cookie and its CSP forbids remote loads: the host answers with the URL of the file under the iframe's own token-protected base
+// (`media-src 'self'`), served with byte ranges like a normal video, which is what every browser, iOS Safari included, needs to play it.
+export type MediaKind = 'image' | 'video' | 'audio';
+export interface MediaState { url?: string; mimeType?: string; kind?: MediaKind; loading: boolean; error: boolean }
+interface MediaEntry extends MediaState { subs: Set<() => void>; req?: string }
+const media = new Map<string, MediaEntry>();
+const mediaReqs = new Map<string, string>(); // request id → media name
+const kindOf = (t: string): MediaKind | undefined => (/^image\//.test(t) ? 'image' : /^video\//.test(t) ? 'video' : /^audio\//.test(t) ? 'audio' : undefined);
+
+function askMedia(name: string, e: MediaEntry) {
+  const id = `m${++seq}`;
+  e.req = id;
+  mediaReqs.set(id, name);
+  toHost({ type: 'agentui:media', id, name });
+}
+
+function mediaResult(id: string, ok: boolean, mimeType: unknown, url: unknown) {
+  const name = mediaReqs.get(id);
+  mediaReqs.delete(id);
+  const e = name === undefined ? undefined : media.get(name);
+  if (!name || !e || e.req !== id) return; // superseded by a newer request
+  const kind = typeof mimeType === 'string' ? kindOf(mimeType) : undefined;
+  if (ok && kind && typeof url === 'string') {
+    // `#t=0.001`: the first frame stands for the poster. Without it Android Chrome and iOS draw nothing (a black box) until the user presses play.
+    e.url = kind === 'video' && !url.includes('#') ? `${url}#t=0.001` : url; e.mimeType = mimeType as string; e.kind = kind; e.error = false;
+  } else if (!e.url) e.error = true; // a failed refresh keeps what is displayed
+  e.loading = false;
+  e.subs.forEach((f) => f());
+}
+
+/** The app's data changed (an asset may have been replaced): fetch every media in use again, quietly. */
+function refreshMedia() { for (const [name, e] of media) if (e.subs.size) askMedia(name, e); }
+
+/**
+ * A media file the agent gave you: `name` is the file name of the asset of a miniapp (added with `agentui_miniapp_asset`), or the `src` exactly as
+ * declared in the `media` list of `agentui_widget_custom`. `url` is a plain URL usable as `<img src>`, `<video src>` or `<audio src>` once `loading` is false
+ * (`error` when the file is unknown or unreadable). Images, videos and audio only. See also the `Media` component, which renders any of them.
+ */
+export function useMedia(name: string): MediaState {
+  const [, force] = useState(0);
+  useEffect(() => {
+    let e = media.get(name);
+    if (!e) { e = { loading: true, error: false, subs: new Set() }; media.set(name, e); askMedia(name, e); }
+    else if (e.error) { e.loading = true; e.error = false; askMedia(name, e); } // retried when remounted
+    const f = () => force((n) => n + 1);
+    e.subs.add(f);
+    f();
+    return () => { e!.subs.delete(f); };
+  }, [name]);
+  const e = media.get(name);
+  return e ? { url: e.url, mimeType: e.mimeType, kind: e.kind, loading: e.loading, error: e.error } : { loading: true, error: false };
+}
 
 export const toHost = (msg: Record<string, unknown>) => window.parent.postMessage({ ...msg }, '*');
 

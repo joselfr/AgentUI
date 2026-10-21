@@ -167,7 +167,7 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
       // State update of a dynamic widget: the code stays that of the first call, only `state` follows the latest call.
       if (isUiUpdate(t)) { if (prev) widgets.set(id, { ...prev, arguments: { ...prev.arguments, state: w.arguments.state } }); continue; }
       // A dynamic widget knows its token: its events to the agent say which widget they come from.
-      widgets.set(id, FILE_WIDGETS.has(w.type) ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w.type === 'custom' ? { ...w, arguments: { ...w.arguments, token: `[[agentui:${id}]]` } } : w);
+      widgets.set(id, FILE_WIDGETS.has(w.type) ? { ...w, arguments: { ...w.arguments, files: filesOf(t) } } : w.type === 'custom' ? { ...w, arguments: { ...w.arguments, token: `[[agentui:${id}]]`, ...(Array.isArray(w.arguments.media) ? { files: filesOf(t) } : {}) } } : w);
     }
   }
   const used = new Set<string>();

@@ -16,8 +16,8 @@ import { GatewayAdapter, sameToken, type GatewaySocket } from './agents/gateway.
 import type { AgentAdapter } from './agents/types.js';
 import { RunManager } from './runs.js';
 import { PushService } from './push.js';
-import { AttachmentError, AttachmentStore, INLINE_MEDIA, parseRange, sniffMedia } from './attachments.js';
-import { createReadStream, openSync, readSync, closeSync, statSync } from 'node:fs';
+import { AttachmentError, AttachmentStore } from './attachments.js';
+import { serveStoredFile } from './serve-file.js';
 import { AppData } from './miniapps/data.js';
 import { FILE_RATE_LIMIT, registerMiniApps } from './miniapps/routes.js';
 import { AppError, MiniAppStore } from './miniapps/store.js';
@@ -298,31 +298,7 @@ async function main() {
   app.get<{ Params: { id: string } }>('/api/attachments/:id', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
     const f = files.get(req.params.id);
     if (!f) return reply.code(404).send({ error: 'not found' });
-    // Only verified images, videos and audio are displayed inline; everything else is downloaded, never interpreted by the browser.
-    let type = f.mimeType;
-    if (!/^image\//.test(type) && !INLINE_MEDIA.test(type)) { // stored before the content check existed: look at the file itself
-      const fd = openSync(f.path, 'r');
-      try { const head = Buffer.alloc(16); type = sniffMedia(head.subarray(0, readSync(fd, head, 0, 16, 0))) ?? type; } finally { closeSync(fd); }
-    }
-    const inline = /^image\/(png|jpeg|gif|webp)$/.test(type) || INLINE_MEDIA.test(type);
-    const size = statSync(f.path).size;
-    reply
-      .header('Content-Type', inline ? type : 'application/octet-stream')
-      .header('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`)
-      .header('X-Content-Type-Options', 'nosniff')
-      .header('Accept-Ranges', 'bytes')
-      .header('Cache-Control', 'private, max-age=86400');
-    // Byte ranges: iOS Safari only plays a video / audio file if the server answers them, and they make seeking instant.
-    const range = parseRange(req.headers.range, size);
-    if (range === 'invalid') return reply.code(416).header('Content-Range', `bytes */${size}`).send();
-    if (range) {
-      return reply
-        .code(206)
-        .header('Content-Range', `bytes ${range.start}-${range.end}/${size}`)
-        .header('Content-Length', range.end - range.start + 1)
-        .send(createReadStream(f.path, { start: range.start, end: range.end }));
-    }
-    return reply.header('Content-Length', size).send(createReadStream(f.path));
+    return serveStoredFile(req, reply, f);
   });
   app.post<{ Params: { id: string } }>('/api/conversations/:id/abort', async (req) => {
     await runs.abort(req.params.id);
@@ -350,6 +326,7 @@ async function main() {
   registerMiniApps(app, {
     store: apps,
     widgets: new WidgetStore(env.dataDir),
+    attachments: files,
     data: appData,
     secret,
     userOf,

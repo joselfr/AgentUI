@@ -104,3 +104,23 @@ export async function readLocalMedia(path: string, kind: FileKind, read: (p: str
   const name = `${IMAGE_PREFIX}${createHash('sha1').update(data).digest('hex').slice(0, 8)}-${basename(path).replace(/[^\w.-]+/g, '_')}`;
   return { name, mimeType, data: data.toString('base64') };
 }
+
+/** Reads a local image, video or audio file (media of a custom widget or asset of a miniapp): throws an agent-readable error if missing, too big or of another type. */
+export async function readLocalVisual(path: string, read: (p: string) => Promise<Buffer> = readFile): Promise<Media> {
+  let data: Buffer;
+  try {
+    data = await read(path);
+  } catch {
+    throw new Error(`File not found or unreadable: ${path}`);
+  }
+  if (data.length > MAX_OUT_MEDIA) throw new Error(`${path} exceeds ${MAX_OUT_MEDIA / 1024 / 1024} MB.`);
+  const mimeType = sniffImage(data) ?? sniffMedia(data);
+  if (!mimeType || !/^(image|video|audio)\//.test(mimeType)) throw new Error(`${path} is not an image (png, jpeg, gif, webp), video (mp4, webm, mov) or audio file in a supported format.`);
+  const name = `${IMAGE_PREFIX}${createHash('sha1').update(data).digest('hex').slice(0, 8)}-${basename(path).replace(/[^\w.-]+/g, '_')}`;
+  return { name, mimeType, data: data.toString('base64') };
+}
+
+/** Name of a miniapp asset: given, or the file name; letters, digits, `.`, `_` and `-` only. */
+export function assetName(src: string, name?: string): string {
+  return (name?.trim() || basename(src)).replace(/[^\w.-]+/g, '_').replace(/^[.-]+/, '').slice(0, 100);
+}

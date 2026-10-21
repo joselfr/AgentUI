@@ -4,6 +4,7 @@ import { useTheme } from '@mui/material/styles';
 import { themeCssVars, type MiniApp } from '@agentui/shared';
 import { api } from '../../api';
 import { getLang, t, useLang } from '../../i18n';
+import { sendMedia } from '../widgetMedia';
 
 /** Rejects paths that could escape the app's own backend namespace. */
 const safePath = (p: unknown): string | undefined =>
@@ -26,6 +27,8 @@ export default function MiniappFrame({ app, dataKey = 0 }: { app: MiniApp; dataK
   const lang = useLang() && getLang();
   const mode = muiTheme.palette.mode;
   const [base, setBase] = useState<string>();
+  const baseRef = useRef<string>();
+  baseRef.current = base;
   const [err, setErr] = useState('');
   const [appError, setAppError] = useState('');
   const [ready, setReady] = useState(false);
@@ -51,6 +54,11 @@ export default function MiniappFrame({ app, dataKey = 0 }: { app: MiniApp; dataK
       const m = e.data as { type?: string; id?: string; method?: string; path?: unknown; body?: unknown } | null;
       if (m?.type === 'agentui:ready') { setReady(true); postTheme(); }
       else if (m?.type === 'agentui:error') setAppError(String((m as { message?: string }).message ?? ''));
+      else if (m?.type === 'agentui:media' && typeof m.id === 'string') {
+        const name = (m as { name?: unknown }).name;
+        // Under the iframe's own token-protected base; `v` makes sure a replaced asset is fetched again.
+        void sendMedia(w, m.id, typeof name === 'string' && baseRef.current ? `${baseRef.current}assets/${encodeURIComponent(name)}?v=${Date.now()}` : undefined);
+      }
       else if (m?.type === 'agentui:open') {
         const url = safeUrl((m as { url?: unknown }).url);
         if (url) window.open(url, '_blank', 'noopener,noreferrer');

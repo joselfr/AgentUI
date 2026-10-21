@@ -136,10 +136,10 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 | Tool | What it does |
 |---|---|
 | `agentui_widget_chart`, `_map`, `_code`, `_table`, `_progress`, `_image`, `_video`, `_audio`, `_pdf`, `_markdown` | Display a component in the chat. Video, audio, PDF and Markdown take a URL or a file of the agent's machine (copied into the chat, 45 MB max). |
-| `agentui_widget_custom` | A component written by the agent (React, same UI kit as miniapps, plus chart.js and Leaflet maps), sandboxed. If it crashes, a button sends the traces to the agent. |
+| `agentui_widget_custom` | A component written by the agent (React, same UI kit as miniapps, plus chart.js and Leaflet maps), sandboxed, and it can show your images, videos and audio (`media`). If it crashes, a button sends the traces to the agent. |
 | `agentui_widget_custom_wait` | Keeps a *live* two-way session with a custom widget: the user’s clicks reach the agent, which updates the widget in place. |
 | `agentui_ask`, `agentui_confirm`, `agentui_form` | Ask the user and wait for the answer. |
-| `agentui_miniapp_*` | Create, write, read, list and remove miniapps, and push data into them. |
+| `agentui_miniapp_*` | Create, write, read, list and remove miniapps, push data into them, and give them images, videos and audio (`asset`). |
 | `agentui_notify` | Send a push notification. |
 | `agentui_set_thread_title` / `agentui_get_thread_title` | Rename the current discussion / read its title. |
 

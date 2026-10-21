@@ -7,6 +7,8 @@ import type { AppData } from './data.js';
 import { runHandler, type SandboxResult } from './sandbox.js';
 import { AppError, type MiniAppStore } from './store.js';
 import { WidgetStore } from './widgets.js';
+import type { AttachmentStore } from '../attachments.js';
+import { serveStoredFile } from '../serve-file.js';
 
 const PUBLIC_RATE_PER_MIN = 120;
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -80,6 +82,7 @@ function indexHtml(base: string, appId: string, name: string, version: number, h
 export interface MiniAppRoutesOpts {
   store: MiniAppStore;
   widgets: WidgetStore;
+  attachments: AttachmentStore;
   data: AppData;
   secret: string;
   userOf: (cookies: Record<string, string | undefined>) => AuthUser | null;
@@ -258,11 +261,16 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         .header('Content-Type', 'text/html; charset=utf-8')
         .header('Cache-Control', 'no-store')
         .header('X-Content-Type-Options', 'nosniff')
-        .header('Content-Security-Policy', `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'`)
+        .header('Content-Security-Policy', `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'`)
         .send(indexHtml(base, 'widget', 'Widget', 1, false, nonce)); // content-addressed: version never changes
     }
     if (rest.startsWith('tiles/')) return sendTile(reply, rest.slice('tiles/'.length));
     if (rest.startsWith('_runtime/')) return sendRuntime(reply, rest.slice('_runtime/'.length));
+    // Media of the widget: the attachments the agent copied into the chat (the id is an unguessable UUID, like on /api/attachments), streamed with byte ranges.
+    if (rest.startsWith('att/')) {
+      const f = o.attachments.get(rest.slice('att/'.length));
+      return f ? serveStoredFile(req, reply, f, true) : reply.code(404).send({ error: 'not found' });
+    }
     if (rest === 'app.js') {
       const file = widgets.file(hash);
       return file ? sendFile(reply, file, 'public, max-age=31536000, immutable') : reply.code(404).send({ error: 'not built' });
@@ -286,12 +294,18 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
         .header('X-Content-Type-Options', 'nosniff')
         .header(
           'Content-Security-Policy',
-          `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'`,
+          `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'`,
         )
         .send(indexHtml(base, id, a.name, a.version, !!store.distFile(id, 'app.css'), nonce));
     }
     if (rest.startsWith('tiles/')) return sendTile(reply, rest.slice('tiles/'.length));
     if (rest.startsWith('_runtime/')) return sendRuntime(reply, rest.slice('_runtime/'.length));
+    // Media the agent gave to the miniapp (assets), streamed with byte ranges.
+    if (rest.startsWith('assets/')) {
+      const name = decodeURIComponent(rest.slice('assets/'.length));
+      const asset = store.asset(id, name);
+      return asset ? serveStoredFile(req, reply, { name, mimeType: asset.mimeType, path: asset.path }, true) : reply.code(404).send({ error: 'not found' });
+    }
     if (rest === 'app.js' || rest === 'app.css') {
       const file = store.distFile(id, rest);
       if (!file) return reply.code(404).send({ error: 'not built' });
