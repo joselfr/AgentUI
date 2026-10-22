@@ -82,6 +82,9 @@ const fence = (w: { type: string; arguments: Record<string, unknown> }) => '\n\n
 /** `agentui_widget_custom` call that only pushes a new state to a widget already displayed (`update` = its token): it creates no component. */
 const isUiUpdate = (t: ToolCallLike) => widgetOfTool(t)?.type === 'custom' && typeof (t.args as { update?: unknown } | undefined)?.update === 'string';
 
+/** `agentui_widget_custom_wait` call (or the legacy `agentui_custom_widget_wait`): the agent listens to a live widget. */
+const LIVE_WAIT = /^agentui_(widget_custom|custom_widget)_wait$/;
+
 const sameCall = (a: ToolCallLike, b: ToolCallLike) => (a.id !== undefined && b.id !== undefined ? a.id === b.id : a === b);
 
 /** Widgets that live outside the text: shown from their first tool call (without waiting for the agent to write the token), updated in place. */
@@ -179,14 +182,21 @@ export function expandWidgetTokens(text: string, own: ToolCallLike[], all: ToolC
     return fence(w);
   });
   out = stripPartialToken(out);
-  if (done) own.forEach((t, i) => {
+  own.forEach((t, i) => {
     if (isUiUpdate(t)) return; // the widget lives where it was created
-    const id = tokenOf(t);
+    // A live widget is shown as soon as the agent listens to it, even if it never wrote the token (it often goes straight to the wait): otherwise
+    // it would only appear once the run is over. Otherwise only the widget tools count: another tool may echo the token in its result (a shell
+    // command that saves it in a file) and must not bring the widget back.
+    const waited = LIVE_WAIT.test(t.name) ? /^\[\[agentui:([0-9a-f]+)\]\]$/.exec(String((t.args as { widget?: unknown } | undefined)?.widget ?? ''))?.[1] : undefined;
+    if (!done && !waited) return;
+    const id = waited ?? (widgetOfTool(t) ? tokenOf(t) : undefined);
     const w = id ? widgets.get(id) : undefined;
     if (!id || !w || used.has(id) || OUT_OF_TEXT.has(w.type)) return;
+    if (waited && !own.some((c) => widgetOfTool(c) && !isUiUpdate(c) && tokenOf(c) === id)) return; // created in an earlier message: it is displayed there
     // A draft the agent redid: a later widget of the same type was placed in the text, this one is superseded (not shown twice)
     if (own.slice(i + 1).some((n) => { const nid = tokenOf(n); return !!nid && used.has(nid) && widgets.get(nid)?.type === w.type; })) return;
     out += fence(w);
+    used.add(id);
   });
   return out;
 }

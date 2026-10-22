@@ -30,6 +30,25 @@ describe('agentui_widget_custom state updates', () => {
   it('an update call does not create a second widget in its own message', () => {
     expect(expandWidgetTokens('Ton coup.', [update('t2', 1)], [create, update('t2', 1)])).toBe('Ton coup.');
   });
+  const wait = { id: 't9', name: 'agentui_widget_custom_wait', args: { widget: '[[agentui:a3f9c1]]' } };
+  const count = (out: string) => (out.match(/```widget/g) ?? []).length;
+  it('a live widget is shown as soon as the agent listens, even if it never wrote the token', () => {
+    expect(count(expandWidgetTokens('', [create, wait], [create, wait], false))).toBe(1);
+    expect(count(expandWidgetTokens('', [create], [create], false))).toBe(0); // not listened to yet: it waits for the end of the message as before
+  });
+  it('a live widget is not shown twice once the agent wrote the token', () => {
+    expect(count(expandWidgetTokens('Ici : [[agentui:a3f9c1]]', [create, wait], [create, wait], false))).toBe(1);
+    expect(count(expandWidgetTokens('Ici : [[agentui:a3f9c1]]', [create, wait], [create, wait], true))).toBe(1);
+    expect(count(expandWidgetTokens('', [create, wait], [create, wait], true))).toBe(1);
+  });
+  it('a wait on a widget created in an earlier message shows nothing here', () => {
+    expect(expandWidgetTokens('', [wait], [create, wait], false)).toBe('');
+  });
+  it('another tool that echoes the token in its result does not bring the widget back', () => {
+    const shell = { id: 't8', name: 'terminal', args: { command: "printf '[[agentui:a3f9c1]]' > widget.token" }, resultPreview: '{"output": "[[agentui:a3f9c1]]"}' };
+    expect(count(expandWidgetTokens('', [create, shell, wait], [create, shell, wait], true))).toBe(1);
+    expect(count(expandWidgetTokens('', [create, shell], [create, shell], true))).toBe(1);
+  });
 });
 
 describe('expandWidgetTokens', () => {
