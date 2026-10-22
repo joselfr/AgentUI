@@ -21,6 +21,7 @@ import { serveStoredFile } from './serve-file.js';
 import { AppData } from './miniapps/data.js';
 import { FILE_RATE_LIMIT, registerMiniApps } from './miniapps/routes.js';
 import { signPreviewToken } from './miniapps/preview.js';
+import { createTitler, titleConfigFromEnv } from './titles.js';
 import { AppError, MiniAppStore } from './miniapps/store.js';
 import { WidgetStore } from './miniapps/widgets.js';
 import { handleAppOp, isAppOp, opError } from './miniapps/ops.js';
@@ -51,6 +52,13 @@ async function main() {
   };
 
   const app = Fastify({ logger: true, trustProxy: true });
+  const titles = titleConfigFromEnv();
+  if (titles.error) app.log.warn(titles.error);
+  if (titles.config) {
+    runs.titler = createTitler(titles.config);
+    runs.onTitleError = (e) => app.log.warn({ err: String(e) }, 'conversation title not generated');
+    app.log.info({ provider: titles.config.provider, model: titles.config.model }, 'generated conversation titles on');
+  }
   const secret = env.cookieSecret || randomBytes(32).toString('hex');
   if (!env.cookieSecret) app.log.warn('COOKIE_SECRET missing: ephemeral secret (sessions invalidated on restart)');
   await app.register(fastifyCookie, { secret });

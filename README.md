@@ -127,6 +127,11 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 | `AGENTS_CONFIG` | Path of `agents.config.yaml` (`/config/agents.config.yaml` in Docker). |
 | `PORT`, `HOST` | Listening address (default `0.0.0.0:8080`). |
 | `VAPID_SUBJECT` | Contact used for push notifications (default `mailto:admin@agentui.local`). |
+| `TITLE_PROVIDER` | Optional: `deepseek`, `openai` or `anthropic` turns on conversation titles written by a small LLM after the first exchange (through the Vercel AI SDK). Unset or `off`: the title stays the first message. Never replaces a title you or the agent set. |
+| `TITLE_MODEL` | Model of the titles (default: `deepseek-chat`, `gpt-5-mini` or `claude-haiku-5-5` by provider). |
+| `TITLE_API_KEY` | API key for the titles (default: the provider's usual variable: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`). |
+| `TITLE_BASE_URL` | Optional other endpoint (an OpenAI-compatible server, a proxy). |
+| `TITLE_LANGUAGE` | Optional language of the titles (`French`…). Default: the language of your message. |
 | `PUBLIC_URL` | Optional, public address of AgentUI (`https://agentui.example.com`): the base of the temporary links that let an agent open a miniapp in its own browser (`agentui_miniapp_open`). Without it the link is relative. |
 | `MINIAPP_FS_ROOTS` | Optional, colon-separated absolute folders that miniapps may ask to read (you approve each one in the UI). |
 

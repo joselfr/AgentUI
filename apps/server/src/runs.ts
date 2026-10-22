@@ -77,6 +77,9 @@ function makeSnippet(text: string, words: string[]): { snippet: string; marks: [
   return { snippet, marks: merged };
 }
 
+/** Title of a new conversation before the model has named it: the first message, on one line. */
+export const provisionalTitle = (text: string) => text.replace(/\s+/g, ' ').trim().slice(0, 60);
+
 type Listener = (push: ServerPush) => void;
 
 /**
@@ -87,6 +90,10 @@ export class RunManager {
   private listeners = new Set<Listener>();
   private active = new Map<string, { agentId: string; runId: string; remoteSessionId: string; convId: string }>();
   onRunFinished?: (conv: ConversationRow, outcome: 'completed' | 'failed' | 'aborted', preview: string) => void;
+  /** Writes the title of a conversation from its first exchange (an LLM, see titles.ts); unset = the title stays the first message. */
+  titler?: (user: string, assistant: string) => Promise<string | undefined>;
+  onTitleError?: (e: unknown) => void;
+  private titling = new Set<string>();
 
   constructor(private db: DB, private adapters: Map<string, AgentAdapter>, private files?: AttachmentStore) {}
 
@@ -384,7 +391,7 @@ export class RunManager {
     if (prepared.stored.length) this.files?.save(userMsgId, convId, prepared.stored);
     if (conv.title === 'Nouvelle conversation') {
       const label = text.replace(/\s+/g, ' ').trim() || prepared.stored[0]?.name || 'Attachment';
-      this.renameConversation(convId, label.slice(0, 60));
+      this.renameConversation(convId, provisionalTitle(label));
     }
 
     const handle = await adapter.send(conv.remote_session_id ?? undefined, {
@@ -558,7 +565,30 @@ export class RunManager {
     this.db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(Date.now(), conv.id);
     this.active.delete(conv.id);
     void this.lateMedia(conv, runId, messageId, mediaSeen, emit);
+    if (outcome === 'completed') void this.autoTitle(conv.id).catch((e) => this.onTitleError?.(e));
     this.onRunFinished?.(conv, outcome, text.replace(/\[\[agentui:[0-9a-f]+\]\]/g, '').trim().slice(0, 140));
+  }
+
+  /**
+   * Replaces the provisional title (the first message) with a generated one. Only while the title is still that provisional one: a title the user
+   * or the agent set is never touched. A failure keeps the provisional title and tries again after the next answer, for the first three exchanges.
+   */
+  private async autoTitle(convId: string): Promise<void> {
+    if (!this.titler || this.titling.has(convId)) return;
+    const first = this.db.prepare("SELECT text FROM messages WHERE conversation_id = ? AND role = 'user' AND hidden = 0 ORDER BY created_at, rowid LIMIT 1").get(convId) as { text: string } | undefined;
+    const answer = this.db.prepare("SELECT text FROM messages WHERE conversation_id = ? AND role = 'assistant' AND text != '' ORDER BY created_at, rowid LIMIT 1").get(convId) as { text: string } | undefined;
+    const provisional = first ? provisionalTitle(first.text) : '';
+    const reply = (answer?.text ?? '').replace(/\[\[agentui:[0-9a-f]+\]\]/g, '').replace(/```widget[\s\S]*?```/g, '').trim();
+    if (!provisional || !reply || this.getConversation(convId)?.title !== provisional) return;
+    const turns = (this.db.prepare("SELECT COUNT(*) n FROM messages WHERE conversation_id = ? AND role = 'assistant'").get(convId) as { n: number }).n;
+    if (turns > 3) return;
+    this.titling.add(convId);
+    try {
+      const title = await this.titler(first!.text.trim(), reply);
+      if (title && this.getConversation(convId)?.title === provisional) this.renameConversation(convId, title); // renamed meanwhile: leave it
+    } finally {
+      this.titling.delete(convId);
+    }
   }
 
   /** Applies an event to the persistent state of the assistant message. */
