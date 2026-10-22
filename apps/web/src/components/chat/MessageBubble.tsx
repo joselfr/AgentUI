@@ -249,8 +249,10 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
           '& table.stackable thead': { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' },
           '& table.stackable tr': { border: 1, borderColor: 'divider', borderRadius: 1.5, mb: 1, p: 0.5 },
           // The column alignment of the Markdown (:--:, --:) lives in an inline style: in cards every label and value starts on the left
-          '& table.stackable td': { border: 0, display: 'flex', gap: 1, px: 1, py: 0.25, textAlign: 'left !important' },
-          '& table.stackable td::before': { content: 'attr(data-label)', flex: '0 0 34%', color: 'text.secondary', fontWeight: 600, textAlign: 'left' },
+          // Block flow (not flex): inline content (text + `code`) must stay one paragraph; the label sits in the left padding
+          '& table.stackable td': { border: 0, position: 'relative', pl: '38%', pr: 1, py: 0.25, textAlign: 'left !important' },
+          '& table.stackable td::before': { content: 'attr(data-label)', position: 'absolute', left: 8, top: 2, width: 'calc(38% - 16px)', color: 'text.secondary', fontWeight: 600, textAlign: 'left' },
+          '& table.stackable td:not([data-label])': { pl: 1 },
           '& table.stackable td:not([data-label])::before': { content: 'none' },
           '& table.stackable td:first-of-type': { fontWeight: 600 },
         },
