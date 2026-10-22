@@ -34,6 +34,8 @@ export const env = {
   host: process.env.HOST ?? '0.0.0.0',
   dataDir: resolve(process.env.DATA_DIR ?? resolve(import.meta.dirname, '../../../data')),
   cookieSecret: process.env.COOKIE_SECRET ?? '',
+  /** Public address of AgentUI (https://agentui.example.com), used to hand absolute links to the agents. */
+  publicUrl: (process.env.PUBLIC_URL ?? '').replace(/\/+$/, ''),
   adminUser: process.env.ADMIN_USER,
   adminPassword: process.env.ADMIN_PASSWORD,
   /** Folders miniapps may ask file access to (`MINIAPP_FS_ROOTS`, separated by `:`). Empty = file access disabled. */

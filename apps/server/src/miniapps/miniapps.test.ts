@@ -9,6 +9,8 @@ import { AppData } from './data.js';
 import Fastify from 'fastify';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { FILE_RATE_LIMIT, registerMiniApps, signAppToken, verifyAppToken } from './routes.js';
+import { handleAppOp } from './ops.js';
+import { signPreviewToken, verifyPreviewToken } from './preview.js';
 import { runHandler, sanitizeHeaders } from './sandbox.js';
 import { AppError, MiniAppStore } from './store.js';
 import { WidgetStore } from './widgets.js';
@@ -222,7 +224,7 @@ describe('network', () => {
 describe('public handlers', () => {
   const server = async () => {
     const app = Fastify();
-    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, userById: () => null, runtimeDir: dir });
     await app.ready();
     return app;
   };
@@ -297,7 +299,7 @@ describe('file grants', () => {
 describe('handler response headers', () => {
   const server = async () => {
     const app = Fastify();
-    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as any, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as any, userById: () => null, runtimeDir: dir });
     await app.ready();
     return app;
   };
@@ -419,7 +421,7 @@ describe('widgets (agentui_widget_custom)', () => {
   it('serves the iframe only with a valid token', async () => {
     const widgets = new WidgetStore(dir);
     const app = Fastify();
-    registerMiniApps(app, { store, widgets, attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as never, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets, attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => ({ id: 1, username: 'u' }) as never, userById: () => null, runtimeDir: dir });
     const r = await widgets.compile('export default () => <div>hi</div>');
     if (!r.ok) throw new Error('build');
     const base = `/w/${r.hash}/${signAppToken('s', 1, `widget-${r.hash}`)}/`;
@@ -442,7 +444,7 @@ describe('hardening of the file routes', () => {
   it('the widget and miniapp file routes are rate limited per client', async () => {
     const app = Fastify();
     await app.register(fastifyRateLimit, { global: false });
-    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, userById: () => null, runtimeDir: dir });
     await app.ready();
     const statuses = new Set<number>();
     for (let i = 0; i < FILE_RATE_LIMIT.max + 5; i++) statuses.add((await app.inject({ url: '/w/0123456789abcdef01234567/bad/app.js' })).statusCode);
@@ -458,7 +460,7 @@ describe('media served to the iframes', () => {
     store.create('a1', { id: 'gal', name: 'Gallery' });
     store.writeAsset('gal', 'a1', 'clip.mp4', MP4);
     const app = Fastify();
-    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, runtimeDir: dir });
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, userById: () => null, runtimeDir: dir });
     const url = `/m/gal/${signAppToken('s', 1, 'gal')}/assets/clip.mp4`;
     const full = await app.inject({ url });
     expect(full.statusCode).toBe(200);
@@ -471,5 +473,66 @@ describe('media served to the iframes', () => {
     expect((await app.inject({ url: `/m/gal/bad.token/assets/clip.mp4` })).statusCode).toBe(403);
     expect((await app.inject({ url: url.replace('clip.mp4', 'nope.mp4') })).statusCode).toBe(404);
     expect((await app.inject({ url: url.replace('clip.mp4', '..%2Fsrc') })).statusCode).toBe(404);
+  });
+});
+
+describe('preview for the agent (agentui_miniapp_open)', () => {
+  const HOUR = 3600 * 1000;
+  const server = async () => {
+    const app = Fastify();
+    registerMiniApps(app, { store, widgets: new WidgetStore(dir), attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, userById: (id) => (id === 1 ? { id: 1, username: 'jose' } : null), runtimeDir: dir });
+    await app.ready();
+    return app;
+  };
+  const link = (appId: string, uid = 1, ttl = HOUR) => `/preview/${appId}/${signPreviewToken('s', uid, appId, ttl).token}`;
+
+  it('the token is bound to one miniapp, one secret and a deadline, and is not an iframe token', () => {
+    const { token } = signPreviewToken('s', 1, 'a', HOUR);
+    expect(verifyPreviewToken('s', 'a', token)).toBe(1);
+    expect(verifyPreviewToken('s', 'b', token)).toBeUndefined();
+    expect(verifyPreviewToken('other', 'a', token)).toBeUndefined();
+    expect(verifyPreviewToken('s', 'a', signPreviewToken('s', 1, 'a', HOUR, Date.now() - 2 * HOUR).token)).toBeUndefined();
+    expect(verifyPreviewToken('s', 'a', signAppToken('s', 1, 'a'))).toBeUndefined(); // the 12 h iframe token does not open a preview
+    expect(verifyAppToken('s', 'a', token)).toBe(false); // and the other way round
+    expect(verifyPreviewToken('s', 'a', 'x.y.z')).toBeUndefined();
+  });
+
+  it('serves the host page, the state and the handlers with the link only, and refuses anything else', async () => {
+    store.create('a1', { id: 'trk', name: 'Tracker' });
+    store.create('a1', { id: 'other', name: 'Other' });
+    await store.writeFiles('trk', 'a1', [{ path: 'src/main.tsx', content: MAIN }, { path: 'server/index.js', content: `export function GET(req, ctx) { return { who: ctx.user.username, path: req.path }; }` }]);
+    const app = await server();
+    const page = await app.inject({ url: link('trk') });
+    expect(page.statusCode).toBe(200);
+    expect(page.headers['content-security-policy']).toContain("frame-src 'self'");
+    expect(page.headers['cache-control']).toBe('no-store');
+    expect(page.body).toContain('data-state="loading"');
+    expect(page.body).toContain('id="agentui-errors"');
+    expect(page.body).toMatch(/\/m\/trk\/1\.\d+\./); // the iframe is the usual sandboxed miniapp
+    expect(JSON.parse((await app.inject({ url: `${link('trk')}/state` })).body)).toEqual({ version: store.get('trk')!.version, seq: 0 });
+    const res = await app.inject({ url: `${link('trk')}/x/items` });
+    expect(res.json()).toEqual({ who: 'jose', path: '/items' });
+
+    const token = link('trk').split('/')[3]!;
+    expect((await app.inject({ url: `/preview/other/${token}` })).statusCode).toBe(403); // another miniapp
+    expect((await app.inject({ url: `/preview/trk/bad.token` })).statusCode).toBe(403);
+    expect((await app.inject({ url: link('trk', 2) })).statusCode).toBe(403); // a user that does not exist
+    expect((await app.inject({ url: link('trk', 1, -1000) })).statusCode).toBe(403); // expired
+    expect((await app.inject({ url: `${link('trk', 1, -1000)}/x/items` })).statusCode).toBe(403);
+    store.dataChanged('trk');
+    expect(JSON.parse((await app.inject({ url: `${link('trk')}/state` })).body).seq).toBe(1);
+    await store.destroy('trk', 'a1');
+    expect((await app.inject({ url: link('trk') })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('the open operation only serves the owner agent, with a link that opens', async () => {
+    store.create('a1', { id: 'trk', name: 'Tracker' });
+    const ctx = { preview: (id: string, ttlS: number) => { const p = signPreviewToken('s', 1, id, ttlS * 1000); return { url: `https://x.test/preview/${id}/${p.token}`, expiresAt: p.expiresAt }; } };
+    const r = (await handleAppOp(store, data, 'a1', 'open', { id: 'trk', ttl_s: 120 }, ctx)) as { url: string; expiresAt: string };
+    expect(r.url).toMatch(/^https:\/\/x\.test\/preview\/trk\/1\.\d+\./);
+    expect(new Date(r.expiresAt).getTime()).toBeGreaterThan(Date.now());
+    await expect(handleAppOp(store, data, 'a2', 'open', { id: 'trk' }, ctx)).rejects.toThrow();
+    await expect(handleAppOp(store, data, 'a1', 'open', { id: 'trk', ttl_s: 99999 }, ctx)).rejects.toThrow(); // above the maximum
   });
 });

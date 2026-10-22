@@ -127,6 +127,7 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 | `AGENTS_CONFIG` | Path of `agents.config.yaml` (`/config/agents.config.yaml` in Docker). |
 | `PORT`, `HOST` | Listening address (default `0.0.0.0:8080`). |
 | `VAPID_SUBJECT` | Contact used for push notifications (default `mailto:admin@agentui.local`). |
+| `PUBLIC_URL` | Optional, public address of AgentUI (`https://agentui.example.com`): the base of the temporary links that let an agent open a miniapp in its own browser (`agentui_miniapp_open`). Without it the link is relative. |
 | `MINIAPP_FS_ROOTS` | Optional, colon-separated absolute folders that miniapps may ask to read (you approve each one in the UI). |
 
 ## Going further
@@ -139,7 +140,7 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 | `agentui_widget_custom` | A component written by the agent (React, same UI kit as miniapps, plus chart.js and Leaflet maps), sandboxed, and it can show your images, videos and audio (`media`). If it crashes, a button sends the traces to the agent. |
 | `agentui_widget_custom_wait` | Keeps a *live* two-way session with a custom widget: the user’s clicks reach the agent, which updates the widget in place. |
 | `agentui_ask`, `agentui_confirm`, `agentui_form` | Ask the user and wait for the answer. |
-| `agentui_miniapp_*` | Create, write, read, list and remove miniapps, push data into them, and give them images, videos and audio (`asset`). |
+| `agentui_miniapp_*` | Create, write, read, list and remove miniapps, push data into them, give them images, videos and audio (`asset`), and open them in the agent's own browser through a temporary link (`open`). |
 | `agentui_notify` | Send a push notification. |
 | `agentui_set_thread_title` / `agentui_get_thread_title` | Rename the current discussion / read its title. |
 

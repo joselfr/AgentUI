@@ -9,6 +9,7 @@ import { AppError, type MiniAppStore } from './store.js';
 import { WidgetStore } from './widgets.js';
 import type { AttachmentStore } from '../attachments.js';
 import { serveStoredFile } from '../serve-file.js';
+import { previewHtml, verifyPreviewToken } from './preview.js';
 
 const PUBLIC_RATE_PER_MIN = 120;
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -86,6 +87,8 @@ export interface MiniAppRoutesOpts {
   data: AppData;
   secret: string;
   userOf: (cookies: Record<string, string | undefined>) => AuthUser | null;
+  /** User a preview link acts as (the one who was logged in when the agent opened it). */
+  userById: (id: number) => AuthUser | null;
   runtimeDir: string;
 }
 
@@ -118,35 +121,75 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     return store.setFsApproval(must(req.params.id).id, b.path, b.approved);
   });
 
+  /** Runs the handler `server/<route>.js` (else `server/index.js`) for `rest` = `<route>/…`, on behalf of `user`. */
+  async function callHandler(req: FastifyRequest, reply: FastifyReply, appId: string, rest: string, user: AuthUser) {
+    rest = rest.replace(/^\/+/, '');
+    const [first = '', ...more] = rest.split('/');
+    let name = first;
+    let path = '/' + more.join('/');
+    let code = first ? store.serverCode(appId, first) : undefined;
+    if (!code) {
+      name = 'index';
+      path = '/' + rest;
+      code = store.serverCode(appId, 'index');
+    }
+    if (!code) return reply.code(404).send({ error: `No handler for route "${rest || '/'}" in this miniapp.` });
+    const res = await runHandler({
+      code,
+      appId,
+      req: { method: req.method, path, query: (req.query ?? {}) as Record<string, string>, body: req.body ?? null },
+      user: { id: user.id, username: user.username },
+      data,
+      fs: store.fsFor(appId),
+      log: (l) => store.log(appId, `[${name}] ${l}`),
+      onData: () => store.dataChanged(appId),
+    });
+    return sendResult(reply, res);
+  }
+
   /** Handlers of a miniapp: `/api/miniapps/<id>/x/<route>/…` → `server/<route>.js`, else `server/index.js`. */
   app.route<{ Params: { id: string; '*': string } }>({
     method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     url: '/api/miniapps/:id/x/*',
+    handler: async (req, reply) => callHandler(req, reply, must(req.params.id).id, req.params['*'], o.userOf(req.cookies)!),
+  });
+
+  // ---------- Preview for the agent's browser (`agentui_miniapp_open`): the link is the credential, one miniapp, short-lived ----------
+  /** The miniapp and the user of a preview link, or the error already sent. */
+  const previewOf = (req: FastifyRequest<{ Params: { id: string; token: string } }>, reply: FastifyReply) => {
+    const { id, token } = req.params;
+    const uid = verifyPreviewToken(secret, id, token);
+    const user = uid === undefined ? null : o.userById(uid);
+    if (!user) return void reply.code(403).send({ error: 'forbidden' });
+    const a = store.get(id);
+    if (!a) return void reply.code(404).send({ error: 'not found' });
+    return { a, user };
+  };
+  app.get<{ Params: { id: string; token: string } }>('/preview/:id/:token', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
+    const p = previewOf(req, reply);
+    if (!p) return;
+    const nonce = randomBytes(16).toString('base64');
+    return reply
+      .header('Content-Type', 'text/html; charset=utf-8')
+      .header('Cache-Control', 'no-store')
+      .header('Referrer-Policy', 'no-referrer')
+      .header('X-Robots-Tag', 'noindex')
+      .header('X-Content-Type-Options', 'nosniff')
+      .header('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'`)
+      .send(previewHtml({ appId: p.a.id, name: p.a.name, frameSrc: `/m/${p.a.id}/${signAppToken(secret, p.user.id, p.a.id)}/`, nonce, version: p.a.version, seq: store.dataSeq(p.a.id) }));
+  });
+  /** Version and data counter: the page reloads on a new version and tells the app to refetch on new data. */
+  app.get<{ Params: { id: string; token: string } }>('/preview/:id/:token/state', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
+    const p = previewOf(req, reply);
+    return p ? reply.header('Cache-Control', 'no-store').send({ version: p.a.version, seq: store.dataSeq(p.a.id) }) : undefined;
+  });
+  app.route<{ Params: { id: string; token: string; '*': string } }>({
+    method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    url: '/preview/:id/:token/x/*',
+    config: { rateLimit: FILE_RATE_LIMIT },
     handler: async (req, reply) => {
-      const a = must(req.params.id);
-      const rest = req.params['*'].replace(/^\/+/, '');
-      const [first = '', ...more] = rest.split('/');
-      let name = first;
-      let path = '/' + more.join('/');
-      let code = first ? store.serverCode(a.id, first) : undefined;
-      if (!code) {
-        name = 'index';
-        path = '/' + rest;
-        code = store.serverCode(a.id, 'index');
-      }
-      if (!code) return reply.code(404).send({ error: `No handler for route "${rest || '/'}" in this miniapp.` });
-      const user = o.userOf(req.cookies)!;
-      const res = await runHandler({
-        code,
-        appId: a.id,
-        req: { method: req.method, path, query: (req.query ?? {}) as Record<string, string>, body: req.body ?? null },
-        user: { id: user.id, username: user.username },
-        data,
-        fs: store.fsFor(a.id),
-        log: (l) => store.log(a.id, `[${name}] ${l}`),
-        onData: () => store.dataChanged(a.id),
-      });
-      return sendResult(reply, res);
+      const p = previewOf(req, reply);
+      return p ? callHandler(req, reply, p.a.id, req.params['*'], p.user) : undefined;
     },
   });
 

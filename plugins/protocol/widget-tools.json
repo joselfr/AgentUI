@@ -763,6 +763,27 @@
         ]
       }
     },
+    "open": {
+      "description": "Gives you a temporary link that opens one of your miniapps in YOUR browser tool, running for real (front, handlers and data), to check that it looks and works as the user will see it. Open it after agentui_miniapp_write, look at the page, click through it, and fix what is wrong. The page text also lists the errors of the front and the failed handler calls (#agentui-errors, and body[data-state] is loading, ready or error), so read it when something looks off; handler-side output stays in agentui_miniapp_logs. The link opens only this miniapp, needs no login, expires (15 minutes by default, 1 hour at most) and the page reloads by itself when you write a new version, so you rarely need a second link. Beware: the app is used for real, so what you click writes real data (use a test entry and remove it). Do not share the link with the user, they have the Miniapps tab.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Miniapp id."
+          },
+          "ttl_s": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 3600,
+            "description": "Lifetime of the link in seconds (default 900)."
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
     "job": {
       "description": "Tags a scheduled task (cron job) as belonging to one of your miniapps, so AgentUI shows the link and deletes the task when the miniapp is removed. Create the task with your usual scheduler tool, then call this with action link and the task id. Use unlink to drop the tag without deleting the task, list to see the tagged task ids.",
       "parameters": {

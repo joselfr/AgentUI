@@ -20,7 +20,7 @@ Protocol between AgentUI (the "gateway", like Telegram for a bot) and a **channe
 | `event` | `conversationId`, `runId`, `event` | A run event, in AgentUI's `AgentEvent` format (see below). |
 | `outbound` | `id`, `conversationId?`, `title?`, `text?`, `media?: Media[]` | **Proactive message** (cron, reminder, `send_message` tool…) outside any run. Without `conversationId`, AgentUI files it in the agent's "home" chat. `title`: proposed title if the chat has to be created (e.g. "⏰ task-name" for a cron). |
 | `rpc.result` | `id`, `result?` \| `error?` | Answer to an `rpc`. |
-| `miniapp.op` | `id`, `op`, `args?` | Operation on the agent's **miniapps** (Miniapps tab): `create`, `write`, `read`, `list`, `delete_file`, `remove`, `logs`, `data`. Answer: `miniapp.result`. An agent only touches its own apps. |
+| `miniapp.op` | `id`, `op`, `args?` | Operation on the agent's **miniapps** (Miniapps tab): `create`, `write`, `read`, `list`, `delete_file`, `remove`, `logs`, `open`, `data`. Answer: `miniapp.result`. An agent only touches its own apps. |
 | `notify` | `id`, `title`, `body?`, `url?` | **Push notification** to the user's devices (backs the `agentui_notify` tool). `url`: opened on tap — an AgentUI path (`/…`) or an `https://` URL (default `/`). Answer: `notify.result`. |
 | `thread.get` | `id`, `conversationId` | Current **title** of the chat (backs the `agentui_get_thread_title` tool). Answer: `thread.result`. |
 | `pong` | — | Answer to `ping`. |
@@ -143,6 +143,8 @@ published as the `.claude/skills/agentui-miniapps` skill). The server compiles (
 the front in a sandboxed iframe. Media of a miniapp (images, videos, audio) are its **assets**: `agentui_miniapp_asset` (`id`, `src`, `name?`) is read by the plugin
 on the agent's machine and sent as the `asset` op (`id`, `name`, `data` base64, 25 MB, 40 per miniapp, type checked from the content); `delete_asset` removes one. The front shows them
 with `<Media name>` / `useMedia(name)`, through the same host bridge as above (`/m/<id>/<token>/assets/<name>`). A miniapp's handlers have no direct network access: `ctx.fetch` goes through the server, which refuses private/internal addresses. See `miniapps-guide.md` for the agent-side constraint.
+
+**Preview for the agent's browser.** `agentui_miniapp_open` (`id`, `ttl_s?` 60-3600, default 900) is the `open` op: it answers `{ url, expiresAt, note }`. The URL (`<PUBLIC_URL>/preview/<id>/<token>`, relative when `PUBLIC_URL` is not set) opens the running miniapp in the agent's own browser tool, without a session cookie: the token is signed (HMAC, `preview.` domain, so an iframe token never opens a preview), bound to one miniapp and one user (the first account), and expires. The page is a minimal host (same sandboxed iframe and postMessage bridge as the Miniapps tab) whose handler calls go through `/preview/<id>/<token>/x/…`; it reloads itself on a new version and refreshes on new data (`/state`). Front errors and failed handler calls are written in its text (`#agentui-errors`, `body[data-state]`). Handlers run for real: what the agent clicks writes real data. No plugin change is needed: any `miniappTools` entry is relayed as a `miniapp.op`.
 
 ## Rules
 

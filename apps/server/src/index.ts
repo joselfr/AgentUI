@@ -20,6 +20,7 @@ import { AttachmentError, AttachmentStore } from './attachments.js';
 import { serveStoredFile } from './serve-file.js';
 import { AppData } from './miniapps/data.js';
 import { FILE_RATE_LIMIT, registerMiniApps } from './miniapps/routes.js';
+import { signPreviewToken } from './miniapps/preview.js';
 import { AppError, MiniAppStore } from './miniapps/store.js';
 import { WidgetStore } from './miniapps/widgets.js';
 import { handleAppOp, isAppOp, opError } from './miniapps/ops.js';
@@ -323,6 +324,7 @@ async function main() {
     if (dataTimers.has(id)) return; // coalesced: one push per 300 ms and miniapp
     dataTimers.set(id, setTimeout(() => { dataTimers.delete(id); runs.broadcast({ type: 'miniapp.data', appId: id }); }, 300));
   };
+  const userById = (id: number): AuthUser | null => (db.prepare('SELECT id, username FROM users WHERE id = ?').get(id) as AuthUser | undefined) ?? null;
   registerMiniApps(app, {
     store: apps,
     widgets: new WidgetStore(env.dataDir),
@@ -330,6 +332,7 @@ async function main() {
     data: appData,
     secret,
     userOf,
+    userById,
     runtimeDir: resolve(process.env.APP_RUNTIME_DIST ?? '../../packages/app-runtime/dist'),
   });
 
@@ -371,7 +374,15 @@ async function main() {
   for (const g of gateways) {
     g.onMiniappOp = async (op, args) => {
       if (!isAppOp(op)) throw new AppError(`Unknown miniapp operation "${op}".`);
-      return handleAppOp(apps, appData, g.id, op, args);
+      return handleAppOp(apps, appData, g.id, op, args, {
+        // The preview acts as the first user (AgentUI is a single-user app: the one who signed up)
+        preview: (appId, ttlS) => {
+          const owner = db.prepare('SELECT id FROM users ORDER BY id LIMIT 1').get() as { id: number } | undefined;
+          if (!owner) throw new AppError('No user account yet.');
+          const { token, expiresAt } = signPreviewToken(secret, owner.id, appId, ttlS * 1000);
+          return { url: `${env.publicUrl}/preview/${appId}/${token}`, expiresAt };
+        },
+      });
     };
     g.onMiniappOpError = opError;
     g.onNotify = async (a) => {
@@ -420,7 +431,7 @@ async function main() {
   if (existsSync(webDist)) {
     await app.register(fastifyStatic, { root: webDist });
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') || req.url.startsWith('/m/') || req.url.startsWith('/public/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
+      req.url.startsWith('/api/') || req.url.startsWith('/m/') || req.url.startsWith('/preview/') || req.url.startsWith('/public/') ? reply.code(404).send({ error: 'not found' }) : reply.sendFile('index.html'),
     );
   }
 

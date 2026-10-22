@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AppData } from './data.js';
+import { PREVIEW_DEFAULT_TTL_S, PREVIEW_MAX_TTL_S } from './preview.js';
 import { AppError, type MiniAppStore } from './store.js';
 
 const id = z.string().min(1).max(60);
@@ -17,6 +18,7 @@ const SCHEMAS = {
   asset: z.object({ id, name: z.string().min(1).max(100), data: z.string().min(1) }), // base64 content, read by the plugin from the agent's machine
   delete_asset: z.object({ id, name: z.string().min(1).max(100) }),
   logs: z.object({ id }),
+  open: z.object({ id, ttl_s: z.number().int().min(60).max(PREVIEW_MAX_TTL_S).optional() }),
   job: z.object({ id, action: z.enum(['link', 'unlink', 'list']), job_id: z.string().min(1).max(200).optional() }),
   data: z.object({
     id,
@@ -37,7 +39,12 @@ export type AppOp = keyof typeof SCHEMAS;
 export const isAppOp = (s: unknown): s is AppOp => typeof s === 'string' && s in SCHEMAS;
 
 /** Operations a plugin can request on behalf of its agent (frame `miniapp.op`). Throws `AppError` / `ZodError` for the agent. */
-export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: string, op: AppOp, rawArgs: unknown): Promise<unknown> {
+/** What only the server wiring knows: how to mint a preview link (`open`). */
+export interface AppOpContext {
+  preview(appId: string, ttlS: number): { url: string; expiresAt: number };
+}
+
+export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: string, op: AppOp, rawArgs: unknown, ctx?: AppOpContext): Promise<unknown> {
   const a = SCHEMAS[op].parse(rawArgs ?? {}) as any;
   switch (op) {
     case 'create': {
@@ -79,6 +86,16 @@ export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: s
       return { ok: true };
     case 'logs':
       return { lines: store.getLogs(a.id, agentId) };
+    case 'open': {
+      store.assertOwner(a.id, agentId);
+      if (!ctx) throw new AppError('Preview links are not available on this server.');
+      const p = ctx.preview(a.id, a.ttl_s ?? PREVIEW_DEFAULT_TTL_S);
+      return {
+        ...p,
+        expiresAt: new Date(p.expiresAt).toISOString(),
+        note: 'Open this URL in your browser. The page runs the miniapp for real, as the user would use it (handlers and data included). Errors of the front and failed handler calls are written in the page text (#agentui-errors, body[data-state]). The link only opens this miniapp and expires; ask for a new one after that.',
+      };
+    }
     case 'data': {
       store.assertOwner(a.id, agentId);
       const need = (v: unknown, name: string) => {

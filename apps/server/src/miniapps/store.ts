@@ -84,7 +84,13 @@ export class MiniAppStore {
 
   /** Notified when the data of a miniapp changed (agent tool or handler): open iframes refresh. */
   onData?: (id: string) => void;
+  private seq = new Map<string, number>();
+  /** Counter of the data changes of a miniapp since the server started (a preview page polls it to refresh the app). */
+  dataSeq(id: string): number {
+    return this.seq.get(id) ?? 0;
+  }
   dataChanged(id: string): void {
+    this.seq.set(id, this.dataSeq(id) + 1);
     this.onData?.(id);
   }
 

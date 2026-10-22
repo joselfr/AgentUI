@@ -91,6 +91,7 @@ Keep only the agents you use. The `token` must be at least 16 characters and is 
 | `DATA_DIR` | Database, attachments and miniapps | `/data` in Docker, `./data` otherwise |
 | `AGENTS_CONFIG` | Path of the agents file | `agents.config.yaml` |
 | `VAPID_SUBJECT` | Contact for push notifications | `mailto:admin@agentui.local` |
+| `PUBLIC_URL` | Public address of AgentUI (e.g. `https://agentui.example.com`), base of the links given to agents by `agentui_miniapp_open` | none: relative links |
 | `MINIAPP_FS_ROOTS` | Colon-separated absolute folders that miniapps may ask to read (each one must then be approved in the interface) | none: file access disabled |
 
 ## 2. Run AgentUI

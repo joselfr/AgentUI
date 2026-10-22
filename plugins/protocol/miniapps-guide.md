@@ -6,8 +6,9 @@ A **miniapp** is a small web application you write — a **front** (React, in `s
 
 1. `agentui_miniapp_create` — `id` (lowercase, digits, dashes, e.g. `habit-tracker`), `name`, `icon`, `description`.
 2. `agentui_miniapp_write` — send all the files (several per call). The result tells you if the build succeeded; on `ok: false` read `errors` (file, line), fix, write again. The last working version stays online meanwhile.
-3. Tell the user the miniapp is in the **Miniapps** tab (link: `/miniapps/<id>`). The miniapp updates live for anyone who has it open.
-4. Iterate: `agentui_miniapp_read` / `agentui_miniapp_list` to see what exists, `agentui_miniapp_data` to read or push data (see below), `agentui_miniapp_logs` to see `console.log` output and handler errors, `agentui_miniapp_delete_file`, `agentui_miniapp_remove` (only on the user's request).
+3. If you have a browser tool, **check the result yourself**: `agentui_miniapp_open` returns a temporary link to the running miniapp (front, handlers, data). Open it, look at the page, click through it and fix what is wrong before telling the user. The page text lists front errors and failed handler calls. What you click writes real data: use a test entry and remove it.
+4. Tell the user the miniapp is in the **Miniapps** tab (link: `/miniapps/<id>`). The miniapp updates live for anyone who has it open.
+5. Iterate: `agentui_miniapp_read` / `agentui_miniapp_list` to see what exists, `agentui_miniapp_data` to read or push data (see below), `agentui_miniapp_logs` to see `console.log` output and handler errors, `agentui_miniapp_delete_file`, `agentui_miniapp_remove` (only on the user's request).
 
 Icons for `icon`: apps, checklist, chart, calendar, notes, timer, shopping, finance, home, star, book, fitness, music, code, map, mail, photo, game, food, travel, weather, idea, health, tools.
 
