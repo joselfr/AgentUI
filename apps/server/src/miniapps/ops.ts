@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { AppData } from './data.js';
-import { PREVIEW_DEFAULT_TTL_S, PREVIEW_MAX_TTL_S } from './preview.js';
+import { PREVIEW_DEFAULT_TTL_S, PREVIEW_MAX_TTL_S, WIDGET_WIDTH, widgetPreviewId } from './preview.js';
+import type { WidgetStore } from './widgets.js';
 import { AppError, type MiniAppStore } from './store.js';
 
 const id = z.string().min(1).max(60);
@@ -19,6 +20,7 @@ const SCHEMAS = {
   delete_asset: z.object({ id, name: z.string().min(1).max(100) }),
   logs: z.object({ id }),
   open: z.object({ id, ttl_s: z.number().int().min(60).max(PREVIEW_MAX_TTL_S).optional() }),
+  widget_open: z.object({ code: z.string().min(1), width: z.number().int().min(WIDGET_WIDTH.min).max(WIDGET_WIDTH.max).optional(), ttl_s: z.number().int().min(60).max(PREVIEW_MAX_TTL_S).optional() }),
   job: z.object({ id, action: z.enum(['link', 'unlink', 'list']), job_id: z.string().min(1).max(200).optional() }),
   data: z.object({
     id,
@@ -39,8 +41,9 @@ export type AppOp = keyof typeof SCHEMAS;
 export const isAppOp = (s: unknown): s is AppOp => typeof s === 'string' && s in SCHEMAS;
 
 /** Operations a plugin can request on behalf of its agent (frame `miniapp.op`). Throws `AppError` / `ZodError` for the agent. */
-/** What only the server wiring knows: how to mint a preview link (`open`). */
+/** What only the server wiring knows: how to mint a preview link (`open`, `widget_open`) and the widget compiler. */
 export interface AppOpContext {
+  widgets: WidgetStore;
   preview(appId: string, ttlS: number): { url: string; expiresAt: number };
 }
 
@@ -94,6 +97,18 @@ export async function handleAppOp(store: MiniAppStore, data: AppData, agentId: s
         ...p,
         expiresAt: new Date(p.expiresAt).toISOString(),
         note: 'Open this URL in your browser. The page runs the miniapp for real, as the user would use it (handlers and data included). Errors of the front and failed handler calls are written in the page text (#agentui-errors, body[data-state]). The link only opens this miniapp and expires; ask for a new one after that.',
+      };
+    }
+    case 'widget_open': {
+      if (!ctx) throw new AppError('Preview links are not available on this server.');
+      const r = await ctx.widgets.compile(a.code);
+      if (!r.ok) return { ok: false, errors: r.errors, note: 'The widget does not compile. Fix the errors and call again; nothing was opened.' };
+      const p = ctx.preview(widgetPreviewId(r.hash), a.ttl_s ?? PREVIEW_DEFAULT_TTL_S);
+      return {
+        ok: true,
+        url: `${p.url}?w=${a.width ?? WIDGET_WIDTH.default}`,
+        expiresAt: new Date(p.expiresAt).toISOString(),
+        note: `Open this URL in your browser. The page shows the widget as in the chat, in a column ${a.width ?? WIDGET_WIDTH.default}px wide (a phone), sized to its content, in the theme of your browser. Errors of the widget are written in the page text (#agentui-errors, body[data-state] is loading, ready or error); what it sends with reply() shows in #agentui-replies instead of reaching a conversation. It has no backend and no state from the agent. The link shows this code only and expires; the page does not reload when you fix the code, call this tool again.`,
       };
     }
     case 'data': {

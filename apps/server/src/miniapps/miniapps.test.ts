@@ -528,11 +528,40 @@ describe('preview for the agent (agentui_miniapp_open)', () => {
 
   it('the open operation only serves the owner agent, with a link that opens', async () => {
     store.create('a1', { id: 'trk', name: 'Tracker' });
-    const ctx = { preview: (id: string, ttlS: number) => { const p = signPreviewToken('s', 1, id, ttlS * 1000); return { url: `https://x.test/preview/${id}/${p.token}`, expiresAt: p.expiresAt }; } };
+    const ctx = { widgets: new WidgetStore(dir), preview: (id: string, ttlS: number) => { const p = signPreviewToken('s', 1, id, ttlS * 1000); return { url: `https://x.test/preview/${id}/${p.token}`, expiresAt: p.expiresAt }; } };
     const r = (await handleAppOp(store, data, 'a1', 'open', { id: 'trk', ttl_s: 120 }, ctx)) as { url: string; expiresAt: string };
     expect(r.url).toMatch(/^https:\/\/x\.test\/preview\/trk\/1\.\d+\./);
     expect(new Date(r.expiresAt).getTime()).toBeGreaterThan(Date.now());
     await expect(handleAppOp(store, data, 'a2', 'open', { id: 'trk' }, ctx)).rejects.toThrow();
     await expect(handleAppOp(store, data, 'a1', 'open', { id: 'trk', ttl_s: 99999 }, ctx)).rejects.toThrow(); // above the maximum
+  });
+
+  it('previews a custom widget: compiled, in a column of the asked width, with no handlers', async () => {
+    const code = `export default function W() { return <div>hello</div>; }`;
+    const widgets = new WidgetStore(dir);
+    const ctx = { widgets, preview: (id: string, ttlS: number) => { const p = signPreviewToken('s', 1, id, ttlS * 1000); return { url: `/preview/${id}/${p.token}`, expiresAt: p.expiresAt }; } };
+    const bad = (await handleAppOp(store, data, 'a1', 'widget_open', { code: 'export default function W() { return <div>; }' }, ctx)) as { ok: boolean; errors: unknown[] };
+    expect(bad.ok).toBe(false);
+    expect(bad.errors.length).toBeGreaterThan(0);
+    const r = (await handleAppOp(store, data, 'a1', 'widget_open', { code, width: 280 }, ctx)) as { ok: boolean; url: string };
+    expect(r.ok).toBe(true);
+    expect(r.url).toMatch(/^\/preview\/widget-[0-9a-f]{24}\/1\.\d+\.[^?]+\?w=280$/);
+    await expect(handleAppOp(store, data, 'a1', 'widget_open', { code, width: 50 }, ctx)).rejects.toThrow();
+
+    const app = Fastify();
+    registerMiniApps(app, { store, widgets, attachments: new AttachmentStore(db, dir), data, secret: 's', userOf: () => null, userById: (id) => (id === 1 ? { id: 1, username: 'jose' } : null), runtimeDir: dir });
+    await app.ready();
+    const page = await app.inject({ url: r.url });
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('width:280px');
+    expect(page.body).toContain('id="agentui-errors"');
+    expect(page.body).toMatch(/\/w\/[0-9a-f]{24}\/1\.\d+\./); // the usual widget iframe
+    const path = r.url.split('?')[0]!;
+    expect((await app.inject({ url: `${path}/state` })).statusCode).toBe(404);
+    expect((await app.inject({ url: `${path}/x/items` })).statusCode).toBe(404);
+    const other = signPreviewToken('s', 1, 'widget-' + '0'.repeat(24), HOUR).token;
+    expect((await app.inject({ url: `/preview/widget-${'0'.repeat(24)}/${other}` })).statusCode).toBe(404); // never compiled
+    expect((await app.inject({ url: path.replace(/\/[^/]+$/, '/bad.token') })).statusCode).toBe(403);
+    await app.close();
   });
 });

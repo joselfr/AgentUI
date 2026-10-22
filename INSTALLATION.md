@@ -92,7 +92,7 @@ Keep only the agents you use. The `token` must be at least 16 characters and is 
 | `AGENTS_CONFIG` | Path of the agents file | `agents.config.yaml` |
 | `VAPID_SUBJECT` | Contact for push notifications | `mailto:admin@agentui.local` |
 | `TITLE_PROVIDER`, `TITLE_MODEL`, `TITLE_API_KEY`, `TITLE_BASE_URL`, `TITLE_LANGUAGE` | Conversation titles written by a small LLM after the first exchange: provider (`deepseek`, `openai`, `anthropic`), model, key (default: the provider's usual variable, e.g. `DEEPSEEK_API_KEY`), another endpoint, language of the titles. A title you or the agent set is never replaced | none: the title stays the first message |
-| `PUBLIC_URL` | Public address of AgentUI (e.g. `https://agentui.example.com`), base of the links given to agents by `agentui_miniapp_open` | none: relative links |
+| `PUBLIC_URL` | Public address of AgentUI (e.g. `https://agentui.example.com`), base of the links given to agents by `agentui_miniapp_open` and `agentui_miniapp_widget_open` | none: relative links |
 | `MINIAPP_FS_ROOTS` | Colon-separated absolute folders that miniapps may ask to read (each one must then be approved in the interface) | none: file access disabled |
 
 ## 2. Run AgentUI

@@ -333,9 +333,10 @@ async function main() {
     dataTimers.set(id, setTimeout(() => { dataTimers.delete(id); runs.broadcast({ type: 'miniapp.data', appId: id }); }, 300));
   };
   const userById = (id: number): AuthUser | null => (db.prepare('SELECT id, username FROM users WHERE id = ?').get(id) as AuthUser | undefined) ?? null;
+  const widgetStore = new WidgetStore(env.dataDir);
   registerMiniApps(app, {
     store: apps,
-    widgets: new WidgetStore(env.dataDir),
+    widgets: widgetStore,
     attachments: files,
     data: appData,
     secret,
@@ -383,6 +384,7 @@ async function main() {
     g.onMiniappOp = async (op, args) => {
       if (!isAppOp(op)) throw new AppError(`Unknown miniapp operation "${op}".`);
       return handleAppOp(apps, appData, g.id, op, args, {
+        widgets: widgetStore,
         // The preview acts as the first user (AgentUI is a single-user app: the one who signed up)
         preview: (appId, ttlS) => {
           const owner = db.prepare('SELECT id FROM users ORDER BY id LIMIT 1').get() as { id: number } | undefined;

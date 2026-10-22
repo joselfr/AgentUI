@@ -116,3 +116,84 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:transpa
 })();
 </script></body></html>`;
 }
+
+/** Preview id of a custom widget: `widget-<hash>` (the hash of its code, see `WidgetStore`). Never the id of a miniapp preview. */
+export const widgetPreviewId = (hash: string) => `widget-${hash}`;
+export const widgetHashOfPreview = (id: string): string | undefined => /^widget-([0-9a-f]{24})$/.exec(id)?.[1];
+export const WIDGET_WIDTH = { min: 200, max: 1200, default: 360 };
+
+/**
+ * Host page of a `agentui_widget_custom` preview: a stand-in for the chat bubble. The widget runs in the same sandboxed iframe, at the width
+ * the agent asked for (a phone by default), sized to its content like in the chat, with the theme, `useWidth()`, full screen and `reply()`.
+ * It has no backend, so what the agent needs to debug is written in the page text: `#agentui-errors` lists the errors of the widget, and
+ * `#agentui-replies` what it tried to send with `reply()` (nothing goes to a conversation). `body[data-state]` is `loading`, `ready` or `error`.
+ */
+export function widgetPreviewHtml(o: { hash: string; frameSrc: string; nonce: string; width: number }): string {
+  const width = Math.min(Math.max(Math.round(o.width) || WIDGET_WIDTH.default, WIDGET_WIDTH.min), WIDGET_WIDTH.max);
+  const cfg = { frameSrc: o.frameSrc, width, themes: { light: themeCssVars('light'), dark: themeCssVars('dark') } };
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex"><meta name="referrer" content="no-referrer">
+<title>Widget (preview)</title>
+<style>
+html,body{margin:0;min-height:100%}
+body{padding:12px;box-sizing:border-box;font:14px system-ui,sans-serif}
+#stage{width:${width}px;max-width:100%;margin:0 auto}
+iframe{display:block;width:100%;height:96px;border:0;background:transparent}
+#stage.fs{position:fixed;inset:0;width:auto;max-width:none;margin:0;z-index:1}
+#stage.fs iframe{height:100%}
+.log{margin:12px auto 0;max-width:${Math.max(width, 360)}px;padding:8px 12px;border-radius:8px;font:12px/1.4 ui-monospace,monospace;white-space:pre-wrap;overflow:auto;max-height:30vh}
+.log:empty{display:none}
+#agentui-errors{background:#7f1d1d;color:#fff}
+#agentui-replies{background:#1e3a5f;color:#fff}
+</style></head>
+<body data-state="loading" data-widget="${esc(o.hash)}">
+<div id="stage"><iframe id="app" title="Widget" sandbox="allow-scripts"></iframe></div>
+<pre id="agentui-errors" class="log" role="alert"></pre>
+<pre id="agentui-replies" class="log"></pre>
+<script nonce="${o.nonce}">
+(function () {
+  var cfg = ${json(cfg)};
+  var frame = document.getElementById('app');
+  var stage = document.getElementById('stage');
+  var errBox = document.getElementById('agentui-errors');
+  var replyBox = document.getElementById('agentui-replies');
+  var dark = matchMedia('(prefers-color-scheme: dark)');
+  var errors = [], replies = [], fs = false;
+  function show(box, list, label) { box.textContent = list.map(function (l) { return label + l; }).join('\\n---\\n'); }
+  function theme() {
+    var mode = dark.matches ? 'dark' : 'light';
+    document.body.style.background = cfg.themes[mode]['--au-bg'] || '';
+    if (frame.contentWindow) frame.contentWindow.postMessage({ type: 'agentui:theme', mode: mode, lang: (navigator.language || 'en').slice(0, 2), vars: cfg.themes[mode] }, '*');
+  }
+  function post(m) { if (frame.contentWindow) frame.contentWindow.postMessage(m, '*'); }
+  dark.addEventListener('change', theme);
+  frame.addEventListener('load', function () { theme(); post({ type: 'agentui:chat', canReply: true }); });
+  frame.src = cfg.frameSrc;
+  theme();
+
+  window.addEventListener('message', function (e) {
+    var w = frame.contentWindow;
+    if (!w || e.source !== w) return;
+    var m = e.data || {};
+    if (m.type === 'agentui:ready') { if (document.body.dataset.state === 'loading') document.body.dataset.state = 'ready'; theme(); post({ type: 'agentui:chat', canReply: true }); }
+    else if (m.type === 'agentui:error') { document.body.dataset.state = 'error'; if (errors.length < 10) errors.push(String(m.message || '')); show(errBox, errors, 'widget error: '); }
+    else if (m.type === 'agentui:resize' && typeof m.height === 'number' && !fs) frame.style.height = Math.max(40, Math.min(m.height, 4000)) + 'px';
+    else if (m.type === 'agentui:fullscreen') {
+      var on = m.on === true;
+      fs = on; stage.className = on ? 'fs' : '';
+      if (typeof m.id === 'string') w.postMessage({ type: 'agentui:fullscreen.result', id: m.id, ok: true }, '*');
+      post({ type: 'agentui:fullscreen.state', on: on });
+    }
+    else if (m.type === 'agentui:reply' && typeof m.id === 'string') {
+      if (replies.length < 20) replies.push(String(m.text || '').slice(0, 500));
+      show(replyBox, replies, 'reply(): ');
+      w.postMessage({ type: 'agentui:reply.result', id: m.id, ok: true }, '*');
+    }
+    else if (m.type === 'agentui:open') { replies.push('openUrl(): ' + String(m.url || '').slice(0, 500)); show(replyBox, replies, ''); }
+    else if (m.type === 'agentui:fetch' && typeof m.id === 'string') w.postMessage({ type: 'agentui:fetch.result', id: m.id, status: 404, body: { error: 'This widget has no backend.' } }, '*');
+    else if (m.type === 'agentui:media' && typeof m.id === 'string') w.postMessage({ type: 'agentui:media.result', id: m.id, ok: false }, '*'); // media of a widget are the chat's attachments: none here
+  });
+})();
+</script></body></html>`;
+}

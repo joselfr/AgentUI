@@ -9,7 +9,7 @@ import { AppError, type MiniAppStore } from './store.js';
 import { WidgetStore } from './widgets.js';
 import type { AttachmentStore } from '../attachments.js';
 import { serveStoredFile } from '../serve-file.js';
-import { previewHtml, verifyPreviewToken } from './preview.js';
+import { previewHtml, verifyPreviewToken, widgetHashOfPreview, widgetPreviewHtml } from './preview.js';
 
 const PUBLIC_RATE_PER_MIN = 120;
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -155,33 +155,40 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
   });
 
   // ---------- Preview for the agent's browser (`agentui_miniapp_open`): the link is the credential, one miniapp, short-lived ----------
-  /** The miniapp and the user of a preview link, or the error already sent. */
+  /** The miniapp (or the custom widget) and the user of a preview link, or the error already sent. */
   const previewOf = (req: FastifyRequest<{ Params: { id: string; token: string } }>, reply: FastifyReply) => {
     const { id, token } = req.params;
     const uid = verifyPreviewToken(secret, id, token);
     const user = uid === undefined ? null : o.userById(uid);
     if (!user) return void reply.code(403).send({ error: 'forbidden' });
+    const hash = widgetHashOfPreview(id);
+    if (hash) return widgets.file(hash) ? { widget: hash, a: undefined, user } : void reply.code(404).send({ error: 'not found' });
     const a = store.get(id);
     if (!a) return void reply.code(404).send({ error: 'not found' });
-    return { a, user };
+    return { widget: undefined, a, user };
   };
-  app.get<{ Params: { id: string; token: string } }>('/preview/:id/:token', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
+  const previewHeaders = (reply: FastifyReply, nonce: string) => reply
+    .header('Content-Type', 'text/html; charset=utf-8')
+    .header('Cache-Control', 'no-store')
+    .header('Referrer-Policy', 'no-referrer')
+    .header('X-Robots-Tag', 'noindex')
+    .header('X-Content-Type-Options', 'nosniff')
+    .header('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'`);
+  app.get<{ Params: { id: string; token: string }; Querystring: { w?: string } }>('/preview/:id/:token', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
     const p = previewOf(req, reply);
     if (!p) return;
     const nonce = randomBytes(16).toString('base64');
-    return reply
-      .header('Content-Type', 'text/html; charset=utf-8')
-      .header('Cache-Control', 'no-store')
-      .header('Referrer-Policy', 'no-referrer')
-      .header('X-Robots-Tag', 'noindex')
-      .header('X-Content-Type-Options', 'nosniff')
-      .header('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'`)
-      .send(previewHtml({ appId: p.a.id, name: p.a.name, frameSrc: `/m/${p.a.id}/${signAppToken(secret, p.user.id, p.a.id)}/`, nonce, version: p.a.version, seq: store.dataSeq(p.a.id) }));
+    if (p.widget) {
+      const frameSrc = `/w/${p.widget}/${signAppToken(secret, p.user.id, `widget-${p.widget}`)}/`;
+      return previewHeaders(reply, nonce).send(widgetPreviewHtml({ hash: p.widget, frameSrc, nonce, width: Number(req.query.w) }));
+    }
+    return previewHeaders(reply, nonce)
+      .send(previewHtml({ appId: p.a!.id, name: p.a!.name, frameSrc: `/m/${p.a!.id}/${signAppToken(secret, p.user.id, p.a!.id)}/`, nonce, version: p.a!.version, seq: store.dataSeq(p.a!.id) }));
   });
   /** Version and data counter: the page reloads on a new version and tells the app to refetch on new data. */
   app.get<{ Params: { id: string; token: string } }>('/preview/:id/:token/state', { config: { rateLimit: FILE_RATE_LIMIT } }, async (req, reply) => {
     const p = previewOf(req, reply);
-    return p ? reply.header('Cache-Control', 'no-store').send({ version: p.a.version, seq: store.dataSeq(p.a.id) }) : undefined;
+    return p?.a ? reply.header('Cache-Control', 'no-store').send({ version: p.a.version, seq: store.dataSeq(p.a.id) }) : p ? reply.code(404).send({ error: 'not found' }) : undefined;
   });
   app.route<{ Params: { id: string; token: string; '*': string } }>({
     method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -189,7 +196,7 @@ export function registerMiniApps(app: FastifyInstance, o: MiniAppRoutesOpts): vo
     config: { rateLimit: FILE_RATE_LIMIT },
     handler: async (req, reply) => {
       const p = previewOf(req, reply);
-      return p ? callHandler(req, reply, p.a.id, req.params['*'], p.user) : undefined;
+      return p?.a ? callHandler(req, reply, p.a.id, req.params['*'], p.user) : p ? reply.code(404).send({ error: 'not found' }) : undefined;
     },
   });
 
