@@ -87,6 +87,8 @@ export async function generateTitle(
     temperature: 0.2,
     abortSignal: AbortSignal.timeout(timeoutMs),
     maxRetries: 1,
+    // DeepSeek thinks by default: the whole token budget would go to its reasoning and the title would come back empty. Other providers ignore this key.
+    providerOptions: { deepseek: { thinking: { type: 'disabled' } } },
   });
   return cleanTitle(text);
 }

@@ -51,6 +51,7 @@ describe('generateTitle', () => {
     expect(arg.prompt).toContain('Voici le plateau');
     expect(arg.system).toContain('Write the title in French');
     expect(arg.abortSignal).toBeInstanceOf(AbortSignal);
+    expect(arg.providerOptions.deepseek.thinking.type).toBe('disabled'); // else DeepSeek spends the budget thinking
   });
   it('lets a provider error through', async () => {
     const run = (async () => { throw new Error('401'); }) as unknown as typeof generateText;
