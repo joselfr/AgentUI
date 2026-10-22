@@ -109,6 +109,7 @@ The miniapp must look native. **Use the components above and the CSS variables; 
 - No external resources in the front (images, fonts, scripts, CDN, direct `fetch` to the internet): the iframe is sandboxed and its CSP blocks them. For photos, videos and audio use the media files you add with `agentui_miniapp_asset` (see *Media* below); otherwise inline SVG or `data:` URLs; fetch external data through `ctx.fetch` in a handler. For live data, refresh with `setInterval` + `api.get(...)` or `useApi`.
 - External links: `window.open` and `target="_blank"` are blocked by the sandbox, so use `openUrl(url)` from `@agentui/ui` (or a plain `<a href="https://…">`, which is routed through it). The host opens it in a new tab; only `http(s):`, `mailto:` and `tel:` are accepted. Call it from a user action (click).
 - No `localStorage`/cookies (opaque origin): persist through the handlers (`ctx.db` / `ctx.kv`).
+- Query params: a link `/miniapps/<id>?tab=stats&id=42` (or the preview link with the same `?…`) is forwarded to the app, which reads it with `useQuery()` from `@agentui/ui` (a `URLSearchParams`: `useQuery().get('tab')`), or `location.search`. Changing the params reloads the app. They are not secret (they appear in the URL); keep them to view state (tab, filter, record id).
 
 ### Mobile first
 

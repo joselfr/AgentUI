@@ -62,7 +62,7 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:transpa
   }
   dark.addEventListener('change', theme);
   frame.addEventListener('load', theme);
-  frame.src = cfg.frameSrc;
+  frame.src = cfg.frameSrc + location.search; // ?a=b on the preview link reaches the app (its location.search)
 
   function safePath(p) {
     return typeof p === 'string' && !p.split('?')[0].split('/').some(function (s) { return s === '..' || s === '.'; }) && !/^[a-z]+:/i.test(p) && p.indexOf('//') !== 0 ? p.replace(/^\\/+/, '') : undefined;

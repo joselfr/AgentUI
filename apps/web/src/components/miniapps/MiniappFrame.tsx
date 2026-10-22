@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, CircularProgress } from '@mui/material';
+import { useLocation } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import { themeCssVars, type MiniApp } from '@agentui/shared';
 import { api } from '../../api';
@@ -23,6 +24,8 @@ const safeUrl = (u: unknown): string | undefined => {
  */
 export default function MiniappFrame({ app, dataKey = 0 }: { app: MiniApp; dataKey?: number }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  // `/miniapps/<id>?a=b` is forwarded as-is: the app reads it from its own `location.search`.
+  const { search } = useLocation();
   const muiTheme = useTheme();
   const lang = useLang() && getLang();
   const mode = muiTheme.palette.mode;
@@ -90,7 +93,7 @@ export default function MiniappFrame({ app, dataKey = 0 }: { app: MiniApp; dataK
       {err && <Alert severity="warning" sx={{ m: 2 }}>{err}</Alert>}
       {!ready && !err && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}><CircularProgress size={24} /></Box>}
       {base && (
-        <iframe ref={frame} key={`${app.id}-${app.version}`} title={app.name} src={base} sandbox="allow-scripts" onLoad={postTheme}
+        <iframe ref={frame} key={`${app.id}-${app.version}-${search}`} title={app.name} src={base + search} sandbox="allow-scripts" onLoad={postTheme}
           style={{ flex: 1, width: '100%', border: 0, background: 'transparent', colorScheme: mode }} />)}
       {appError && <Alert severity="error" onClose={() => setAppError('')} sx={{ position: 'absolute', left: 8, right: 8, bottom: 8, whiteSpace: 'pre-wrap', maxHeight: '40%', overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>{t('miniapps.error')}: {appError}</Alert>}
     </Box>

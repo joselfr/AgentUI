@@ -1,5 +1,5 @@
 /** Link with the AgentUI host (parent window): theme, language and authenticated requests to the app backend. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export type Mode = 'light' | 'dark';
 export interface HostTheme { mode: Mode; lang: string; vars: Record<string, string> }
@@ -273,6 +273,11 @@ export const onDataChange = (f: () => void) => { dataSubs.add(f); return () => {
 export const useLang = (): string => useTheme().lang;
 export const getTheme = () => theme;
 export const onTheme = (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; };
+
+/** Query params of the link that opened the miniapp (`/miniapps/<id>?tab=stats`). Fixed for the life of the page: the host reloads the app when they change. */
+export function useQuery(): URLSearchParams {
+  return useMemo(() => new URLSearchParams(window.location.search), []);
+}
 
 /** Loads `path` from the backend; `reload()` refetches. */
 export function useApi<T = any>(path: string | null, deps: unknown[] = []) {
