@@ -8,9 +8,11 @@ import { miniappOp, notifyUser, askUser, emitMedia, setThreadTitle, getThreadTit
 import { FILE_KINDS, assetName, fileWidgetError, imagesError, readLocalImage, readLocalMedia, readLocalVisual, type FileKind } from './images.js';
 
 export const MINIAPP_TOOL_PREFIX = `${spec.prefix}miniapp_`;
+/** Name of a miniapp operation's tool: `agentui_miniapp_<op>`, unless the spec names it (`tool`, e.g. `agentui_widget_custom_preview`). */
+const miniappToolName = (op: string, t: object) => ('tool' in t && typeof t.tool === 'string' ? t.tool : MINIAPP_TOOL_PREFIX + op);
 /** Prefix of a tool: `agentui_widget_` for the widgets (and what belongs to a widget, like its live session), `agentui_` for the interactions (ask, confirm, form). */
 const toolPrefix = (t: object) => ('widget' in t && t.widget ? spec.widgetPrefix : spec.prefix);
-export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools).map((k) => spec.widgetPrefix + k), ...Object.entries(spec.blockingTools).map(([k, t]) => toolPrefix(t) + k)].concat(Object.keys(spec.miniappTools).map((k) => MINIAPP_TOOL_PREFIX + k), Object.keys(spec.notifyTool).map((k) => spec.prefix + k), Object.keys(spec.titleTool).map((k) => spec.prefix + k));
+export const WIDGET_TOOL_NAMES = [...Object.keys(spec.tools).map((k) => spec.widgetPrefix + k), ...Object.entries(spec.blockingTools).map(([k, t]) => toolPrefix(t) + k)].concat(Object.entries(spec.miniappTools).map(([k, t]) => miniappToolName(k, t)), Object.keys(spec.notifyTool).map((k) => spec.prefix + k), Object.keys(spec.titleTool).map((k) => spec.prefix + k));
 
 type Args = Record<string, any>;
 
@@ -145,8 +147,8 @@ export function registerWidgetTools(api: OpenClawPluginApi): void {
     }));
     // Miniapps: files are built and stored on the AgentUI server; the result (or the build errors) comes back to the model.
     const miniapps = Object.entries(spec.miniappTools).map(([op, tool]) => ({
-      name: MINIAPP_TOOL_PREFIX + op,
-      label: MINIAPP_TOOL_PREFIX + op,
+      name: miniappToolName(op, tool),
+      label: miniappToolName(op, tool),
       description: tool.description,
       parameters: tool.parameters as any,
       async execute(_id: string, args: Args) {

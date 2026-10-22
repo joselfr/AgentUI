@@ -1617,6 +1617,8 @@ def _register_widget_tools(ctx) -> None:
     for kind, handlers in (("tools", make_handler), ("blockingTools", make_blocking_handler), ("miniappTools", None), ("notifyTool", make_notify_handler), ("titleTool", make_title_handler)):
         for key, tool in spec.get(kind, {}).items():
             name = (spec["widgetPrefix"] if kind == "tools" or (kind == "blockingTools" and tool.get("widget")) else spec["prefix"]) + ("miniapp_" if kind == "miniappTools" else "") + key
+            if kind == "miniappTools" and tool.get("tool"):
+                name = tool["tool"]  # a miniapp operation exposed under its own name (agentui_widget_custom_preview)
             ctx.register_tool(
                 name=name,
                 toolset="agentui",

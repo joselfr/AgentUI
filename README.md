@@ -132,7 +132,7 @@ Then open AgentUI, sign in, start a conversation and ask for a chart. The agent 
 | `TITLE_API_KEY` | API key for the titles (default: the provider's usual variable: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`). |
 | `TITLE_BASE_URL` | Optional other endpoint (an OpenAI-compatible server, a proxy). |
 | `TITLE_LANGUAGE` | Optional language of the titles (`French`…). Default: the language of your message. |
-| `PUBLIC_URL` | Optional, public address of AgentUI (`https://agentui.example.com`): the base of the temporary links that let an agent open a miniapp in its own browser (`agentui_miniapp_open`, `agentui_miniapp_widget_open`). Without it the link is relative. |
+| `PUBLIC_URL` | Optional, public address of AgentUI (`https://agentui.example.com`): the base of the temporary links that let an agent open a miniapp in its own browser (`agentui_miniapp_open`, `agentui_widget_custom_preview`). Without it the link is relative. |
 | `MINIAPP_FS_ROOTS` | Optional, colon-separated absolute folders that miniapps may ask to read (you approve each one in the UI). |
 
 ## Going further
