@@ -7,6 +7,8 @@ import { themeCssVars, type WidgetEvent } from '@agentui/shared';
 import { api } from '../api';
 import { getLang, t, useLang } from '../i18n';
 import type { Resolved } from './ImageCard';
+import { cachedBase, markWarm, rememberBase } from './widgetCache';
+import { offlineDocument, warmWidget } from './widgetOffline';
 import { answerMedia, type MediaRequest } from './widgetMedia';
 
 interface Ui { code: string; title?: string; maxHeight: number; state?: unknown; token?: string; media?: string[] }
@@ -73,6 +75,7 @@ export default function UiCard({ ui, onReply, resolve }: { ui: Ui; onReply?: (te
   const lang = useLang() && getLang();
   const mode = muiTheme.palette.mode;
   const [base, setBase] = useState<string>();
+  const [srcDoc, setSrcDoc] = useState<string>(); // offline: the widget's document built from the cache, instead of the server's URL
   baseRef.current = base;
   const [errors, setErrors] = useState<string[]>([]);
   const [runtimeErrors, setRuntimeErrors] = useState<string[]>([]);
@@ -103,12 +106,21 @@ export default function UiCard({ ui, onReply, resolve }: { ui: Ui; onReply?: (te
 
   useEffect(() => {
     let live = true;
-    setBase(undefined); setReady(false); setErrors([]); setRuntimeErrors([]); setSent(false);
+    setBase(undefined); setSrcDoc(undefined); setReady(false); setErrors([]); setRuntimeErrors([]); setSent(false);
     api.buildWidget(ui.code).then((r) => {
       if (!live) return;
-      if (r.ok) setBase(r.base);
+      if (r.ok) {
+        setBase(r.base);
+        if (rememberBase(ui.code, r.base)) warmWidget(r.base).then(() => markWarm(ui.code), () => {}); // kept for a week, to open it offline
+      }
       else setErrors(r.errors.map((e) => (e.line ? `${e.line}:${e.column ?? 0} ` : '') + e.message));
-    }).catch((e) => live && setErrors([(e as Error).message]));
+    }).catch((e) => {
+      if (!live) return;
+      // Server unreachable: the widget's files are in the service worker's cache (a week), reopen it from there.
+      const known = cachedBase(ui.code);
+      if (!known) return setErrors([(e as Error).message]);
+      offlineDocument(known).then((d) => live && setSrcDoc(d), () => live && setErrors([(e as Error).message]));
+    });
     return () => { live = false; };
   }, [ui.code]);
 
@@ -199,7 +211,7 @@ export default function UiCard({ ui, onReply, resolve }: { ui: Ui; onReply?: (te
       <Box ref={wrap} role={fs ? 'dialog' : undefined} aria-modal={fs || undefined} aria-label={fs ? (ui.title ?? t('ui.title')) : undefined}
         sx={fs ? { position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'background.default' } : { position: 'relative', minHeight: ready ? 0 : 96 }}>
         {!ready && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}><CircularProgress size={20} /></Box>}
-        {base && <iframe ref={frame} title={ui.title ?? t('ui.title')} src={base} sandbox="allow-scripts" onLoad={() => { postTheme(); postChat(); postState(); }}
+        {(base || srcDoc) && <iframe ref={frame} title={ui.title ?? t('ui.title')} {...(srcDoc ? { srcDoc } : { src: base })} sandbox="allow-scripts" onLoad={() => { postTheme(); postChat(); postState(); }}
           style={{ display: 'block', width: '100%', height: fs ? '100%' : height, border: 0, background: 'transparent', colorScheme: mode, visibility: ready ? 'visible' : 'hidden' }} />}
         {fs && (
           <IconButton onClick={leaveFs} aria-label={t('ui.exitFullscreen')} title={t('ui.exitFullscreen')}
