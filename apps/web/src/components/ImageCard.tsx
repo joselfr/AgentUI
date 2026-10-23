@@ -76,22 +76,31 @@ export function Lightbox({ gallery, resolve, index, onIndex, onClose }: { galler
   useEffect(() => zoom.reset, [index]); // eslint-disable-line react-hooks/exhaustive-deps
   const url = r.state === 'ok' ? r.url : undefined;
   const btn = { color: '#fff', bgcolor: 'rgba(255,255,255,.12)', '&:hover': { bgcolor: 'rgba(255,255,255,.2)' }, borderRadius: '8px', fontSize: 13, px: 1.25 } as const;
+  const action = { ...btn, flex: 1, py: 1.5, fontSize: 14, bgcolor: 'rgba(255,255,255,.16)' } as const;
+  const remote = isRemote(img.src);
   return (
-    <Dialog open onClose={onClose} fullScreen PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,.92)', backgroundImage: 'none', color: '#fff', display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) auto', height: 'var(--app-height, 100dvh)', maxHeight: 'var(--app-height, 100dvh)', overflow: 'hidden', border: 0, pt: 'env(safe-area-inset-top)', pb: 'env(safe-area-inset-bottom)', pl: 'env(safe-area-inset-left)', pr: 'env(safe-area-inset-right)' } }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.5, flexShrink: 0 }}>
-        <Typography sx={{ flex: 1, fontSize: 13, minWidth: 0 }} noWrap>{n > 1 ? `${index + 1} / ${n}` : ''}{n > 1 && img.caption ? ' — ' : ''}{img.caption}</Typography>
-        {isRemote(img.src) && <IconButton component="a" href={img.src} target="_blank" rel="noreferrer noopener" sx={btn}>{t('image.open')}</IconButton>}
-        {url && <IconButton component="a" href={url} download sx={btn}>{t('image.download')}</IconButton>}
-        <IconButton onClick={onClose} aria-label={t('common.close')} sx={btn}>✕</IconButton>
+    <Dialog open onClose={onClose} fullScreen PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,.92)', backgroundImage: 'none', color: '#fff', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'auto minmax(0, 1fr) auto', height: 'var(--app-height, 100dvh)', maxHeight: 'var(--app-height, 100dvh)', overflow: 'hidden', border: 0, pt: 'env(safe-area-inset-top)', pb: 'env(safe-area-inset-bottom)', pl: 'env(safe-area-inset-left)', pr: 'env(safe-area-inset-right)' } }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '40px 1fr 40px', alignItems: 'center', gap: 1.25, px: 1.5, py: 1.25 }}>
+        <IconButton onClick={onClose} aria-label={t('common.close')} sx={{ ...btn, width: 40, height: 40, borderRadius: '50%', fontSize: 16 }}>✕</IconButton>
+        <Typography sx={{ textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{n > 1 ? `${index + 1} / ${n}` : ''}</Typography>
+        <span />
       </Box>
-      <Box sx={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: 0, overflow: 'hidden', p: 1, touchAction: 'none' }} {...zoom.handlers}>
+      <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)', placeItems: 'center', minHeight: 0, overflow: 'hidden', p: 1, touchAction: 'none' }} {...zoom.handlers}>
         {url ? <img src={url} alt={img.alt ?? img.caption ?? ''} referrerPolicy="no-referrer" draggable={false} style={{ width: '100%', height: '100%', minHeight: 0, objectFit: 'contain', transform: zoom.transform, willChange: zoom.zoomed ? 'transform' : undefined, userSelect: 'none' }} /> : <Typography color="inherit" sx={{ opacity: 0.7 }}>{t('image.unavailable')}</Typography>}
         {n > 1 && !zoom.zoomed && (<>
           <IconButton onClick={() => go(-1)} aria-label={t('image.previous')} sx={{ ...btn, position: 'absolute', left: 8, top: '50%', fontSize: 22 }}>‹</IconButton>
           <IconButton onClick={() => go(1)} aria-label={t('image.next')} sx={{ ...btn, position: 'absolute', right: 8, top: '50%', fontSize: 22 }}>›</IconButton>
         </>)}
       </Box>
-      <Typography sx={{ textAlign: 'center', px: 1.5, py: 1, fontSize: 13, minHeight: 24, overflowWrap: 'anywhere', maxHeight: '20dvh', overflowY: 'auto' }}>{img.caption}</Typography>
+      <Box>
+        {img.caption && <Typography sx={{ px: 2, pt: 1.5, fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere', maxHeight: '15dvh', overflowY: 'auto' }}>{img.caption}</Typography>}
+        {(remote || url) && (
+          <Box sx={{ display: 'flex', gap: 1.25, px: 2, pt: 1.5, pb: 2 }}>
+            {remote && <IconButton component="a" href={img.src} target="_blank" rel="noreferrer noopener" sx={action}>{t('image.open')}</IconButton>}
+            {url && <IconButton component="a" href={url} download sx={action}>{t('image.download')}</IconButton>}
+          </Box>
+        )}
+      </Box>
     </Dialog>
   );
 }
