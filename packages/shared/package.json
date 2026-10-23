@@ -7,6 +7,6 @@
   "types": "dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "scripts": { "build": "tsc -p .", "typecheck": "tsc -p . --noEmit" },
-  "dependencies": { "zod": "^3.23.8" },
+  "dependencies": { "zod": "^4.6.7" },
   "devDependencies": { "typescript": "^5.6.3" }
 }
