@@ -75,6 +75,7 @@ const themed = async (ctx, theme) => { await ctx.addInitScript((t) => localStora
   for (const s of SCENARIOS) {
     await page.getByRole('button', { name: TEXT.newChat, exact: true }).click();
     await page.getByRole('button', { name: TEXT.start }).click({ timeout: 3000 }).catch(() => {}); // agent choice
+    await page.waitForTimeout(800); // the new empty chat must be shown before typing, or the message goes to the previous chat
     const box = page.getByPlaceholder(TEXT.composer(AGENT));
     await box.fill(s.prompt);
     await box.press('Enter');
