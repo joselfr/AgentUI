@@ -75,7 +75,7 @@ export default function TableCard({ table: t }: { table: Table }) {
     <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.default', minWidth: 0 }}>
       {t.title && <Typography sx={{ fontWeight: 600 }}>{t.title}</Typography>}
       {t.caption && <Typography variant="caption" color="text.secondary">{t.caption}</Typography>}
-      <Box sx={{ mt: 1, overflow: 'auto', maxWidth: '100%', maxHeight: open ? 320 : undefined, border: 1, borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper' }}>
+      <Box sx={{ mt: 1, overflow: 'auto', maxWidth: '100%', border: 1, borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
           <thead>
             <tr>

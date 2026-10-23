@@ -315,7 +315,7 @@
           },
           "height": {
             "type": "integer",
-            "description": "Maximum height in px before the widget scrolls inside the chat (default 2400, max 4000): leave it unset, the widget is sized to its content."
+            "description": "Ignored: the widget is always sized to its content and never scrolls inside the chat. Leave it unset."
           },
           "update": {
             "type": "string",

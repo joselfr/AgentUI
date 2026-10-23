@@ -14,14 +14,13 @@ interface Ui { code: string; title?: string; maxHeight: number; state?: unknown;
 const MIN_HEIGHT = 40;
 const MAX_HEIGHT = 4000;
 
-/** Arguments of the `ui` widget: `{ code, title?, height?, state? }` (`state`: latest value pushed by the agent). `code` is a TSX module that default-exports a React component. `undefined` if invalid. */
+/** Arguments of the `ui` widget: `{ code, title?, state? }` (`state`: latest value pushed by the agent). The widget is always sized to its content, so a `height` sent by the agent is ignored: it would make the widget scroll inside the chat. `code` is a TSX module that default-exports a React component. `undefined` if invalid. */
 export function parseUi(a: Record<string, unknown>): Ui | undefined {
   if (typeof a.code !== 'string' || !a.code.trim()) return undefined;
-  const h = a.height;
   return {
     code: a.code,
     title: typeof a.title === 'string' && a.title.trim() ? a.title.trim() : undefined,
-    maxHeight: typeof h === 'number' && isFinite(h) ? Math.min(Math.max(h, 120), MAX_HEIGHT) : 2400,
+    maxHeight: MAX_HEIGHT,
     state: a.state,
     token: typeof a.token === 'string' ? a.token : undefined,
     media: Array.isArray(a.media) ? a.media.filter((x): x is string => typeof x === 'string' && x.startsWith('/')) : undefined,
