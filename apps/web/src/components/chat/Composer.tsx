@@ -31,7 +31,7 @@ export default function Composer({ agentName, running, awaiting, canAbort, attac
     if (!(await onSubmit(t.trim(), f))) { setText(t); attachments.restore(f); } // failure: keep the draft
   };
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 'max(12px, env(safe-area-inset-bottom))', pt: 0.5 }}>
+    <Box sx={{ px: { xs: 1.75, sm: 3 }, pb: 'max(12px, env(safe-area-inset-bottom))', pt: 0.5 }}>
       <Paper sx={{ maxWidth: 860, mx: 'auto', borderRadius: 1.5, bgcolor: 'background.paper', '&:focus-within': { borderColor: 'primary.main' }, transition: 'border-color .15s' }}>
         {quote && (
           <Box data-testid="composer-quote" sx={{ mx: 1, mt: 1, pl: 1, pr: 0.5, py: 0.5, display: 'flex', alignItems: 'center', gap: 1, borderLeft: 3, borderColor: 'primary.main', borderRadius: 0.5, bgcolor: 'action.hover' }}>

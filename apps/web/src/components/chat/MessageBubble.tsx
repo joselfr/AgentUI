@@ -230,14 +230,21 @@ export default function MessageBubble({ m, expandTools, agentName, answers = [],
     },
   }), []);
   return (
-    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 1.5, mb: 2 }}>
-      {!mine && <Avatar sx={{ width: 30, height: 30, fontSize: 14, fontWeight: 700, mt: 0.25, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
-        '--halo': (t) => alpha(t.palette.primary.main, 0.5), animation: working ? `${halo} 1.6s infinite` : 'none' }}>{agentName[0]}</Avatar>}
+    <Box sx={{ display: mine ? 'flex' : 'block', justifyContent: 'flex-end', mb: 2 }}>
+      {/* The agent has no bubble (full width, mostly on a phone): its avatar and name head the message */}
+      {!mine && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <Avatar sx={{ width: 22, height: 22, fontSize: 11, fontWeight: 700, bgcolor: (t) => alpha(t.palette.primary.main, 0.16), color: 'primary.main',
+            '--halo': (t) => alpha(t.palette.primary.main, 0.5), animation: working ? `${halo} 1.6s infinite` : 'none' }}>{agentName[0]}</Avatar>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{agentName}</Typography>
+        </Box>)}
       <Paper data-role={m.role} data-bubble="" data-mid={m.id} onContextMenu={onContextMenu} {...press} sx={{
         ...(touch && !selectable ? { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } : {}),
         position: 'relative', '&:hover .bubble-more, &:focus-within .bubble-more': { opacity: 1 },
-        maxWidth: mine ? 'min(640px, 88%)' : 'min(760px, calc(100% - 44px))', px: 2, py: 1.25, borderRadius: mine ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
-        bgcolor: mine ? (t) => alpha(t.palette.primary.main, 0.14) : 'background.paper', borderColor: mine ? (t) => alpha(t.palette.primary.main, 0.4) : 'divider', color: 'text.primary',
+        ...(mine
+          ? { maxWidth: 'min(640px, 88%)', px: 2, py: 1.25, borderRadius: '16px 16px 4px 16px', bgcolor: (t) => alpha(t.palette.primary.main, 0.14), borderColor: (t) => alpha(t.palette.primary.main, 0.4) }
+          : { maxWidth: '100%', p: 0, borderRadius: 0, bgcolor: 'transparent', border: 0 }),
+        color: 'text.primary',
         '& pre': { overflow: 'auto', p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: 1, borderColor: 'divider', fontSize: 13 },
         '& code': { fontSize: '0.88em' }, '& :not(pre) > code': { px: 0.6, py: 0.15, borderRadius: 1, bgcolor: 'action.selected' },
         '& p': { my: 0.5 }, '& a': { color: 'primary.main' }, '& table': { borderCollapse: 'collapse', display: 'block', maxWidth: '100%', overflowX: 'auto' }, '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5, verticalAlign: 'top' },

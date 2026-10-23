@@ -48,7 +48,7 @@ export default function Chat(props: {
         <Box sx={{ position: 'absolute', inset: 8, zIndex: 10, border: 2, borderStyle: 'dashed', borderColor: 'primary.main', borderRadius: 4, bgcolor: (t) => alpha(t.palette.primary.main, 0.08), display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
           <Typography variant="h6" color="primary">{t('chat.drop')}</Typography>
         </Box>)}
-      <Box ref={scroll.scroller} onScroll={scroll.onScroll} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', p: { xs: 1.5, sm: 3 } }}>
+      <Box ref={scroll.scroller} onScroll={scroll.onScroll} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', p: { xs: 1.75, sm: 3 } }}>
         <Box ref={scroll.content} sx={{ maxWidth: 860, mx: 'auto', minWidth: 0 }}>
           {props.messages.length === 0 && props.loading && <Box sx={{ display: 'grid', placeItems: 'center', mt: 8 }}><CircularProgress size={28} /></Box>}
           {props.messages.length === 0 && props.isNew && (
