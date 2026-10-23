@@ -48,7 +48,12 @@ export default function Chat(props: {
         <Box sx={{ position: 'absolute', inset: 8, zIndex: 10, border: 2, borderStyle: 'dashed', borderColor: 'primary.main', borderRadius: 4, bgcolor: (t) => alpha(t.palette.primary.main, 0.08), display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
           <Typography variant="h6" color="primary">{t('chat.drop')}</Typography>
         </Box>)}
-      <Box ref={scroll.scroller} onScroll={scroll.onScroll} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', p: { xs: 1.75, sm: 3 } }}>
+      {/* The messages fade out above the composer instead of being cut off by a hard edge. A gradient band over the scroller (not a mask, which would also clip a
+          widget in full screen): the bottom padding is as tall as the band, so the last line stays fully visible once scrolled down */}
+      <Box sx={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column',
+        '&::after': { content: '""', position: 'absolute', left: 0, right: 0, bottom: 0, height: 24, pointerEvents: 'none',
+          background: (t) => `linear-gradient(to bottom, ${alpha(t.palette.background.default, 0)}, ${t.palette.background.default})` } }}>
+      <Box ref={scroll.scroller} onScroll={scroll.onScroll} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', p: { xs: 1.75, sm: 3 }, pb: 3 }}>
         <Box ref={scroll.content} sx={{ maxWidth: 860, mx: 'auto', minWidth: 0 }}>
           {props.messages.length === 0 && props.loading && <Box sx={{ display: 'grid', placeItems: 'center', mt: 8 }}><CircularProgress size={28} /></Box>}
           {props.messages.length === 0 && props.isNew && (
@@ -75,6 +80,7 @@ export default function Chat(props: {
               </Fragment>);
           })}
         </Box>
+      </Box>
       </Box>
       {props.approval && (
         <Alert severity="warning" variant="outlined" sx={alertSx} action={<>
